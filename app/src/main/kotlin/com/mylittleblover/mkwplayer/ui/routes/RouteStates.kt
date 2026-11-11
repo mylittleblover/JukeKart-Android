@@ -351,7 +351,7 @@ internal fun canAdd(editor: RouteEditor, stop: RouteStop): String? =
 private const val UNPLACED_FRACTION = 0.5f
 
 /** Label for a stop whose identity may not be shown. Says that it cannot be used, not why. */
-private const val NOT_AVAILABLE_LABEL = "Not available"
+internal const val NOT_AVAILABLE_LABEL = "Not available"
 
 /** Follows [lockedProblem] on a saved route; says the route will not play as saved. */
 private const val SAVED_ROUTE_BLOCKED_SUFFIX = "This saved route cannot be played as saved."
@@ -368,7 +368,7 @@ private fun fractionOf(value: Double, min: Double, max: Double): Float {
  * Reuses [CupVisibility.hiddenReason] so the map, the routes and every other surface say the same
  * thing, and never names the cup.
  */
-private fun lockedProblem(unlock: UnlockUi?): String =
+internal fun lockedProblem(unlock: UnlockUi?): String =
     CupVisibility.hiddenReason(unlock) ?: NOT_AVAILABLE_LABEL
 
 /**

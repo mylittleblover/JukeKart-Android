@@ -20,7 +20,8 @@ import com.mylittleblover.mkwplayer.routes.RouteStop
 import com.mylittleblover.mkwplayer.routes.SavedRoute
 import com.mylittleblover.mkwplayer.routes.StageId
 import com.mylittleblover.mkwplayer.ui.Tokens
-import com.mylittleblover.mkwplayer.ui.UnlockUi
+import com.mylittleblover.mkwplayer.player.UnlockUi
+import com.mylittleblover.mkwplayer.ui.CupVisibility
 
 /**
  * The route editor, with the stop list it edits and the stages it can add.
