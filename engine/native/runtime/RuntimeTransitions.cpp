@@ -364,7 +364,7 @@ void EngineRuntime::tickTransition() noexcept {
         if(run.bridge) run.bridge->preentry=false;
     }
     if(now>=run.destinationEntry && !run.destinationCommitted) {
-        if(run.bridge) { for(auto& voice:voices_.slots())if(voice.active && voice.instance==run.bridge->instance)voice.releaseClipLoop(); run.bridge->active=false; lastPositions_[run.bridge->segment->index]=Tempo::roundedFrame(run.bridge->position); }
+        if(run.bridge) { for(auto& voice:voices_.slots())if(voice.active && voice.instance==run.bridge->instance)voice.releaseClipLoop(); if(!run.rule->timeline || !run.rule->postExit)run.bridge->active=false; lastPositions_[run.bridge->segment->index]=Tempo::roundedFrame(run.bridge->position); }
         run.destination->preentry=false; run.destination->controlled=true;
         foreground_=run.destination; current_=run.destination->object; preview_->commit(selections_,clock_.frame(),journal_->epoch); archivePlaylist(*run.destination);
         if(run.albumEdge && albumActive_)updateAlbumCurrent(true);
