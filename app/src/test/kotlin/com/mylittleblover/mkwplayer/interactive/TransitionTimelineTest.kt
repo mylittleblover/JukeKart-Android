@@ -15,6 +15,14 @@ class TransitionTimelineTest {
         assertEquals(6,ByteBuffer.wrap(G.build(spec(null))).getInt(4))
         assertEquals(14,ByteBuffer.wrap(G.build(spec(G.TransitionTimeline(-49921,-5624,1,0)))).getInt(4))
     }
+    @Test fun androidEnvelopeProbeAcceptsTheNativeTimelineVersion() {
+        val packet=G.build(spec(G.TransitionTimeline(-49921,-5624,1,0)))
+        assertTrue(com.mylittleblover.mkwplayer.graph.GraphProbe.inspect(packet) is com.mylittleblover.mkwplayer.graph.GraphProbe.Result.Ok)
+    }
+    @Test fun assetAndNodeIndicesMustHaveDifferentOwners() {
+        val original=spec(null)
+        assertFailsWith<IllegalArgumentException> { G.build(original.copy(assets=original.assets + G.Asset("b",48000,2,1000000,ByteArray(32)))) }
+    }
     @Test fun destinationCannotCommitBeforeItsAudioStarts() {
         assertFailsWith<IllegalArgumentException> { G.build(spec(G.TransitionTimeline(0,100,0,0))) }
     }

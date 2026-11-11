@@ -208,8 +208,12 @@ object MusicGraphBuilder {
         // Every index the reader sees must be inside the identities list, and no two nodes may
         // share an index. Identities are named so a rejection can point at one.
         val nodeIndices = spec.segments.map { it.index } + spec.tracks.map { it.index }
-        require(nodeIndices.toSet().size == nodeIndices.size) {
-            "node indices must be unique, got $nodeIndices"
+        val ownedIndices = spec.assets.indices.toList() + nodeIndices +
+            spec.transitions.map { it.index } + spec.segments.flatMap { s -> s.cues.map { it.index } } +
+            spec.tracks.flatMap { t -> t.clips.map { it.index } }
+        require(ownedIndices.all { it in 0 until 4096 }) { "identity index must be in 0..4095" }
+        require(ownedIndices.toSet().size == ownedIndices.size) {
+            "identity indices must be unique across assets, nodes, cues and clips: $ownedIndices"
         }
         val maxIndex = maxOf(
             nodeIndices.maxOrNull() ?: 0,

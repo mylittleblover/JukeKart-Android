@@ -71,7 +71,7 @@ object GraphProbe {
     }
 
     /** Versions the native reader accepts, from GraphProtocolIds.hpp. */
-    val SUPPORTED_VERSIONS: IntRange = 1..13
+    val SUPPORTED_VERSIONS: IntRange = 1..14
 
     private fun readU32(bytes: ByteArray, offset: Int): Long {
         var value = 0L

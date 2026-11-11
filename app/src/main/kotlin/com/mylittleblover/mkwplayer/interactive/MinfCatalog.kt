@@ -7,7 +7,7 @@ internal class MinfCatalog(val records: List<Record>) {
     data class Beat(val frame: Long, val label: Int)
     data class Event(val name: String, val frames: List<Long>)
     data class Record(
-        val stage: String, val role: String, val name: String,
+        val stage: String, val role: String, val name: String, val logicalName: String,
         val phase: Long, val rate: Int, val bpm: Double,
         val loopStart: Long, val loopEnd: Long,
         val archive: String, val offset: Long, val hash: String,
@@ -21,18 +21,13 @@ internal class MinfCatalog(val records: List<Record>) {
 
     /** No fuzzy name fallback or arbitrary selection among duplicate records. */
     fun part(stage: String, role: String): Record? {
-        val base = stage.substringBefore("_Pattern")
-        val pattern = stage.substringAfter("_Pattern", "")
-        val roles = when (role) {
-            "Pre" -> setOf("Pre", "Pre_2")
-            "Pre_Short" -> setOf("Pre_Short", "Pre_Short_2")
-            "Bridge" -> setOf("Bridge", "Bridge_Short_1")
-            else -> setOf(role)
+        val logical = if(stage=="Rainbow") "BGM_Rainbow_$role" else {
+            val suffix=if(role=="Full") "" else "_$role"
+            val pattern=Regex("_Pattern\\d+$").find(stage)?.value.orEmpty()
+            "BGM_Stage_${stage.removeSuffix(pattern)}$suffix$pattern"
         }
-        return records.filter { r ->
-            r.stage == base && r.role in roles &&
-                if (pattern.isEmpty()) !r.name.contains("_Pattern") else r.name.endsWith("_Pattern$pattern")
-        }.singleOrNull()
+        return records.singleOrNull { it.logicalName==logical }
+
     }
 
     companion object {
@@ -45,7 +40,7 @@ internal class MinfCatalog(val records: List<Record>) {
                 fun number(key: String) = r.getLong(key).also { require(it >= 0) }
                 val beats = r.getJSONArray("beats")
                 val events = r.getJSONArray("events")
-                Record(r.getString("stage"), r.getString("role"), r.getString("name"),
+                Record(r.getString("stage"), r.getString("role"), r.getString("name"), r.getString("logicalName"),
                     number("phase"), r.getInt("rate").also { require(it == 48000) },
                     r.getDouble("bpm").also { require(it.isFinite() && it > 0) },
                     number("loopStart"), number("loopEnd"), r.getString("archive"),

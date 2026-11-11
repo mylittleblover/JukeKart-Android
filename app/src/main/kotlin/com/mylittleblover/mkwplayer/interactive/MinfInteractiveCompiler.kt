@@ -6,13 +6,17 @@ import com.mylittleblover.mkwplayer.library.StageFlow
 
 /** Compiles original sample nodes. Unsupported/ambiguous research never falls back to guessed timing. */
 internal object MinfInteractiveCompiler {
-    data class Prepared(val spec: G.Spec, val compiled: StageFlowCompiler.Compiled)
+    data class Prepared(val spec: G.Spec, val compiled: StageFlowCompiler.Compiled, val entryBasis: String = "SOURCE_MINF_PHASE_CANDIDATE")
 
     fun prepare(flow: StageFlow, digests: Map<String, ByteArray>, catalog: MinfCatalog): Prepared {
         val stage=flow.name.removePrefix("BGM_Stage_")
         require(stage!="Rainbow") { "Rainbow requires its Area/Final graph" }
         val full=catalog.part(stage,"Full") ?: error("No unambiguous Full MINF for $stage")
+        val fromBridge=full.event("Full_FromBridge")?.singleOrNull()
         val skip=full.event("Full_SkipForBridge")?.singleOrNull()
+        require(fromBridge==null || skip==null || fromBridge==skip) { "Conflicting Full entry markers for $stage" }
+        // Zero is an explicit source entry too. It must not fall through to phase pre-entry.
+        val fullEntry=fromBridge ?: skip
         val ordered=flow.parts.filter { it.role!=StageFlow.Role.Outro }.sortedBy { it.role.ordinal } + flow.outros().sortedBy { it.outroNumber }
         val indices=ordered.mapIndexed { i,p -> p.fileName to (100+i) }.toMap()
         val byRole=ordered.filter { it.role!=StageFlow.Role.Outro }.associate { it.role to indices.getValue(it.fileName) }
@@ -23,8 +27,12 @@ internal object MinfInteractiveCompiler {
         val bridge=if(hasEntry) catalog.part(stage,"Bridge") else null
         val bridgePart=flow.part(StageFlow.Role.Bridge)
         require((bridge==null)==(bridgePart==null)) { "Bridge audio/MINF mismatch for $stage" }
-        val bridgeExit=bridge?.event("Bridge_ToFull")?.singleOrNull()
-        if(bridge!=null) require(bridgeExit!=null && bridgeExit>=0 && bridgeExit<bridgePart!!.frames) {
+        val sourceBridgeExit=bridge?.event("Bridge_ToFull")
+        // User proposal received in this session: Choco's missing marker is its natural source end.
+        // Keep the empty raw event unchanged and expose this different evidence basis to callers.
+        val userNaturalEnd=stage=="ChocoMountain" && sourceBridgeExit?.isEmpty()==true && bridgePart!=null
+        val bridgeExit=sourceBridgeExit?.singleOrNull() ?: if(userNaturalEnd) bridgePart!!.frames else null
+        if(bridge!=null) require(bridgeExit!=null && bridgeExit>=0 && bridgeExit<=bridgePart!!.frames) {
             "$stage requires a separately verified layered/missing-marker bridge plan"
         }
         val confirmed=ConfirmedOutroCatalog.forStage(stage) ?: error("No confirmed Outro mapping for $stage")
@@ -59,8 +67,8 @@ internal object MinfInteractiveCompiler {
                     timeline=if(bridge==null) G.TransitionTimeline(0,-full.phase,0,0) else {
                         val handover=bridgeExit!!-bridge.phase
                         G.TransitionTimeline(-bridge.phase,
-                            if(skip==null) handover-full.phase else handover,
-                            maxOf(0,handover),skip ?: 0)
+                            if(fullEntry==null) handover-full.phase else handover,
+                            maxOf(0,handover),fullEntry ?: 0)
                     }))
             }
             byRole[StageFlow.Role.Fast]?.let { target ->
@@ -80,6 +88,7 @@ internal object MinfInteractiveCompiler {
             tracks=ordered.mapIndexed { i,p -> G.Track(300+i,indices.getValue(p.fileName),listOf(G.Clip(500+i,i,sourceLength=p.frames))) },
             transitions=transitions,bpm=full.bpm,
         )
-        return Prepared(spec,StageFlowCompiler.Compiled(G.build(spec),flow,byRole,byOutro,ordered.map { it.fileName }))
+        return Prepared(spec,StageFlowCompiler.Compiled(G.build(spec),flow,byRole,byOutro,ordered.map { it.fileName }),
+            if(userNaturalEnd) "USER_PROPOSED_BRIDGE_END" else if(fullEntry!=null) "SOURCE_MINF_EXPLICIT_FULL_ENTRY" else "SOURCE_MINF_PHASE_CANDIDATE")
     }
 }

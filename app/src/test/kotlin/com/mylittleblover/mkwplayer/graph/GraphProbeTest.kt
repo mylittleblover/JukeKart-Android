@@ -80,10 +80,10 @@ class GraphProbeTest {
 
     @Test
     fun versionRangeMatchesTheNativeReader() {
-        // GraphReader accepts 1..13 today; widening this without widening the
+        // GraphReader accepts 1..14 today; widening this without widening the
         // native reader would let a packet through the probe and fail in native.
         assertEquals(1, GraphProbe.SUPPORTED_VERSIONS.first)
-        assertEquals(13, GraphProbe.SUPPORTED_VERSIONS.last)
+        assertEquals(14, GraphProbe.SUPPORTED_VERSIONS.last)
     }
 
     @Test

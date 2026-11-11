@@ -26,6 +26,12 @@ class MinfCatalogTest {
         assertTrue(e.frames.isEmpty())
         assertEquals(listOf(38400L), catalog().part("ChocoMountain", "Full")!!.event("Full_SkipForBridge"))
     }
+    @Test fun multipleTempoRecordsDoNotHideTheFullGrid() {
+        assertTrue(catalog().part("ShyGuyBazaar","Full")!!.beats.isNotEmpty())
+        assertTrue(catalog().part("DKPass","Full")!!.beats.isNotEmpty())
+        assertTrue(catalog().part("Cave","Full")!!.beats.isNotEmpty())
+        assertTrue(catalog().part("Cave","Fast")!!.beats.isNotEmpty())
+    }
     @Test fun repeatedLoopVariantsRemainSeparate() {
         assertTrue(catalog().records.groupBy { it.name }.values.any { rs -> rs.map { it.loopStart to it.loopEnd }.distinct().size > 1 })
         assertNotNull(catalog().part("Rainbow", "Final_Pre"))
