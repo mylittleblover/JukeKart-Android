@@ -129,7 +129,12 @@ template<class Bytes> BwavLayout parseBwav(Bytes& input,const DecodeLimits& limi
         result.starts[ch]=start;
         // Only the final channel may omit its block padding; every earlier channel
         // is followed by that padding, which the gap check above already validates.
-        previousEnd=start+static_cast<std::size_t>(ch+1==count ? minimum : encoded);
+        // Unused bytes of a complete final DSP block are encoded padding,
+        // not a container trailer. They need not be zero (FirstCircuit Outro01).
+        // The decoder still reads exactly `samples` frames. Any bytes after the
+        // complete block remain subject to the strict trailing-gap check.
+        const bool completeFinalBlock=kind==1 && input.size()-start>=encoded;
+        previousEnd=start+static_cast<std::size_t>(ch+1==count && !completeFinalBlock ? minimum : encoded);
         auto& channel=result.channels[ch];
         if(kind) {
             for(unsigned n=0;n<16;++n)channel.coefficients[n]=static_cast<std::int16_t>(dspSigned(input.u16(h+16+n*2)));
