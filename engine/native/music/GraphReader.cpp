@@ -75,6 +75,21 @@ Graph GraphReader::read() {
         });
         if(version>=protocol::SegmentEnvelopeVersion)segmentEnvelopes(g);
         if(version>=protocol::ClipEnvelopeVersion)clipEnvelopes(g);
+        if(version>=protocol::TransitionTimelineVersion) {
+            const auto count=integer();if(count<0 || count>4096)invalid();
+            for(int n=0;n<count;++n) {
+                const auto id=index();auto t=std::find_if(g.transitions.begin(),g.transitions.end(),[&](const Transition& r){return r.index==id;});
+                if(t==g.transitions.end() || t->timeline)invalid();
+                TransitionTimeline p{frame(),frame(),frame(),frame()};
+                if(p.bridgeStart==std::numeric_limits<Frame>::min() || p.destinationStart==std::numeric_limits<Frame>::min() || p.destinationSource<0 || p.destinationCommit<0 || p.destinationCommit<p.destinationStart ||
+                   (t->bridge>=0 && p.destinationCommit<p.bridgeStart))invalid();
+                for(const auto destination:t->destinations) {
+                    const auto d=std::find_if(g.segments.begin(),g.segments.end(),[&](const Segment& s){return s.index==destination;});
+                    if(d==g.segments.end() || p.destinationSource>=d->exit)invalid();
+                }
+                t->timeline=p;
+            }
+        }
         if(position_!=size_) invalid();
         std::array<bool,4096> occupied{}; for(const auto& node:g.nodes) { if(occupied[node.index]) invalid(); occupied[node.index]=true; }
         g.indexNodes();

@@ -143,10 +143,16 @@ EngineStatus EngineRuntime::planTransition(Scene& source,int target,const Transi
     run.revision=parameters_->syncRevision();
     const auto speed=parameters_->property(source.segment->index,1);
     long double musicalDistance=0;
+    Frame minimumDelay=0;
+    if(run.rule->timeline) {
+        const auto& p=*run.rule->timeline;
+        minimumDelay=std::max<Frame>(0,-p.destinationStart);
+        if(run.rule->bridge>=0)minimumDelay=std::max(minimumDelay,-p.bridgeStart);
+    }
     auto sync=sourceSyncFrame(*source.segment,graph_->node(source.segment->index)->tempo,source.position,speed,
         clock_.frame(),run.rule->sync,run.rule->sourceCue,cueSearchReplan_,
         !source.disableLoop && (!source.segment->hasLoop || source.segment->loop.count<0 || source.loopCount<source.segment->loop.count),source.musicalPosition,
-        source.segment->hasLoop && source.segment->loop.count>=0 ? source.segment->loop.count-source.loopCount : -1,!naturalSource,&musicalDistance);
+        source.segment->hasLoop && source.segment->loop.count>=0 ? source.segment->loop.count-source.loopCount : -1,!naturalSource,&musicalDistance,nullptr,minimumDelay);
     if(!sync) {
         const bool cueRule=run.rule->sync==SyncPoint::NextCue || run.rule->sync==SyncPoint::NextCustomCue;
         if(!cueRule || !source.playlist.active() || (source.segment->hasLoop && !source.disableLoop && source.segment->loop.count<0)) return EngineStatus::MissingCue;
@@ -192,6 +198,13 @@ EngineStatus EngineRuntime::planTransition(Scene& source,int target,const Transi
         if(run.rule->preEntry) run.bridgeStart=addFrame(*sync,-Tempo::roundedFrame(bridge->entry/parameters_->property(bridge->index,1)));
     }
     run.preStart=run.rule->preEntry ? addFrame(run.destinationEntry,-Tempo::roundedFrame(run.position/destinationSpeed)) : run.destinationEntry;
+    if(run.rule->timeline) {
+        const auto& p=*run.rule->timeline;
+        run.bridgeStart=addFrame(run.sourceSync,p.bridgeStart);
+        run.preStart=addFrame(run.sourceSync,p.destinationStart);
+        run.destinationEntry=addFrame(run.sourceSync,p.destinationCommit);
+        run.position=p.destinationSource;
+    }
     if(run.preStart<clock_.frame() || run.bridgeStart<clock_.frame()) return EngineStatus::DeadlineMiss;
     if(run.forecast) {
         const auto* cueNode=graph_->node(run.forecastPlan.segment);
@@ -270,11 +283,16 @@ bool EngineRuntime::retimeWaitingTransition() noexcept {
         destinationEntry=addFrame(sync,Tempo::roundedFrame(std::ceil(duration/bridgeSpeed)));
         if(run.rule->preEntry) bridgeStart=addFrame(sync,-Tempo::roundedFrame(bridge->entry/bridgeSpeed));
     }
-    const auto preStart=run.rule->preEntry ? addFrame(destinationEntry,-Tempo::roundedFrame(position/destinationSpeed)) : destinationEntry;
+    auto preStart=run.rule->preEntry ? addFrame(destinationEntry,-Tempo::roundedFrame(position/destinationSpeed)) : destinationEntry;
+    if(run.rule->timeline) {
+        const auto& p=*run.rule->timeline;
+        bridgeStart=addFrame(sync,p.bridgeStart);preStart=addFrame(sync,p.destinationStart);
+        destinationEntry=addFrame(sync,p.destinationCommit);
+    }
     if(preStart<now || bridgeStart<now) {
         last_=EngineStatus::DeadlineMiss; ++rejected_; cancelTransition(); return false;
     }
-    run.sourceSync=sync;run.destinationEntry=destinationEntry;run.bridgeStart=bridgeStart;run.preStart=preStart;run.position=position;
+    run.sourceSync=sync;run.destinationEntry=destinationEntry;run.bridgeStart=bridgeStart;run.preStart=preStart;run.position=run.rule->timeline ? run.rule->timeline->destinationSource : position;
     if(run.albumEdge)albumState_.scheduledAt={destinationEntry};
     run.sourceSpeed=sourceSpeed;run.destinationSpeed=destinationSpeed;run.bridgeSpeed=bridgeSpeed;
     departScene(*run.source,*run.rule,sync,run.naturalSource);
@@ -315,7 +333,7 @@ void EngineRuntime::tickTransition() noexcept {
     };
     if(!run.bridgeStarted && run.bridge && now>=run.bridgeStart) {
         const auto* segment=find(graph_->segments,run.rule->bridge);
-        last_=start(*run.bridge,run.switchChange ? run.source->object : run.target,run.rule->bridge,run.rule->preEntry ? 0 : segment->entry,run.rule->preEntry);
+        last_=start(*run.bridge,run.switchChange ? run.source->object : run.target,run.rule->bridge,run.rule->timeline ? 0 : (run.rule->preEntry ? 0 : segment->entry),run.rule->preEntry);
         if(last_!=EngineStatus::Ok) { ++rejected_; cancelTransition(); return; }
         run.bridge->switchOwners=run.switchOwners; run.bridge->playlist=run.playlist;
         run.bridge->stopFrame=run.rule->postExit ? -1 : run.destinationEntry;
@@ -323,7 +341,7 @@ void EngineRuntime::tickTransition() noexcept {
     }
     if(!run.destinationStarted && now>=run.preStart) {
         auto& destination=*run.destination;
-        last_=start(destination,run.switchChange ? run.source->object : run.target,run.segment,run.rule->preEntry ? 0 : run.position,run.rule->preEntry);
+        last_=start(destination,run.switchChange ? run.source->object : run.target,run.segment,run.rule->timeline ? run.position : (run.rule->preEntry ? 0 : run.position),run.rule->preEntry);
         if(last_!=EngineStatus::Ok) { ++rejected_; cancelTransition(); return; }
         destination.playlistObject=run.playlistObject; destination.playlist=run.playlist;
         destination.playlistSwitch=run.playlistSwitch;destination.playlistSwitchValues=run.playlistSwitchValues;destination.playlistSwitchRevision=run.playlistSwitchRevision;

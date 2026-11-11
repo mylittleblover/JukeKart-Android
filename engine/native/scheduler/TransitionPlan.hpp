@@ -35,7 +35,7 @@ inline TransitionChoice chooseTransition(const Graph& graph,int source,int sourc
 // Convert once to an absolute frame on the same SampleClock as all voices.
 inline std::optional<Frame> sourceSyncFrame(const Segment& segment,const Tempo& tempo,long double position,double speed,
     Frame now,SyncPoint sync,const std::optional<std::string>& filter,bool includeCurrent=false,bool loopAvailable=true,
-    long double musicalPosition=std::numeric_limits<long double>::quiet_NaN(),int remainingLoops=-2,bool exitBreaksLoop=true,long double* musicalDistance=nullptr,Frame* matchedCue=nullptr) noexcept {
+    long double musicalPosition=std::numeric_limits<long double>::quiet_NaN(),int remainingLoops=-2,bool exitBreaksLoop=true,long double* musicalDistance=nullptr,Frame* matchedCue=nullptr,Frame minimumDelay=0) noexcept {
     if(!std::isfinite(speed) || speed<=0) return std::nullopt;
     if(!std::isfinite(musicalPosition)) musicalPosition=position;
     const Frame musical=Tempo::roundedFrame(musicalPosition);
@@ -59,14 +59,20 @@ inline std::optional<Frame> sourceSyncFrame(const Segment& segment,const Tempo& 
         case SyncPoint::NextCustomCue: {
             std::optional<long double> best;
             auto candidate=[&](Frame frame) {
-                long double distance=frame-position;
+                long double distance=frame-position;int wraps=0;
                 if(segment.hasLoop && position<=segment.loop.end && frame>segment.loop.end && remainingLoops!=0) {
                     if(remainingLoops<0) return;
                     distance+=loopSpan*remainingLoops;
                 }
                 if(distance<0 || (!includeCurrent && distance==0)) {
                     if(remainingLoops==0 || !segment.hasLoop || frame<segment.loop.start || frame>segment.loop.end) return;
-                    distance+=loopSpan;
+                    distance+=loopSpan;wraps=1;
+                }
+                if(distance<static_cast<long double>(minimumDelay)*speed) {
+                    if(remainingLoops==0 || !segment.hasLoop || frame<segment.loop.start || frame>segment.loop.end || loopSpan<=0) return;
+                    const auto extra=std::ceil((static_cast<long double>(minimumDelay)*speed-distance)/loopSpan);
+                    if(remainingLoops>0 && wraps+extra>remainingLoops) return;
+                    distance+=extra*loopSpan;
                 }
                 if(distance>=0 && (!best || distance<*best)) {best=distance;if(matchedCue)*matchedCue=frame;}
             };

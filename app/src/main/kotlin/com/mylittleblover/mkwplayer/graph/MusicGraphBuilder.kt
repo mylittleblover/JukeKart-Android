@@ -122,6 +122,12 @@ object MusicGraphBuilder {
         val shape: Shape = Shape.Linear,
     )
 
+    /** Fixed Transport-frame offsets relative to a source cue; source positions remain source-local. */
+    data class TransitionTimeline(
+        val bridgeStart: Long, val destinationStart: Long,
+        val destinationCommit: Long, val destinationSource: Long = 0,
+    )
+
     data class Transition(
         val index: Int,
         val sources: List<Int>,
@@ -140,6 +146,7 @@ object MusicGraphBuilder {
         val priority: Int = 0,
         val specificity: Int = 0,
         val jumpItem: Int = -1,
+        val timeline: TransitionTimeline? = null,
     )
 
     data class MusicalLoop(
@@ -286,7 +293,24 @@ object MusicGraphBuilder {
 
         GraphWire.writeByteValue(body, 0)   // hasAutomatic
 
-        return GraphWire.envelope(body.toByteArray(), VERSION)
+        val timed = spec.transitions.filter { it.timeline != null }
+        if (timed.isNotEmpty()) {
+            require(spec.musicalLoop == null) { "Timeline graph requires an explicit segment loop" }
+            repeat(4) { GraphWire.writeI32(body, 0) } // v10 effects, v11 album, v12/v13 envelopes
+            GraphWire.writeI32(body, timed.size)
+            timed.forEach { t ->
+                val p = t.timeline!!
+                require(p.bridgeStart != Long.MIN_VALUE && p.destinationStart != Long.MIN_VALUE)
+                require(p.destinationSource >= 0 && p.destinationCommit >= 0 && p.destinationCommit >= p.destinationStart)
+                require(t.bridge < 0 || p.destinationCommit >= p.bridgeStart)
+                GraphWire.writeI32(body, t.index)
+                GraphWire.writeLong(body, p.bridgeStart)
+                GraphWire.writeLong(body, p.destinationStart)
+                GraphWire.writeLong(body, p.destinationCommit)
+                GraphWire.writeLong(body, p.destinationSource)
+            }
+        }
+        return GraphWire.envelope(body.toByteArray(), if(timed.isEmpty()) VERSION else 14)
     }
 
     // ---------------------------------------------------------------- sections

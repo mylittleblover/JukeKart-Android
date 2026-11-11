@@ -11,7 +11,8 @@ constexpr int EffectRtpcVersion=10;
 constexpr int AlbumFlowVersion=11;
 constexpr int SegmentEnvelopeVersion=12;
 constexpr int ClipEnvelopeVersion=13;
-constexpr int Version=ClipEnvelopeVersion;
+constexpr int TransitionTimelineVersion=14;
+constexpr int Version=TransitionTimelineVersion;
 constexpr int ClipLoopVersion=5;
 constexpr int SourceReferenceVersion=4;
 constexpr int SourceDigestVersion=3;
@@ -20,7 +21,7 @@ constexpr int LegacyVersion=1;
 constexpr bool supportedVersion(int version) noexcept {
     switch(version) {
         case LegacyVersion:case PropertyPresenceVersion:case SourceDigestVersion:
-        case SourceReferenceVersion:case ClipLoopVersion:case PlaylistSeedVersion:case PlaybackExtensionVersion:case LayerControlVersion:case MusicalLoopVersion:case EffectRtpcVersion:case AlbumFlowVersion:case SegmentEnvelopeVersion:case ClipEnvelopeVersion:return true;
+        case SourceReferenceVersion:case ClipLoopVersion:case PlaylistSeedVersion:case PlaybackExtensionVersion:case LayerControlVersion:case MusicalLoopVersion:case EffectRtpcVersion:case AlbumFlowVersion:case SegmentEnvelopeVersion:case ClipEnvelopeVersion:case TransitionTimelineVersion:return true;
         default:return false;
     }
 }

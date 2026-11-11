@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.22)
+project(mkw_interactive_preview LANGUAGES C CXX)
+get_filename_component(MKW_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
+add_subdirectory("${MKW_ROOT}/engine/native" engine)
+add_executable(mkw_interactive_preview main.cpp)
+target_link_libraries(mkw_interactive_preview PRIVATE player2_engine)
+target_compile_features(mkw_interactive_preview PRIVATE cxx_std_17)
