@@ -19,7 +19,7 @@ internal class AudioOutput private constructor(
     private val engine: Long,
     private val handle: Long,
     val sampleRate: Int,
-) {
+) : SessionAudioOutput {
     private var closed = false
 
     companion object {
@@ -68,7 +68,7 @@ internal class AudioOutput private constructor(
      * Returns null once closed, or when the native side has no packet. Callers pass
      * this to [TimingDiagnosis.read], which refuses an unexpected wire version.
      */
-    fun timingSnapshot(): LongArray? =
+    override fun timingSnapshot(): LongArray? =
         if (closed) null else NativeAudioLibrary.outputTimingSnapshot(handle)
 
     /**
@@ -79,7 +79,7 @@ internal class AudioOutput private constructor(
     fun rebuild(rate: Int): Boolean = !closed && NativeAudioLibrary.rebuildOutput(handle, rate)
 
     /** Stops and releases the consumer. Safe to call more than once. */
-    fun close() {
+    override fun close() {
         if (closed) return
         closed = true
         NativeAudioLibrary.stopOutput(handle)

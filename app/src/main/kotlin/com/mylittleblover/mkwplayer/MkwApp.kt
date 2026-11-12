@@ -117,7 +117,10 @@ internal fun MkwApp(
 
             val detail = nav.detail
             when {
-                detail is NavState.Detail.Course -> CoursePage(model, ui, detail.code)
+                detail is NavState.Detail.Course -> CoursePage(model, ui, detail.code) {
+                    model.startStagePerformance(detail.code)
+                    nav=nav.select(Tab.INTERACTIVE)
+                }
                 else -> when (nav.tab) {
                     Tab.LIBRARY -> LibraryPage(model, ui, openPack, openFiles)
                     Tab.WORLD_MAP -> MapPage(model, ui)
@@ -199,16 +202,16 @@ private fun LibraryPage(
 
 /** A course's detail page, reached from the map or the library. */
 @Composable
-private fun CoursePage(model: PlayerViewModel, ui: PlayerViewModel.Ui, code: String) {
+private fun CoursePage(model: PlayerViewModel, ui: PlayerViewModel.Ui, code: String,onInteractive: () -> Unit) {
     DetailScreen(
         header = UiMapping.detailHeader(ui.flow),
         cues = emptyList(),
         cueWarning = null,
         structure = UiMapping.structure(ui.flow),
         provenance = UiMapping.provenance(ui.flow),
-        onPlay = { model.startPerformance() },
-        onInteractive = {},
-        canPlay = ui.flow?.performanceBlocker == null,
+        onPlay = { model.startStagePerformance(code) },
+        onInteractive = onInteractive,
+        canPlay = model.canStartStage(code) && ui.flow?.performanceBlocker == null,
         modifier = Modifier.fillMaxSize(),
     )
 }
@@ -355,9 +358,9 @@ private fun ConsolePage(
                             // line, so the switch is not a cut.
                             OutlinedButton(
                                 onClick = { model.toggleFast() },
-                                enabled = flow.canEnd || flow.fastPlaying,
+                                enabled = flow.canEnd && !flow.fastPlaying,
                             ) {
-                                Text(if (flow.fastPlaying) "Back to normal" else "Fast version")
+                                Text(if (flow.fastPlaying) "Fast playing" else "Fast version")
                             }
                         }
 

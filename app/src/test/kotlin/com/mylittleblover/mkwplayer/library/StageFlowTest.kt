@@ -73,10 +73,8 @@ class StageFlowTest {
     }
 
     @Test
-    fun tempoAndArrangementVariantsAreNotStructuralParts() {
-        // A speed variant is not a section; treating it as one would put a second, faster main
-        // loop into the graph.
-        assertNull(StageFlowReader.roleOf("BGM_Stage_Coaster_Fast.bwav"))
+    fun fastArrangementRetainsItsDistinctRoleWhenImported() {
+        assertEquals(StageFlow.Role.Fast,StageFlowReader.roleOf("BGM_Stage_Coaster_Fast.bwav"))
         assertNull(StageFlowReader.roleOf("BGM_Stage_Coaster_SFC.bwav"))
     }
 
@@ -191,7 +189,7 @@ class StageFlowTest {
 
     @Test
     fun aNonStructuralFileNameIsRejected() {
-        val result = StageFlowReader.readPart("BGM_Stage_Coaster_Fast.bwav", ByteArray(64))
+        val result = StageFlowReader.readPart("BGM_Stage_Coaster_SFC.bwav", ByteArray(64))
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull()!!.message!!.contains("not a structural part"))
     }

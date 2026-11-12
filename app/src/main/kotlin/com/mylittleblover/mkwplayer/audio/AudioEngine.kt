@@ -15,12 +15,12 @@ import com.mylittleblover.player2.platform.audio.NativeAudioLibrary
  * escape as a raw Long, and [close] is idempotent because a destroyed native
  * handle is a dangling pointer, not an error code.
  */
-internal class AudioEngine private constructor(private val handle: Long) : PlaybackEngine {
+internal class AudioEngine private constructor(private val handle: Long) : SessionAudioEngine {
 
     private var closed = false
 
     /** Exposed only for constructing the output, which must reference the engine. */
-    internal fun nativeHandle(): Long = if (closed) 0 else handle
+    override fun nativeHandle(): Long = if (closed) 0 else handle
 
     override val sampleRate: Int
         get() = if (closed) 0 else NativeAudioLibrary.engineSampleRate(handle)
@@ -41,6 +41,9 @@ internal class AudioEngine private constructor(private val handle: Long) : Playb
                 assetId, null, null, null,
             )
         }
+
+    override fun bindStreamedBwav(assetIndex: Int,bytes: ByteArray,assetId: String): Int =
+        if(closed) CLOSED else NativeAudioLibrary.bindSource(handle,assetIndex,PROVIDER_BWAV,bytes,1,assetId,null,null,null)
 
     fun loadLinearBwav(bytes: ByteArray, assetId: String, loop: Boolean): Int =
         if (closed) {
@@ -84,6 +87,9 @@ internal class AudioEngine private constructor(private val handle: Long) : Playb
     }
 
     override fun snapshot(): LongArray? = if (closed) null else NativeAudioLibrary.snapshot(handle)
+
+    override fun sourceSnapshot(slot: Int): LongArray? =
+        if(closed) null else NativeAudioLibrary.sourceSnapshot(handle,slot)
 
     /** Releases the engine. Safe to call repeatedly; the native delete runs once. */
     override fun close() {

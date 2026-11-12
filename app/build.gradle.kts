@@ -12,10 +12,9 @@ android {
         applicationId = "com.mylittleblover.mkwplayer"
         minSdk = 26
         targetSdk = 35
-        // Bumped for alpha05: pack import is reachable from the library and the console, and the world map is
-        // full screen, draggable and zoomable.
-        versionCode = 5
-        versionName = "0.1.0-alpha05"
+        // MINF sample timelines, actual Native state, and Rainbow's complete regional graph.
+        versionCode = 6
+        versionName = "0.1.0-alpha06"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

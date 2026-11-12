@@ -199,8 +199,8 @@ internal object StageFlowReader {
             stem.contains("_pre") && !stem.contains("_pre_short") -> StageFlow.Role.Pre
             stem.contains("_bridge") -> StageFlow.Role.Bridge
             stem.contains("_outro") -> StageFlow.Role.Outro
-            stem.contains("_fast") -> null   // a tempo variant, not a structural part
-            stem.contains("_sfc") -> null     // an arrangement, not a structural part
+            stem.contains("_fast") -> StageFlow.Role.Fast
+            stem.endsWith("_sfc") -> null     // variant suffix; SFCMarioCircuit itself is a real stage
             else -> StageFlow.Role.Main
         }
     }

@@ -30,7 +30,8 @@ class PreviewJobExportTest {
                 val files=dir.listFiles()!!.filter { f ->
                     f.extension=="bwav" && when {
                         f.name.contains("_Outro") -> Regex("Outro(\\d+)").find(f.name)?.groupValues?.get(1)?.toInt() in confirmed
-                        stage.contains("_Pattern") -> f.name=="BGM_Stage_$stage.bwav"
+                        stage.contains("_Pattern") -> f.name=="BGM_Stage_$stage.bwav" ||
+                            f.name=="BGM_Stage_${stage.substringBefore("_Pattern")}_Fast_Pattern${stage.substringAfter("_Pattern")}.bwav"
                         f.name.contains("_Pattern") -> false
                         else -> true
                     }

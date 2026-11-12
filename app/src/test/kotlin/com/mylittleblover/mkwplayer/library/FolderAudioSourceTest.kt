@@ -173,7 +173,7 @@ class FolderAudioSourceTest {
     @Test
     fun aFileWithANonStructuralNameIsRejectedWithAReason() {
         val dir = tempDir()
-        write(dir, "BGM_Stage_Coaster_Fast.bwav")
+        write(dir, "BGM_Stage_Coaster_SFC.bwav")
 
         val scan = FolderAudioSource.scan(dir)
         assertEquals(0, scan.found.size)

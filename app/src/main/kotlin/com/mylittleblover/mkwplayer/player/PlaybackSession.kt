@@ -5,6 +5,9 @@ import com.mylittleblover.mkwplayer.audio.AudioOutput
 import com.mylittleblover.mkwplayer.audio.AudioStatusText
 import com.mylittleblover.mkwplayer.audio.PlaybackController
 import com.mylittleblover.mkwplayer.audio.PlaybackEngine
+import com.mylittleblover.mkwplayer.audio.SessionAudioEngine
+import com.mylittleblover.mkwplayer.audio.SessionAudioOutput
+import com.mylittleblover.mkwplayer.interactive.NativeInteractiveDriver
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,8 +28,8 @@ import kotlinx.coroutines.flow.asStateFlow
  * requires that, and nothing here starts a thread of its own.
  */
 internal class PlaybackSession(
-    private val createEngine: () -> AudioEngine?,
-    private val openOutput: (Long, Int) -> AudioOutput?,
+    private val createEngine: () -> SessionAudioEngine?,
+    private val openOutput: (Long, Int) -> SessionAudioOutput?,
 ) {
 
     /** What the UI and the notification both need to render. */
@@ -56,9 +59,12 @@ internal class PlaybackSession(
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state.asStateFlow()
 
-    private var engine: AudioEngine? = null
+    private var engine: SessionAudioEngine? = null
     private var controller: PlaybackController? = null
-    private var output: AudioOutput? = null
+    private var output: SessionAudioOutput? = null
+    private var automaticTransitions: Map<Int,Int> = emptyMap()
+    private var automaticSource: Int? = null
+    private var automaticPending: Triple<Int,Int,Long>? = null
 
     /** True while a device stream is open. */
     val hasOutput: Boolean get() = output != null
@@ -71,6 +77,26 @@ internal class PlaybackSession(
      * with no audio device never opens one at all.
      */
     fun timingSnapshot(): LongArray? = output?.timingSnapshot()
+
+    fun interactiveObservation(): NativeInteractiveDriver.Observation? {
+        val current=engine ?: return null
+        val raw=current.snapshot() ?: return null
+        if(raw.size<65 || raw[0]!=8L) return null
+        val segment=raw[11].toInt()
+        var sourceFrame: Long?=null
+        for(slot in 0 until 128) {
+            val source=current.sourceSnapshot(slot) ?: continue
+            if(source.size==207 && source[0] in 3L..11L && source[1]==1L && source[4]==segment.toLong()) {
+                sourceFrame=source[10]
+                break
+            }
+        }
+        val destination=if(raw[24]!=0L) raw[27].toInt() else automaticPending?.takeIf {
+            it.first==segment && it.third==raw[6]
+        }?.second
+        return NativeInteractiveDriver.Observation(segment,sourceFrame,raw[24]!=0L,raw[2]==2L,raw[3].toInt(),
+            if(raw[7]!=0L) "Native playback: ${AudioStatusText.engine(raw[7].toInt())}" else null,raw[6],destination)
+    }
 
     /**
      * Loads a multi-segment flow and starts its first section.
@@ -87,6 +113,8 @@ internal class PlaybackSession(
         assets: List<Pair<String, ByteArray>>,
         frames: Long,
         startSegment: Int,
+        streamed: Boolean = false,
+        autoAdvance: Map<Int,Int> = emptyMap(),
     ): State {
         var current = engine
         if (current == null) {
@@ -96,13 +124,14 @@ internal class PlaybackSession(
         }
         val active = controller ?: return fail("The audio engine is not initialised.")
 
+        closeOutput()
         val loaded = active.loadGraphOnly(packet)
         if (loaded is PlaybackController.State.Failed) return fail(loaded.reason)
 
         // One bind per part. A flow that bound only its first asset would play the prelude and
         // then fail silently at the first transition.
         assets.forEachIndexed { index, (name, bytes) ->
-            val status = current.bindBwav(index, bytes, name)
+            val status = if(streamed) current.bindStreamedBwav(index,bytes,name) else current.bindBwav(index, bytes, name)
             if (status != AudioEngine.STATUS_OK) {
                 return fail("Could not bind '$name': ${AudioStatusText.engineHint(status) ?: AudioStatusText.engine(status)}")
             }
@@ -110,6 +139,7 @@ internal class PlaybackSession(
 
         val started = active.playSegment(startSegment)
         if (started is PlaybackController.State.Failed) return fail(started.reason)
+        automaticTransitions=autoAdvance.toMap()
 
         active.setDuration(frames)
         if (output == null) {
@@ -151,6 +181,7 @@ internal class PlaybackSession(
         }
 
         val active = controller ?: return fail("The audio engine is not initialised.")
+        closeOutput()
         val result = active.load(title, packet, audio, assetId)
         if (result is PlaybackController.State.Failed) {
             return fail(result.reason)
@@ -200,17 +231,39 @@ internal class PlaybackSession(
      */
     fun poll(): State {
         val active = controller ?: return _state.value
-        return publishState(active.poll())
+        val current=active.poll()
+        if(_state.value.loaded) {
+            val observation=interactiveObservation()
+            if(observation?.segment!=automaticSource) { automaticSource=null;automaticPending=null }
+            if(observation!=null && !observation.paused && !observation.transitioning && observation.sourceFrame!=null) {
+                val target=automaticTransitions[observation.segment]
+                if(target!=null && automaticSource!=observation.segment) {
+                    val queued=active.playSegment(target)
+                    if(queued !is PlaybackController.State.Failed) {
+                        automaticSource=observation.segment
+                        automaticPending=Triple(observation.segment,target,observation.failureCount)
+                    }
+                    return publishState(queued)
+                }
+            }
+        }
+        return publishState(current)
     }
 
     /** Releases the output and the engine. Safe to call more than once. */
     fun release() {
-        output?.close()
-        output = null
+        closeOutput()
         controller?.release()
         controller = null
         engine = null
         _state.value = State()
+    }
+
+    /** Native output destruction joins its callback before a graph or binding can change. */
+    private fun closeOutput() {
+        output?.close()
+        output = null
+        automaticTransitions=emptyMap();automaticSource=null;automaticPending=null
     }
 
     private fun publishState(controllerState: PlaybackController.State): State {

@@ -62,16 +62,18 @@ internal object StageFlowDiscovery {
      */
     fun prefixOf(fileName: String): String {
         val stem = fileName.substringBeforeLast('.')
-        var result = stem
+        val pattern=Regex("_Pattern\\d+$",RegexOption.IGNORE_CASE).find(stem)?.value.orEmpty()
+        var result = if(pattern.isEmpty()) stem else stem.dropLast(pattern.length)
         // Longest suffix first: `_Pre_Short` must win over `_Pre`.
         for (suffix in SUFFIXES.sortedByDescending { it.length }) {
             val at = result.indexOf(suffix, ignoreCase = true)
+            if(suffix=="_SFC" && at+suffix.length!=result.length) continue
             if (at > 0) {
                 result = result.substring(0, at)
                 break
             }
         }
-        return result
+        return result+pattern
     }
 
     /**
