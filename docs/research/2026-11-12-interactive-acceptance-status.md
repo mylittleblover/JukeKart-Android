@@ -13,7 +13,7 @@
 ## 已执行验证
 
 - Native 预览：主衔接 334 项（29 条普通赛道、Rainbow、2 个 Pattern2 变体），跨赛道 Outro→Pre 174 项，共 508 项。检查同步采样点、实际 source origin、PCM、削波与流式解码状态。
-- JVM：1151 项，0 失败，6 项按环境开关跳过。预览重录属于显式 opt-in 任务，不在普通测试中隐式执行。
+- JVM：1152 项，0 失败，6 项按环境开关跳过。预览重录属于显式 opt-in 任务，不在普通测试中隐式执行。
 - Android 15 x86_64 软件模拟器：30 组真实声源的图、绑定和 PCM 输出通过；应用排队/暂停恢复/Stop 重载通过。最终构建的自动 Outro→Pre AAudio marker=382784 已通过，最终应用控制复核通过（暂停源位置、Native Full 提交、Stop/Start 重新输出帧已验）。
 - 独立 Luna 审查已修复选错赛道、自定义标题绕过 MINF、持久错误无法重试三个问题；自动衔接新增审查未发现阻塞问题。
 
@@ -65,6 +65,13 @@ Pattern2：Cinema、SnowMountain 各 7 项，包含真实 Full→Fast 及其 Out
 
 详细 WAV、日志、SHA 与完整 manifest 位于本会话 /workspace/mkw-recordings、/workspace/mkw-preview-jobs；分赛道 ZIP 和预览索引位于 /workspace/mkw-delivery。
 
-## 新反馈：Rainbow Final Full 进入偏晚（待修正）
+## Rainbow 正确参考与一秒交叉过渡（2026-11-12）
 
-用户提供了 Rainbow Road (Medley) 参考 FLAC。此前把 Fanfare 的 EOF=338824 当交接点，属于未被参考证实的假设；原始 MINF 没有同名 Bridge_ToFull 标记。旧预览和 APK 已归档，正在做多窗口采样对齐；Final 两条预览的旧数值通过不能算听感通过。
+用户更正参考文件为 `RainbowRoad.flac`（Drive `1tiQumSMVC15TujrhDRvjRArCLe9LmPWJ`）。独立全局长窗与 48 kHz 精确互相关均确认 Fanfare 源 0 在参考帧 30695935、Full 源 0 在 30914669，间隔 **218734 帧 / 4.556958333 秒**；三个不重叠窗口相关度均约 0.997。Pre 在 Fanfare 起点结束，不沿用错误 Medley 推导的 Pre 淡出。Full 进入后保留 Fanfare 的真实有限尾音，独立 Fanfare→Full 使用同一交接点。此值来自正确参考，不伪称 MINF 命名事件。
+
+Area3→Final_Pre 从原 label-1 首拍起进行 48000 帧线性交叉淡化。循环 EOF 触发曾截短源声，现为匹配整源 clip/原始循环/采样率的有限 departure fade 保留循环，fadeEnd 关闭 voice；取消会撤销本次拥有的 repeat，含 sourceLeft 前后。普通首拍、循环 EOF、执行前取消的 Native 回归通过，独立审查无剩余阻塞。
+
+- Rainbow 16 项已用最终 Native `eff1154769081f53ab366a9ca27b16afd5e49acba45a4226d7b1a9739062603c` 重录，同步点、源起点、PCM 与长度均通过，零削波/欠载/解码失败。
+- 最终 APK 在 Android 15 x86_64 上通过新增采样边界测试（127.399 秒，OK 1 test）：实际交叉重叠 48000 帧、Full 在 Fanfare 后 218734 帧进入、Fanfare 自然结束后仅剩 Full。
+- 完整 JVM 1152 项，0 失败，6 个 opt-in 跳过；四 ABI APK 已生成。此前 30 组 Android 输出与会话控制验收仍按各自构建记录保留。
+- 正确参考分析见 [数据与方法](2026-11-12-rainbow-correct-reference.md)。先前错误参考与 81620 候选只保留为撤回记录，不属于验收依据。与参考的波形对齐和 Android Native PCM 不等于人工听音或扬声器录音。

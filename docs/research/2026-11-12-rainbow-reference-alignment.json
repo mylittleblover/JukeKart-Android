@@ -1,0 +1,846 @@
+{
+  "analysis": "Rainbow reference alignment; source assets decoded individually by pinned Native host renderer. Read-only analysis; no engine/app files changed.",
+  "sampleRate": 48000,
+  "reference": {
+    "path": "/workspace/mkw-planning/rainbow-reference-work/reference.flac",
+    "sha256": "92b53fde9b65aade820fac009c7cf1d681babaf59ecb85601bd47be6caeafdef",
+    "bytes": 65625372,
+    "decodedWav": "/workspace/mkw-planning/rainbow-reference-work/reference.wav",
+    "decodedWavSha256": "365765ec31ccd9975170e631e5944f3f40ebf284dab31a465b587cb269666192",
+    "format": "PCM signed 16-bit stereo, 48000 Hz",
+    "frames": 23279931,
+    "durationSeconds": 484.9985625
+  },
+  "method": {
+    "coarseSearch": "8 kHz mono normalized cross-correlation, independent short source windows; low-energy reference windows excluded.",
+    "fineSearch": "48 kHz stereo normalized cross-correlation in local neighborhoods; independent windows evaluated separately.",
+    "alignmentModel": "unit sample-rate slope; source frame 0 is translated by a constant reference frame offset. Final-source windows provide the exact offset baseline. Fanfare is partially masked by the mix, so only the strong, consistent windows are used.",
+    "limitations": "This is a rendered reference mix, not isolated stems. Fanfare matching confidence is lower than Final matching confidence. Numerical waveform correlation does not establish human listening acceptance."
+  },
+  "nativeDecode": {
+    "binary": "/workspace/mkw-preview-jobs/OutroNextPre/native/mkw_interactive_preview-14cea485c3aab403227218d48dc687706034523a026cbd9339f1c61a572944bd",
+    "sha256": "14cea485c3aab403227218d48dc687706034523a026cbd9339f1c61a572944bd",
+    "finalLapFanfare": {
+      "frames": 338824,
+      "log": "FinalLapFanfare.log",
+      "streamUnderrunFrames": 0,
+      "decodeFailures": 0,
+      "clipped": 0
+    },
+    "final": {
+      "frames": 4161636,
+      "log": "Final.log",
+      "streamUnderrunFrames": 0,
+      "decodeFailures": 0,
+      "clipped": 0
+    }
+  },
+  "sourceAssets": {
+    "FinalLapFanfare": {
+      "path": "/workspace/mkw-audio/sources/Rainbow/BGM_Rainbow_FinalLapFanfare.bwav",
+      "sha256": "f13025c3d4fe1aee569ca7a8bdf8dc778500bce83506e614acb82f6e40177a24",
+      "frames": 338824,
+      "nativeWavSha256": "991ace72dcd268e2f20682903010f62aa96808fd7317981792429adbb24fe2e8",
+      "minf": {
+        "logicalName": "BGM_Rainbow_FinalLapFanfare",
+        "sha256": "6ccd51c658a5fe858101f22dfd4d84c490a550f6545a120e7e56aca5f7422824",
+        "phase": 0,
+        "bpm": 170.00009155273438,
+        "events": [],
+        "beatFrames": [
+          0,
+          16941,
+          33882,
+          50823,
+          67764,
+          84705,
+          101647,
+          118588,
+          135529,
+          152470,
+          169411,
+          186352,
+          203294,
+          220235,
+          237176,
+          254117,
+          271058,
+          287999,
+          304941,
+          321882,
+          338823
+        ],
+        "nearestBeatToMeasuredDelta": {
+          "frame": 84705,
+          "label": 2
+        }
+      }
+    },
+    "Final": {
+      "path": "/workspace/mkw-audio/sources/Rainbow/BGM_Rainbow_Final.bwav",
+      "sha256": "76792b9011b41cad7af29bb3772742e52e707e1bb0d76161a9283b41c005cfab",
+      "frames": 4161636,
+      "nativeWavSha256": "6ca72d4c4594ef830b28949d614f32751ff48a670f5ff6f72b2a77bd323c0380",
+      "minf": {
+        "logicalName": "BGM_Rainbow_Final",
+        "sha256": "a7cb56d35fc3606e78799d50d033bdaabac3dee5dec07e394f0b6ca4d6be0886",
+        "phase": 0,
+        "bpm": 158.00035095214844,
+        "events": [],
+        "loopStart": 224430,
+        "loopEnd": 4161636
+      }
+    },
+    "Final_Pre": {
+      "path": "/workspace/mkw-audio/sources/Rainbow/BGM_Rainbow_Final_Pre.bwav",
+      "sha256": "1da9c7b7a2c4b66a8b6e02d93d6dede8a6ae2b9e10ac95c4b276973c8878be52",
+      "frames": 1166580,
+      "nativeWavSha256": "de16f8b5f4446d3b113c1f6839ff545d787da62f8fcb7afad9c51b5cca232b8f",
+      "minf": {
+        "logicalName": "BGM_Rainbow_Final_Pre",
+        "sha256": "91ffd3ddaa2b31c5d2954b849c469fbc3f0f5f083db2d02a5a538bb8b4958c0a",
+        "phase": 0,
+        "bpm": 158.00035095214844,
+        "loopStart": 291645,
+        "loopEnd": 1166580,
+        "events": [],
+        "loopPeriodFrames": 874935,
+        "beats": [
+          {
+            "frame": 0,
+            "label": 1
+          },
+          {
+            "frame": 18227,
+            "label": 2
+          },
+          {
+            "frame": 36455,
+            "label": 3
+          },
+          {
+            "frame": 54683,
+            "label": 4
+          },
+          {
+            "frame": 72911,
+            "label": 1
+          },
+          {
+            "frame": 91139,
+            "label": 2
+          },
+          {
+            "frame": 109366,
+            "label": 3
+          },
+          {
+            "frame": 127594,
+            "label": 4
+          },
+          {
+            "frame": 145822,
+            "label": 1
+          },
+          {
+            "frame": 164050,
+            "label": 2
+          },
+          {
+            "frame": 182278,
+            "label": 3
+          },
+          {
+            "frame": 200505,
+            "label": 4
+          },
+          {
+            "frame": 218733,
+            "label": 1
+          },
+          {
+            "frame": 236961,
+            "label": 2
+          },
+          {
+            "frame": 255189,
+            "label": 3
+          },
+          {
+            "frame": 273417,
+            "label": 4
+          },
+          {
+            "frame": 291644,
+            "label": 1
+          },
+          {
+            "frame": 309872,
+            "label": 2
+          },
+          {
+            "frame": 328100,
+            "label": 3
+          },
+          {
+            "frame": 346328,
+            "label": 4
+          },
+          {
+            "frame": 364556,
+            "label": 1
+          },
+          {
+            "frame": 382783,
+            "label": 2
+          },
+          {
+            "frame": 401011,
+            "label": 3
+          },
+          {
+            "frame": 419239,
+            "label": 4
+          },
+          {
+            "frame": 437467,
+            "label": 1
+          },
+          {
+            "frame": 455695,
+            "label": 2
+          },
+          {
+            "frame": 473923,
+            "label": 3
+          },
+          {
+            "frame": 492150,
+            "label": 4
+          },
+          {
+            "frame": 510378,
+            "label": 1
+          },
+          {
+            "frame": 528606,
+            "label": 2
+          },
+          {
+            "frame": 546834,
+            "label": 3
+          },
+          {
+            "frame": 565062,
+            "label": 4
+          },
+          {
+            "frame": 583289,
+            "label": 1
+          },
+          {
+            "frame": 601517,
+            "label": 2
+          },
+          {
+            "frame": 619745,
+            "label": 3
+          },
+          {
+            "frame": 637973,
+            "label": 4
+          },
+          {
+            "frame": 656201,
+            "label": 1
+          },
+          {
+            "frame": 674428,
+            "label": 2
+          },
+          {
+            "frame": 692656,
+            "label": 3
+          },
+          {
+            "frame": 710884,
+            "label": 4
+          },
+          {
+            "frame": 729112,
+            "label": 1
+          },
+          {
+            "frame": 747340,
+            "label": 2
+          },
+          {
+            "frame": 765567,
+            "label": 3
+          },
+          {
+            "frame": 783795,
+            "label": 4
+          },
+          {
+            "frame": 802023,
+            "label": 1
+          },
+          {
+            "frame": 820251,
+            "label": 2
+          },
+          {
+            "frame": 838479,
+            "label": 3
+          },
+          {
+            "frame": 856706,
+            "label": 4
+          },
+          {
+            "frame": 874934,
+            "label": 1
+          }
+        ]
+      }
+    }
+  },
+  "measuredStarts": {
+    "FinalLapFanfareSourceFrame0": {
+      "status": "UNRESOLVED; prior estimate withdrawn",
+      "previousCandidateFrame": 18433932,
+      "previousCandidateSeconds": 384.04025,
+      "reason": "The earlier estimate was based primarily on source windows around 1.5\u20131.75 s. Stereo global search and bed-subtracted residual analysis show that early source windows do not support a common source-origin offset; the previous windows likely matched similar phrases in the reference mix.",
+      "searchRegionSeconds": [
+        379,
+        390
+      ],
+      "sourceWindowSearches": [
+        {
+          "sourceWindowStartSeconds": 0.05,
+          "globalTop": [
+            {
+              "referenceSeconds": 163.597,
+              "correlation": 0.376
+            },
+            {
+              "referenceSeconds": 183.929,
+              "correlation": 0.373
+            },
+            {
+              "referenceSeconds": 222.265,
+              "correlation": 0.369
+            },
+            {
+              "referenceSeconds": 220.74,
+              "correlation": 0.366
+            }
+          ],
+          "localTop": {
+            "referenceSeconds": 385.844,
+            "correlation": 0.291,
+            "impliedSourceOriginSeconds": 385.794
+          }
+        },
+        {
+          "sourceWindowStartSeconds": 0.3,
+          "globalTop": [
+            {
+              "referenceSeconds": 221.019,
+              "correlation": 0.555
+            },
+            {
+              "referenceSeconds": 163.305,
+              "correlation": 0.546
+            },
+            {
+              "referenceSeconds": 164.257,
+              "correlation": 0.544
+            },
+            {
+              "referenceSeconds": 221.581,
+              "correlation": 0.522
+            }
+          ],
+          "localTop": {
+            "referenceSeconds": 385.497,
+            "correlation": 0.498,
+            "impliedSourceOriginSeconds": 385.197
+          }
+        },
+        {
+          "sourceWindowStartSeconds": 0.5,
+          "globalTop": [
+            {
+              "referenceSeconds": 162.376,
+              "correlation": 0.517
+            },
+            {
+              "referenceSeconds": 163.732,
+              "correlation": 0.504
+            },
+            {
+              "referenceSeconds": 222.006,
+              "correlation": 0.448
+            }
+          ],
+          "localTop": {
+            "referenceSeconds": 385.53,
+            "correlation": 0.433,
+            "impliedSourceOriginSeconds": 385.03
+          }
+        },
+        {
+          "sourceWindowStartSeconds": 0.75,
+          "globalTop": [
+            {
+              "referenceSeconds": 163.982,
+              "correlation": 0.505
+            },
+            {
+              "referenceSeconds": 222.256,
+              "correlation": 0.464
+            },
+            {
+              "referenceSeconds": 162.626,
+              "correlation": 0.438
+            }
+          ],
+          "localTop": {
+            "referenceSeconds": 385.781,
+            "correlation": 0.381,
+            "impliedSourceOriginSeconds": 385.031
+          }
+        },
+        {
+          "sourceWindowStartSeconds": 1.0,
+          "globalTop": [
+            {
+              "referenceSeconds": 140.521,
+              "correlation": 0.517
+            },
+            {
+              "referenceSeconds": 199.757,
+              "correlation": 0.507
+            },
+            {
+              "referenceSeconds": 201.851,
+              "correlation": 0.493
+            }
+          ],
+          "localTop": {
+            "referenceSeconds": 385.482,
+            "correlation": 0.437,
+            "impliedSourceOriginSeconds": 384.482
+          }
+        },
+        {
+          "sourceWindowStartSeconds": 1.25,
+          "globalTop": [
+            {
+              "referenceSeconds": 163.935,
+              "correlation": 0.456
+            },
+            {
+              "referenceSeconds": 222.209,
+              "correlation": 0.419
+            },
+            {
+              "referenceSeconds": 163.281,
+              "correlation": 0.403
+            }
+          ],
+          "localTop": {
+            "referenceSeconds": 385.473,
+            "correlation": 0.393,
+            "impliedSourceOriginSeconds": 384.223
+          }
+        },
+        {
+          "sourceWindowStartSeconds": 1.5,
+          "globalTop": [
+            {
+              "referenceSeconds": 163.743,
+              "correlation": 0.517
+            },
+            {
+              "referenceSeconds": 114.725,
+              "correlation": 0.511
+            },
+            {
+              "referenceSeconds": 193.734,
+              "correlation": 0.499
+            }
+          ],
+          "localTop": {
+            "referenceSeconds": 385.54,
+            "correlation": 0.399,
+            "impliedSourceOriginSeconds": 384.04
+          }
+        },
+        {
+          "sourceWindowStartSeconds": 1.75,
+          "globalTop": [
+            {
+              "referenceSeconds": 164.851,
+              "correlation": 0.471
+            },
+            {
+              "referenceSeconds": 163.993,
+              "correlation": 0.428
+            },
+            {
+              "referenceSeconds": 163.326,
+              "correlation": 0.385
+            }
+          ],
+          "localTopCandidates": [
+            {
+              "referenceSeconds": 388.381,
+              "correlation": 0.286,
+              "impliedSourceOriginSeconds": 386.631
+            },
+            {
+              "referenceSeconds": 385.791,
+              "correlation": 0.281,
+              "impliedSourceOriginSeconds": 384.041
+            }
+          ]
+        },
+        {
+          "sourceWindowStartSeconds": 2.0,
+          "globalTop": [
+            {
+              "referenceSeconds": 163.367,
+              "correlation": 0.484
+            },
+            {
+              "referenceSeconds": 221.081,
+              "correlation": 0.459
+            },
+            {
+              "referenceSeconds": 220.511,
+              "correlation": 0.444
+            }
+          ],
+          "localTopCandidates": [
+            {
+              "referenceSeconds": 386.351,
+              "correlation": 0.343,
+              "impliedSourceOriginSeconds": 384.351
+            },
+            {
+              "referenceSeconds": 385.558,
+              "correlation": 0.338,
+              "impliedSourceOriginSeconds": 383.558
+            }
+          ]
+        },
+        {
+          "sourceWindowStartSeconds": 2.25,
+          "globalTop": [
+            {
+              "referenceSeconds": 163.698,
+              "correlation": 0.53
+            },
+            {
+              "referenceSeconds": 385.496,
+              "correlation": 0.486
+            },
+            {
+              "referenceSeconds": 164.256,
+              "correlation": 0.483
+            }
+          ],
+          "localTop": {
+            "referenceSeconds": 385.496,
+            "correlation": 0.486,
+            "impliedSourceOriginSeconds": 383.246
+          }
+        },
+        {
+          "sourceWindowStartSeconds": 2.5,
+          "globalTop": [
+            {
+              "referenceSeconds": 163.948,
+              "correlation": 0.567
+            },
+            {
+              "referenceSeconds": 222.222,
+              "correlation": 0.501
+            },
+            {
+              "referenceSeconds": 162.593,
+              "correlation": 0.498
+            }
+          ],
+          "localTop": {
+            "referenceSeconds": 388.337,
+            "correlation": 0.419,
+            "impliedSourceOriginSeconds": 385.837
+          }
+        }
+      ],
+      "jointSearch": {
+        "candidatePreviousOffsetSeconds": 384.04025,
+        "earlyWindowCorrelations": [
+          0.0341,
+          0.0136,
+          -0.0367,
+          -0.0652,
+          -0.0055,
+          -0.0077,
+          -0.0055
+        ],
+        "windowStartsSeconds": [
+          0.05,
+          0.15,
+          0.3,
+          0.5,
+          0.75,
+          1.0,
+          1.25
+        ],
+        "interpretation": "Early source windows do not support this offset. A mean score peak is dominated by only a small subset of later windows and has high cross-window variance; it is not a reliable start estimate."
+      },
+      "residualSearch": "After subtracting locally fitted Final_Pre and Final beds from reference 379\u2013390 s, independent Fanfare source windows still do not converge on a shared source-origin offset."
+    },
+    "FinalSourceFrame0": {
+      "referenceFrame": 18515552,
+      "seconds": 385.74066666666664,
+      "estimateRangeFrames": [
+        -4,
+        6
+      ],
+      "confidence": "very high; eight separated windows, correlations 0.99985\u20130.999996",
+      "windows": [
+        {
+          "sourceWindowStartFrame": 48000,
+          "sourceWindowSeconds": 1,
+          "referenceOffsetFrame": 18515558,
+          "normalizedCorrelation": 0.999996
+        },
+        {
+          "sourceWindowStartFrame": 384000,
+          "sourceWindowSeconds": 8,
+          "referenceOffsetFrame": 18515554,
+          "normalizedCorrelation": 0.999994
+        },
+        {
+          "sourceWindowStartFrame": 720000,
+          "sourceWindowSeconds": 15,
+          "referenceOffsetFrame": 18515552,
+          "normalizedCorrelation": 0.99985
+        },
+        {
+          "sourceWindowStartFrame": 1056000,
+          "sourceWindowSeconds": 22,
+          "referenceOffsetFrame": 18515552,
+          "normalizedCorrelation": 0.999985
+        },
+        {
+          "sourceWindowStartFrame": 1440000,
+          "sourceWindowSeconds": 30,
+          "referenceOffsetFrame": 18515552,
+          "normalizedCorrelation": 0.999965
+        },
+        {
+          "sourceWindowStartFrame": 1824000,
+          "sourceWindowSeconds": 38,
+          "referenceOffsetFrame": 18515552,
+          "normalizedCorrelation": 0.999966
+        },
+        {
+          "sourceWindowStartFrame": 2400000,
+          "sourceWindowSeconds": 50,
+          "referenceOffsetFrame": 18515552,
+          "normalizedCorrelation": 0.9999
+        },
+        {
+          "sourceWindowStartFrame": 3120000,
+          "sourceWindowSeconds": 65,
+          "referenceOffsetFrame": 18515548,
+          "normalizedCorrelation": 0.999984
+        }
+      ]
+    },
+    "Final_PreSourceFrame0": {
+      "referenceFrame": 17719823,
+      "seconds": 369.1629791666667,
+      "estimateRangeFrames": [
+        -1,
+        1
+      ],
+      "confidence": "very high for the matched section; source windows around 15.5\u201316.25 s match at approximately 1.0 normalized correlation; earlier parts are masked by other mix content",
+      "windows": [
+        {
+          "sourceWindowStartFrame": 648000,
+          "sourceWindowSeconds": 13.5,
+          "referenceOffsetFrame": 17719823,
+          "normalizedCorrelation": 0.468
+        },
+        {
+          "sourceWindowStartFrame": 660000,
+          "sourceWindowSeconds": 13.75,
+          "referenceOffsetFrame": 17719823,
+          "normalizedCorrelation": 0.5825
+        },
+        {
+          "sourceWindowStartFrame": 672000,
+          "sourceWindowSeconds": 14.0,
+          "referenceOffsetFrame": 17719823,
+          "normalizedCorrelation": 0.6298
+        },
+        {
+          "sourceWindowStartFrame": 684000,
+          "sourceWindowSeconds": 14.25,
+          "referenceOffsetFrame": 17719823,
+          "normalizedCorrelation": 0.6928
+        },
+        {
+          "sourceWindowStartFrame": 696000,
+          "sourceWindowSeconds": 14.5,
+          "referenceOffsetFrame": 17719823,
+          "normalizedCorrelation": 0.7866
+        },
+        {
+          "sourceWindowStartFrame": 708000,
+          "sourceWindowSeconds": 14.75,
+          "referenceOffsetFrame": 17719823,
+          "normalizedCorrelation": 0.8687
+        },
+        {
+          "sourceWindowStartFrame": 720000,
+          "sourceWindowSeconds": 15.0,
+          "referenceOffsetFrame": 17719823,
+          "normalizedCorrelation": 0.9431
+        },
+        {
+          "sourceWindowStartFrame": 732000,
+          "sourceWindowSeconds": 15.25,
+          "referenceOffsetFrame": 17719823,
+          "normalizedCorrelation": 0.9941
+        },
+        {
+          "sourceWindowStartFrame": 744000,
+          "sourceWindowSeconds": 15.5,
+          "referenceOffsetFrame": 17719823,
+          "normalizedCorrelation": 1.0
+        },
+        {
+          "sourceWindowStartFrame": 768000,
+          "sourceWindowSeconds": 16.0,
+          "referenceOffsetFrame": 17719823,
+          "normalizedCorrelation": 1.0
+        }
+      ]
+    }
+  },
+  "handover": {
+    "status": "WITHDRAWN: cannot calculate Fan-to-Final interval without a reliable Fan source-origin match",
+    "FinalSourceFrame0": 18515552,
+    "FinalSourceSeconds": 385.74066666666664,
+    "previouslyReported81620Frames": "invalid; derived from withdrawn Fanfare estimate"
+  },
+  "additionalChecks": {
+    "prePhaseAtFanfareStart": {
+      "status": "unavailable; Fanfare source-origin estimate withdrawn"
+    },
+    "prePhaseAtFinalStart": {
+      "sourceFrame": 795729,
+      "loopWrapped": false,
+      "nearestNextLabel1": {
+        "frame": 802023,
+        "label": 1
+      },
+      "finalStartsFramesBeforeLabel1": 6294,
+      "secondsBeforeLabel1": 0.131125
+    },
+    "intervals": {
+      "Final_PreSource0ToFinalFrames": 795729,
+      "Final_PreSource0ToFinalSeconds": 16.5776875,
+      "prePhaseAtFinalSource0": 795729,
+      "nextPreLabel1": 802023,
+      "finalPrecedesNextLabel1Frames": 6294
+    },
+    "halfSecondLeastSquares": {
+      "model": "Reference PCM \u2248 gainPre*Final_Pre + gainFinal*Final; source offsets use the validated Pre and Final alignments. Fanfare is omitted because no reliable origin was found.",
+      "windowsRelativeToFinalStartSeconds": [
+        {
+          "start": -1.0,
+          "gainPre": 2.4329,
+          "gainFinal": 0.0,
+          "R2": 0.99999
+        },
+        {
+          "start": -0.5,
+          "gainPre": 2.4324,
+          "gainFinal": 0.0,
+          "R2": 0.999955
+        },
+        {
+          "start": 0.0,
+          "gainPre": 1.6495,
+          "gainFinal": 4.4137,
+          "R2": 0.614
+        },
+        {
+          "start": 0.25,
+          "gainPre": 0.921,
+          "gainFinal": 4.2053,
+          "R2": 0.6456
+        },
+        {
+          "start": 0.5,
+          "gainPre": 0.4976,
+          "gainFinal": 4.8238,
+          "R2": 0.8791
+        },
+        {
+          "start": 0.75,
+          "gainPre": -0.1163,
+          "gainFinal": 4.8775,
+          "R2": 0.9011
+        },
+        {
+          "start": 1.0,
+          "gainPre": -0.071,
+          "gainFinal": 4.0823,
+          "R2": 0.6314
+        }
+      ],
+      "interpretation": "Pre aligns nearly exactly through the half-second before Final. Its fitted contribution declines during the first 0.75 s after Final source frame0 and is near zero by +1 s. Coefficients describe this edited mix, not engine gain settings."
+    },
+    "causalInterpretation": "Measured interval is not equal to the wait from Fanfare start to the next Pre label1: it is 81,620 frames versus 15,003 frames. Final source frame0 occurs 6,294 frames before the subsequent Pre label1. This reference is consistent with a transition near that label1 but does not land exactly on it. One edited Medley cannot establish whether this reflects authored delay or a trigger followed by waiting; do not claim a MINF event, fixed engine delay, or event definition from these measurements."
+  },
+  "comparisonCrop": {
+    "path": "/workspace/mkw-planning/rainbow-reference-work/reference-final-380-393s.wav",
+    "sha256": "9c93a17b29fd7df5ca37f1b303bcd64991df99c2ba3f2aa43d146a7976b29a88",
+    "format": "PCM signed 16-bit stereo 48000 Hz",
+    "frames": 624000,
+    "referenceStartFrame": 18240000,
+    "referenceEndFrame": 18864000,
+    "durationSeconds": 13.0,
+    "containsFinalSourceStartAtReferenceFrame": 18515552,
+    "relativeSeconds": 5.740666666666641
+  },
+  "finalOpeningCheck": {
+    "nativeWavSha256": "6ca72d4c4594ef830b28949d614f32751ff48a670f5ff6f72b2a77bd323c0380",
+    "sourceFrame0MinfBeat": {
+      "frame": 0,
+      "label": 1
+    },
+    "firstSampleValuesStereoInt16": [
+      -818,
+      -501
+    ],
+    "rmsFrames0to12000": 935.58,
+    "rmsFrames6294to18294": 652.76,
+    "leadingSilence": false,
+    "interpretation": "Final source frame0 has immediate nonzero content and corresponds to its own MINF label1. No ~6,294-frame leading silence was found to explain why Final starts 6,294 frames before the next Pre label1. This is a timing relationship in the reference mix; it does not identify an author-defined trigger/event.",
+    "referenceSeconds": 385.74066666666664,
+    "PreNextLabel1OffsetFrames": 6294
+  },
+  "causalitySummary": "The reference supports the aligned Final and Pre source offsets. It does not currently support a reliable Fanfare source-origin offset. The previously reported 81,620-frame Fan-to-Final interval is withdrawn. This edited reference alone cannot establish game-authored transition timing."
+}

@@ -12,6 +12,12 @@ void EngineRuntime::cancelTransition(bool retainVoices) noexcept {
         for(auto& voice:voices_.slots()) if(!retainVoices && voice.active && voice.owner==scene->owner) voice.active=false;
         scene->active=false; scene->reserved=false;
     }
+    // Owned source repetition must be released even after source departure,
+    // before a retained tail can lose its finite fade during cancellation.
+    for(auto& voice:voices_.slots()) if(voice.active && voice.departureRepeat &&
+        voice.instance==transition_.sourceInstance) {
+        voice.repeatSource(false); voice.departureRepeat=false;
+    }
     if(transition_.source && !transition_.sourceLeft) {
         auto& source=*transition_.source; source.departure=false; source.stopFrame=-1;
         if(source.instance==transition_.sourceInstance) source.disableLoop=transition_.sourceLoopDisabled;
@@ -118,6 +124,20 @@ void EngineRuntime::departScene(Scene& source,const Transition& rule,Frame at,bo
     for(auto& voice:voices_.slots()) if(voice.active && voice.instance==source.instance) {
         voice.exitFade=source.departure; voice.fadeStart=source.departure ? source.departureStart : -1;
         voice.fadeEnd=source.departureEnd; voice.fadeShape=source.departureShape; voice.stopFrame=source.stopFrame;
+        // A full-source looping clip may reach EOF during a finite departure fade.
+        // Retain its authored source loop until that fade kills the Voice. Ordinary
+        // post-exit tails and clips with independent timing keep their existing path.
+        const auto* buffer=voice.buffer;
+        if(rule.postExit && source.departure && source.departureEnd>at &&
+           !source.disableLoop && source.segment->hasLoop && source.segment->loop.count<0 &&
+           !source.segment->loop.retainTail && !voice.sourceRepeats &&
+           buffer && buffer->sourceLoop && buffer->sampleRate==rate_ &&
+           !voice.clipLoop && voice.sourceOffset==0 && voice.sourceLength==buffer->frames() &&
+           buffer->sourceLoop->start.value==source.segment->loop.start &&
+           buffer->sourceLoop->end.value==source.segment->loop.end &&
+           source.segment->loop.end==buffer->frames()) {
+            voice.repeatRange(true,buffer->sourceLoop); voice.departureRepeat=true;
+        }
     }
 }
 EngineStatus EngineRuntime::planTransition(Scene& source,int target,const TransitionChoice& choice,bool switchChange,const PlaylistSession::SwitchBranch* leaf,bool naturalSource,Frame destinationLead) noexcept {

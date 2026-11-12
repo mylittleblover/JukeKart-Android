@@ -1,0 +1,497 @@
+{
+  "reference": {
+    "identity": "user-corrected Drive RainbowRoad.flac",
+    "driveFileId": "1tiQumSMVC15TujrhDRvjRArCLe9LmPWJ",
+    "path": "/workspace/mkw-planning/rainbow-correct-reference/reference.flac",
+    "bytes": 192546927,
+    "sha256": "49b0084371a529a9d964160800f88161d7826f91af0ac1f18c091cb017e11328",
+    "sampleRate": 48000,
+    "channels": 2,
+    "frames": 40101265,
+    "durationSeconds": 835.4430208333333,
+    "decodedWav": "/workspace/mkw-planning/rainbow-correct-reference/reference-48k.wav",
+    "decodedWavSha256": "235ae5a2b7f1955e574d8e9d109ea8447a305ce0c890949471b76fda180a6c1e",
+    "decodedWavBytes": 160405138
+  },
+  "method": {
+    "coarse": "Global normalized correlation over the complete corrected reference using an ffmpeg 8 kHz mono decode. No previous offset was supplied as an anchor.",
+    "fine": "Local 48 kHz stereo normalized correlation around independent global coarse peaks. Times are computed from exact frame positions divided by 48000.",
+    "sourceAudio": "Each source waveform is an individual Native-rendered WAV; no hand-built source concatenation.",
+    "limitations": "Reference is a user-provided edited mix. Alignment establishes waveform positions in this mix, not a device recording or authored engine event."
+  },
+  "nativeRenderer": {
+    "path": "/workspace/mkw-preview-jobs/OutroNextPre/native/mkw_interactive_preview-14cea485c3aab403227218d48dc687706034523a026cbd9339f1c61a572944bd",
+    "sha256": "14cea485c3aab403227218d48dc687706034523a026cbd9339f1c61a572944bd"
+  },
+  "sources": {
+    "FinalLapFanfare": {
+      "path": "/workspace/mkw-audio/sources/Rainbow/BGM_Rainbow_FinalLapFanfare.bwav",
+      "sha256": "f13025c3d4fe1aee569ca7a8bdf8dc778500bce83506e614acb82f6e40177a24",
+      "nativeWav": "/workspace/mkw-planning/rainbow-reference-work/FinalLapFanfare.wav",
+      "nativeWavSha256": "991ace72dcd268e2f20682903010f62aa96808fd7317981792429adbb24fe2e8",
+      "frames": 338824,
+      "durationSeconds": 7.058833333333333,
+      "minf": {
+        "logicalName": "BGM_Rainbow_FinalLapFanfare",
+        "sha256": "6ccd51c658a5fe858101f22dfd4d84c490a550f6545a120e7e56aca5f7422824",
+        "phase": 0,
+        "bpm": 170.00009155273438,
+        "loopStart": 338824,
+        "loopEnd": 338824,
+        "events": []
+      }
+    },
+    "Final_Pre": {
+      "path": "/workspace/mkw-audio/sources/Rainbow/BGM_Rainbow_Final_Pre.bwav",
+      "sha256": "1da9c7b7a2c4b66a8b6e02d93d6dede8a6ae2b9e10ac95c4b276973c8878be52",
+      "nativeWav": "/workspace/mkw-planning/rainbow-reference-work/Final_Pre.wav",
+      "nativeWavSha256": "de16f8b5f4446d3b113c1f6839ff545d787da62f8fcb7afad9c51b5cca232b8f",
+      "frames": 1166580,
+      "durationSeconds": 24.30375,
+      "minf": {
+        "logicalName": "BGM_Rainbow_Final_Pre",
+        "sha256": "91ffd3ddaa2b31c5d2954b849c469fbc3f0f5f083db2d02a5a538bb8b4958c0a",
+        "phase": 0,
+        "bpm": 158.00035095214844,
+        "loopStart": 291645,
+        "loopEnd": 1166580,
+        "loopPeriodFrames": 874935,
+        "events": []
+      }
+    },
+    "Final": {
+      "path": "/workspace/mkw-audio/sources/Rainbow/BGM_Rainbow_Final.bwav",
+      "sha256": "76792b9011b41cad7af29bb3772742e52e707e1bb0d76161a9283b41c005cfab",
+      "nativeWav": "/workspace/mkw-planning/rainbow-reference-work/Final.wav",
+      "nativeWavSha256": "6ca72d4c4594ef830b28949d614f32751ff48a670f5ff6f72b2a77bd323c0380",
+      "frames": 4161636,
+      "durationSeconds": 86.70075,
+      "minf": {
+        "logicalName": "BGM_Rainbow_Final",
+        "sha256": "a7cb56d35fc3606e78799d50d033bdaabac3dee5dec07e394f0b6ca4d6be0886",
+        "phase": 0,
+        "bpm": 158.00035095214844,
+        "loopStart": 224430,
+        "loopEnd": 4161636,
+        "events": []
+      }
+    }
+  },
+  "measuredSourceStarts": {
+    "Final_Pre": {
+      "referenceFrame": 29529353,
+      "seconds": 615.1948541666667,
+      "confidence": "high for source offset; local fine offsets from multiple non-overlap windows agree exactly; source 0-2 s is partly attenuated/masked",
+      "fineWindows": [
+        {
+          "sourceFrames": [
+            0,
+            48000
+          ],
+          "offsetFrame": 29529353,
+          "correlation": 0.6416
+        },
+        {
+          "sourceFrames": [
+            0,
+            96000
+          ],
+          "offsetFrame": 29529353,
+          "correlation": 0.716
+        },
+        {
+          "sourceFrames": [
+            96000,
+            192000
+          ],
+          "offsetFrame": 29529353,
+          "correlation": 0.9913
+        },
+        {
+          "sourceFrames": [
+            192000,
+            288000
+          ],
+          "offsetFrame": 29529353,
+          "correlation": 0.9903
+        },
+        {
+          "sourceFrames": [
+            384000,
+            480000
+          ],
+          "offsetFrame": 29529353,
+          "correlation": 0.9909
+        },
+        {
+          "sourceFrames": [
+            576000,
+            672000
+          ],
+          "offsetFrame": 29529353,
+          "correlation": 0.9926
+        },
+        {
+          "sourceFrames": [
+            720000,
+            816000
+          ],
+          "offsetFrame": 29529353,
+          "correlation": 0.9911
+        },
+        {
+          "sourceFrames": [
+            816000,
+            912000
+          ],
+          "offsetFrame": 29529353,
+          "correlation": 0.9917
+        },
+        {
+          "sourceFrames": [
+            960000,
+            1056000
+          ],
+          "offsetFrame": 29529353,
+          "correlation": 0.9923
+        }
+      ]
+    },
+    "FinalLapFanfare": {
+      "referenceFrame": 30695935,
+      "seconds": 639.4986458333333,
+      "confidence": "very high; four independently searched windows converge at the same 48 kHz sample",
+      "globalCoarseWindows": [
+        {
+          "sourceSeconds": [
+            0,
+            1
+          ],
+          "offsetSeconds": 639.498625,
+          "correlation": 0.9944972992
+        },
+        {
+          "sourceSeconds": [
+            1,
+            2
+          ],
+          "offsetSeconds": 639.498625,
+          "correlation": 0.9945844412
+        },
+        {
+          "sourceSeconds": [
+            2,
+            3
+          ],
+          "offsetSeconds": 639.498625,
+          "correlation": 0.992511332
+        },
+        {
+          "sourceSeconds": [
+            0,
+            3
+          ],
+          "offsetSeconds": 639.498625,
+          "correlation": 0.9938969612
+        }
+      ],
+      "fine48kWindows": [
+        {
+          "sourceFrames": [
+            0,
+            48000
+          ],
+          "bestFrame": 30695935,
+          "correlation": 0.9974160488,
+          "adjacentCandidates": [
+            [
+              30695934,
+              0.9782100987
+            ],
+            [
+              30695936,
+              0.9460461427
+            ]
+          ]
+        },
+        {
+          "sourceFrames": [
+            48000,
+            96000
+          ],
+          "bestFrame": 30695935,
+          "correlation": 0.9978512554,
+          "adjacentCandidates": [
+            [
+              30695934,
+              0.9820702142
+            ],
+            [
+              30695936,
+              0.9562171913
+            ]
+          ]
+        },
+        {
+          "sourceFrames": [
+            96000,
+            144000
+          ],
+          "bestFrame": 30695935,
+          "correlation": 0.996905975,
+          "adjacentCandidates": [
+            [
+              30695934,
+              0.974051485
+            ],
+            [
+              30695936,
+              0.9361294277
+            ]
+          ]
+        },
+        {
+          "sourceFrames": [
+            0,
+            144000
+          ],
+          "bestFrame": 30695935,
+          "correlation": 0.9973957398,
+          "adjacentCandidates": [
+            [
+              30695934,
+              0.9781638962
+            ],
+            [
+              30695936,
+              0.9462770382
+            ]
+          ]
+        }
+      ]
+    },
+    "Final": {
+      "referenceFrame": 30914669,
+      "seconds": 644.0556041666666,
+      "confidence": "very high; three separated first-section windows agree at one frame",
+      "globalCoarseWindows": [
+        {
+          "sourceSeconds": [
+            0,
+            2
+          ],
+          "offsetSeconds": 644.055625,
+          "correlation": 0.9923309088
+        },
+        {
+          "sourceSeconds": [
+            8,
+            10
+          ],
+          "offsetSeconds": 644.055625,
+          "correlation": 0.9804816248
+        },
+        {
+          "sourceSeconds": [
+            30,
+            32
+          ],
+          "offsetSeconds": 644.055625,
+          "correlation": 0.9819208979
+        }
+      ],
+      "fine48kWindows": [
+        {
+          "sourceFrames": [
+            0,
+            48000
+          ],
+          "bestFrame": 30914669,
+          "correlation": 0.9977811073,
+          "adjacentCandidates": [
+            [
+              30914668,
+              0.9897021162
+            ],
+            [
+              30914670,
+              0.9750910699
+            ]
+          ]
+        },
+        {
+          "sourceFrames": [
+            48000,
+            96000
+          ],
+          "bestFrame": 30914669,
+          "correlation": 0.9979679146,
+          "adjacentCandidates": [
+            [
+              30914668,
+              0.9828039208
+            ],
+            [
+              30914670,
+              0.9570713893
+            ]
+          ]
+        },
+        {
+          "sourceFrames": [
+            144000,
+            192000
+          ],
+          "bestFrame": 30914669,
+          "correlation": 0.9979162678,
+          "adjacentCandidates": [
+            [
+              30914668,
+              0.9826120268
+            ],
+            [
+              30914670,
+              0.9573153547
+            ]
+          ]
+        }
+      ]
+    }
+  },
+  "timingRelationships": {
+    "PreToFanfare": {
+      "frames": 1166582,
+      "seconds": 24.303791666666665,
+      "preLengthFrames": 1166580,
+      "differenceFromPreEOFFrames": 2,
+      "interpretation": "Pre source reaches its natural EOF at the Fanfare source-0 boundary within 2 frames. It does not continue underneath Fanfare in the reference."
+    },
+    "FanfareToFinal": {
+      "frames": 218734,
+      "seconds": 4.556958333333333,
+      "fanFramesRemainingAtFinalStart": 120090,
+      "fanSourceSecondsRemaining": 2.501875,
+      "FinalTempoBeats": 12,
+      "exact12BeatFramesAt158Bpm": 218733.69136038658,
+      "measuredMinus12BeatFrames": 0.3086396134167444,
+      "FanfareBpmBeatCount": 12.911388897811044,
+      "nearestFanfareBeatFrame": 220235,
+      "framesBeforeNearestFanfareBeat": 1501,
+      "interpretation": "Observed gap equals 12 beats at the 158 BPM Final/Pre tempo to within about 0.31 sample (3 bars of 4/4). It is about 12.91 Fanfare beats and is not an exact Fanfare beat. This measured relationship does not by itself establish an authored delay or a MINF event."
+    },
+    "PreLoopContinuationCheck": {
+      "expectedPhaseIfLoopedAtFanfareStart": 291645,
+      "method": "After the Pre natural EOF, test the reference against the Pre MINF loop continuation and jointly fit Pre-loop, Fanfare, and Final source waveforms at exact aligned offsets.",
+      "windowsAfterFanfareSeconds": [
+        0,
+        0.5,
+        1,
+        1.5,
+        2,
+        2.5,
+        3,
+        3.5,
+        4
+      ],
+      "gainsPreLoop": [
+        0.0051,
+        0.0011,
+        -0.0025,
+        0.0091,
+        -0.0055,
+        0.0096,
+        0.0031,
+        0.0044,
+        0.0011
+      ],
+      "correlationPreLoop": [
+        -0.0013,
+        0.0092,
+        -0.0032,
+        0.0216,
+        0.0161,
+        0.0054,
+        -0.0145,
+        -0.0085,
+        0.0011
+      ],
+      "fanfareGains": [
+        3.9586,
+        3.9655,
+        3.9909,
+        3.963,
+        3.9534,
+        3.9361,
+        3.9488,
+        3.9619,
+        3.956
+      ],
+      "r2": [
+        0.9552,
+        0.9586,
+        0.971,
+        0.9575,
+        0.9527,
+        0.9444,
+        0.9505,
+        0.9568,
+        0.954
+      ],
+      "interpretation": "The loop-phase Pre template is not present after Fanfare starts; the Fanfare source is. This supports Pre cutting at the end of its non-loop pass."
+    },
+    "FanfareTail": {
+      "sourceRmsByStartSeconds": [
+        {
+          "sourceSeconds": 4.0,
+          "rms": 842.4
+        },
+        {
+          "sourceSeconds": 4.25,
+          "rms": 458.61
+        },
+        {
+          "sourceSeconds": 4.5,
+          "rms": 102.39
+        },
+        {
+          "sourceSeconds": 4.75,
+          "rms": 33.57
+        },
+        {
+          "sourceSeconds": 5.0,
+          "rms": 9.28
+        },
+        {
+          "sourceSeconds": 5.25,
+          "rms": 3.91
+        },
+        {
+          "sourceSeconds": 5.5,
+          "rms": 1.63
+        },
+        {
+          "sourceSeconds": 5.75,
+          "rms": 0.76
+        },
+        {
+          "sourceSeconds": 6.0,
+          "rms": 0.57
+        }
+      ],
+      "interpretation": "Final begins when Fanfare source position is 4.55696 s, in the rapidly declining tail. After that point the Fanfare waveform has little energy; the overlap is mainly a source timeline fact, not evidence of two strong melodies continuing together."
+    }
+  },
+  "comparisonCrop": {
+    "path": "/workspace/mkw-delivery/Rainbow-correct-reference-fan-final-636-648s.wav",
+    "sha256": "90a2c2481d3b0df2e5cb7b32c93c2f00449a14a78d70781fe84e23e36b6c4ec5",
+    "sampleRate": 48000,
+    "channels": 2,
+    "bitsPerSample": 16,
+    "frames": 576000,
+    "durationSeconds": 12,
+    "referenceStartFrame": 30528000,
+    "FanfareSource0RelativeSeconds": 3.498645833333285,
+    "FinalSource0RelativeSeconds": 8.055604166666626
+  },
+  "authorshipLimit": "The reference establishes its own timings. It cannot prove an engine-authored fixed delay or event. The MINF event lists for Fanfare, Pre, and Final are empty."
+}

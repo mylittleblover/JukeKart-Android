@@ -49,7 +49,8 @@ struct Voice {
     // Frozen music ownership survives Scene reuse while outgoing voices keep ringing.
     std::bitset<4096> musicOwners;
     bool active{},sourceEnded{},lastUnderrun{};
-    // Decoded-linear repetition only. Graph Clip/Musical loops never infer this policy.
+    // Linear repetition or finite graph departure continuation; authored clip loops stay separate.
+    bool departureRepeat{}; // Owned by the pending finite departure; undone on cancellation.
     bool sourceRepeats{};audio::SourceSamplePosition sourceRepeatBegin,sourceRepeatEnd; MusicFilters filters; audio::StreamCursor streamCursor; const AudioBuffer* buffer{}; std::uint64_t numericalCorrections{};
     int segment{-1},track{-1},clip{-1},bus{-1},instance{-1},owner{-1}; Frame startFrame{},sourceOffset{},sourceLength{};
     std::optional<CompiledClipLoop> clipLoop;bool clipLoopReleased{};std::int64_t releasedWraps{};long double sourceProgress{},sourceProgressCorrection{};
@@ -61,7 +62,7 @@ struct Voice {
     // Graph owns this immutable Segment until all of its Voices retire.
     const Segment* envelopeSegment{}; const Clip* envelopeClip{}; Frame segmentClipStart{};
     void begin(const AudioBuffer* data,int rate,double catchup=0) noexcept {
-        streamCursor.reset(); sourceRepeats=false;clipLoopReleased=false;releasedWraps=0; buffer=data; active=data && data->valid() && (!clipLoop || validClipLoop(*clipLoop,sourceOffset,sourceLength)); sourceEnded=false; filters.clear(); timelinePosition=catchup;
+        streamCursor.reset(); sourceRepeats=false;departureRepeat=false;clipLoopReleased=false;releasedWraps=0; buffer=data; active=data && data->valid() && (!clipLoop || validClipLoop(*clipLoop,sourceOffset,sourceLength)); sourceEnded=false; filters.clear(); timelinePosition=catchup;
         sourceProgress=static_cast<long double>(catchup)*speed/timelineRate*(data ? data->sampleRate : rate)/rate;
         sourceProgressCorrection=0;
         sourcePosition=clipLoop ? ClipPlayback::position(*clipLoop,sourceOffset,sourceProgress) : static_cast<double>(sourceOffset+sourceProgress);

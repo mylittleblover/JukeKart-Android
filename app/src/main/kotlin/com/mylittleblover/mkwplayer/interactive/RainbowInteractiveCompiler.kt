@@ -4,6 +4,9 @@ import com.mylittleblover.mkwplayer.graph.MusicGraphBuilder as G
 
 /** Rainbow's independent regions; all offsets are source sample coordinates. */
 internal object RainbowInteractiveCompiler {
+    // Corrected user reference: Fan source 0 at 30695935; Final source 0 at 30914669.
+    // Multiple independent 48 kHz windows agree. This is not a named MINF event.
+    private const val FINAL_FROM_FANFARE_FRAMES=218_734L
     val roles = listOf("Area1_Pre","Area1_Bridge","Area1_Inst","Area1_Melody","Area2",
         "Area2_Outro00","Area2_Outro01","Area2_Outro02","Area2_Outro03","Area2_Outro04",
         "Area3_Pre","Area3","Final_Pre","Final","FinalLapFanfare")
@@ -39,7 +42,11 @@ internal object RainbowInteractiveCompiler {
                     add(G.Cue(cueId++,label,r.event(label)!!.single()))
                 }
             }
-            val exit=if(name.startsWith("Area2_Outro")) r.event("Outro_ToNextPre")!!.single() else s.frames
+            val exit=when {
+                name.startsWith("Area2_Outro") -> r.event("Outro_ToNextPre")!!.single()
+                name=="FinalLapFanfare" -> FINAL_FROM_FANFARE_FRAMES
+                else -> s.frames
+            }
             require(exit in 1..s.frames)
             G.Segment(ids.getValue(name),exit=exit,
                 loop=s.loopStart?.let { G.Loop(it,s.loopEnd!!) },cues=cues)
@@ -55,10 +62,12 @@ internal object RainbowInteractiveCompiler {
         val transitions=mutableListOf<G.Transition>()
         fun link(from: String,to: String,cue: String?="bar.exit",bridge: String?=null,
                  sync: G.SyncPoint=G.SyncPoint.NextCustomCue,tail: Boolean=false,
+                 crossfadeSeconds: Double=0.0,
                  timeline: G.TransitionTimeline=G.TransitionTimeline(0,-record(to).phase,0,0)) {
+            val fade=G.Fade(beats=crossfadeSeconds*meta("Area1_Inst").bpm/60.0)
             transitions+=G.Transition(transitionId++,listOf(ids.getValue(from)),listOf(ids.getValue(to)),
                 sync=sync,sourceCue=cue,bridge=bridge?.let { ids.getValue(it) } ?: -1,
-                postExit=tail,timeline=timeline)
+                postExit=tail,fadeIn=fade,fadeOut=fade,timeline=timeline)
         }
         val bridgeExit=meta("Area1_Bridge").event("Bridge_ToFull")!!.single()
         val bridgePhase=meta("Area1_Bridge").phase
@@ -67,12 +76,12 @@ internal object RainbowInteractiveCompiler {
         // User-confirmed region policy: leave at original label-1 bar nodes, start target by MINF phase.
         link("Area1","Area2")
         link("Area3_Pre","Area3","pre.exit")
-        link("Area3","Final_Pre")
-        // User-confirmed final order: Pre -> Fanfare -> Full. The fanfare is one-shot.
-        val fanfareEnd=byRole.getValue("FinalLapFanfare").frames
+        // User-confirmed: overlap both sources for one second from the source bar cue.
+        link("Area3","Final_Pre",tail=true,crossfadeSeconds=1.0)
+        // Pre stops at G; Fanfare starts at G; Full enters before the Fanfare decay ends.
         link("Final_Pre","Final","pre.exit","FinalLapFanfare",tail=true,
-            timeline=G.TransitionTimeline(0,fanfareEnd-meta("Final").phase,fanfareEnd,0))
-        link("FinalLapFanfare","Final",null,sync=G.SyncPoint.ExitCue)
+            timeline=G.TransitionTimeline(0,FINAL_FROM_FANFARE_FRAMES,FINAL_FROM_FANFARE_FRAMES,0))
+        link("FinalLapFanfare","Final",null,sync=G.SyncPoint.ExitCue,tail=true)
         for(n in 0..4) {
             val outro="Area2_Outro%02d".format(n)
             link("Area2",outro,"Full_ToOutro%02d".format(n),timeline=G.TransitionTimeline(0,0,0,0))

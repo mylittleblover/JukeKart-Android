@@ -3,6 +3,7 @@ package com.mylittleblover.mkwplayer.interactive
 import com.mylittleblover.mkwplayer.graph.MusicGraphBuilder as G
 import java.io.File
 import kotlin.test.*
+import kotlin.math.roundToLong
 
 class RainbowInteractiveCompilerTest {
     private val catalog = MinfCatalog.parse(File("src/main/assets/interactive_minf.json").readText())
@@ -48,18 +49,34 @@ class RainbowInteractiveCompilerTest {
             assertTrue(p.spec.tracks.single { it.segment==id }.clips.single().sourceLength>segment.exit)
         }
     }
+    @Test fun area3ToFinalPreCrossfadesForExactlyOneSecondAtTheBarCue() {
+        val p=prepare()
+        val t=p.spec.transitions.single { it.sources==listOf(p.segments.getValue("Area3")) &&
+            it.destinations==listOf(p.segments.getValue("Final_Pre")) }
+        assertEquals(G.SyncPoint.NextCustomCue,t.sync)
+        assertEquals("bar.exit",t.sourceCue)
+        assertTrue(t.postExit,"Area3 must remain audible during its fade")
+        assertEquals(48000L,(t.fadeOut.beats*60.0*48000/p.spec.bpm).roundToLong())
+        assertEquals(48000L,(t.fadeIn.beats*60.0*48000/p.spec.bpm).roundToLong())
+        assertEquals(0.0,t.fadeIn.offset);assertEquals(0.0,t.fadeOut.offset)
+    }
     @Test fun finalPreAlwaysPassesThroughFanfareBeforeFull() {
         val p=prepare();val id=p.segments.getValue("FinalLapFanfare")
         val pre=p.spec.transitions.single { it.sources==listOf(p.segments.getValue("Final_Pre")) }
         assertEquals(id,pre.bridge)
         assertEquals(p.segments.getValue("Final"),pre.destinations.single())
         assertEquals(0L,pre.timeline!!.bridgeStart)
-        val duration=p.assets.single { it.fileName=="BGM_Rainbow_FinalLapFanfare.bwav" }.frames
-        assertEquals(duration,pre.timeline!!.destinationStart)
-        assertEquals(duration,pre.timeline!!.destinationCommit)
+        // Independently aligned source origins in the corrected user reference (48 kHz).
+        val handover=30_914_669L-30_695_935L
+        assertEquals(handover,pre.timeline!!.destinationStart)
+        assertEquals(handover,pre.timeline!!.destinationCommit)
+        assertEquals(0L,pre.timeline!!.destinationSource)
         val t=p.spec.transitions.single { it.sources==listOf(id) }
         assertEquals(G.SyncPoint.ExitCue,t.sync)
         assertEquals(p.segments.getValue("Final"),t.destinations.single())
+        assertEquals(handover,p.spec.segments.single { it.index==id }.exit)
+        assertTrue(t.postExit)
+        assertTrue(p.spec.tracks.single { it.segment==id }.clips.single().sourceLength>handover)
         assertFalse(p.spec.transitions.any { it.sources==listOf(p.segments.getValue("Area3")) && id in it.destinations })
         assertNull(p.spec.segments.single { it.index==id }.loop)
     }
