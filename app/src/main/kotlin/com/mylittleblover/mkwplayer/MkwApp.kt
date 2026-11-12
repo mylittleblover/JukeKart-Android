@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -358,10 +359,25 @@ private fun ConsolePage(
                             // line, so the switch is not a cut.
                             OutlinedButton(
                                 onClick = { model.toggleFast() },
-                                enabled = flow.canEnd && !flow.fastPlaying,
+                                enabled = flow.canFast || (flow.versionNumbers.isEmpty() && flow.canEnd && !flow.fastPlaying),
                             ) {
                                 Text(if (flow.fastPlaying) "Fast playing" else "Fast version")
                             }
+                        }
+
+                        if (flow.versionNumbers.isNotEmpty()) {
+                            Text(androidx.compose.ui.res.stringResource(R.string.recording_version))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                flow.versionNumbers.forEach { number ->
+                                    FilterChip(
+                                        selected = flow.selectedVersion == number,
+                                        onClick = { model.selectRecordingVersion(number) },
+                                        enabled = number in flow.availableVersions || number == flow.selectedVersion,
+                                        label = { Text(androidx.compose.ui.res.stringResource(R.string.recording_version_number,number)) },
+                                    )
+                                }
+                            }
+                            Text(androidx.compose.ui.res.stringResource(R.string.recording_version_hint),style = MaterialTheme.typography.bodySmall)
                         }
 
                         if (flow.canEnd) {

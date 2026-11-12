@@ -1,0 +1,5 @@
+<resources>
+    <string name="recording_version">音樂版本</string>
+    <string name="recording_version_number">版本 %1$d</string>
+    <string name="recording_version_hint">保持目前樂句進度，以一秒交叉淡化切換。</string>
+</resources>

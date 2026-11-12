@@ -55,6 +55,18 @@ class PackInteractiveSourcesTest {
             assertEquals("BGM_Stage_Cinema_Pattern2_Fast.bwav",r.flow.part(StageFlow.Role.Fast)!!.fileName)
         } finally { f.root.deleteRecursively() }
     }
+    @Test fun baseVersionLoadsOnlyItsDeclaredAlternateSourcesWithTheirOwnHashes() {
+        val f=fixture("Cinema",listOf("Main","Fast"),listOf("Cinema_Pattern2" to "Main","Cinema_Pattern2" to "Fast"))
+        try {
+            val r=PackInteractiveSources.resolve(f.manifest,f.track("Cinema"),f.root,f.playable("Cinema"),f.identities) as PackInteractiveSources.Resolved.Normal
+            assertEquals(4,r.bytes.size,"Version controls need both real Full/Fast alternate bytes")
+            val digest=f.manifest.tracks.last().primary.sha256
+            File(f.root,"audio/$digest").appendBytes(byteArrayOf(8))
+            assertFailsWith<IllegalArgumentException> {
+                PackInteractiveSources.resolve(f.manifest,f.track("Cinema"),f.root,f.playable("Cinema"),f.identities)
+            }
+        } finally { f.root.deleteRecursively() }
+    }
     @Test fun rainbowUsesAllFifteenDeclaredGroupAssetsInsteadOfTheSinglePrimary() {
         val f=fixture("Rainbow",RainbowInteractiveCompiler.roles)
         try {

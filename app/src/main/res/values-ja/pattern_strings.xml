@@ -1,0 +1,5 @@
+<resources>
+    <string name="recording_version">楽曲バージョン</string>
+    <string name="recording_version_number">バージョン %1$d</string>
+    <string name="recording_version_hint">現在の再生位置を保ち、1秒のクロスフェードで切り替えます。</string>
+</resources>

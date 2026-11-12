@@ -9,7 +9,7 @@
 - 用户要求在实际导入并播放验证后交付。JVM 1159、Python 147、实际安装后的 81 图准备已通过；Android 30/30 赛道入口输出与 FirstCircuit Pre→Bridge→Full 实际切换已通过，设备结果 OK (1 test)，耗时 1257.405 秒。
 - 首轮设备测到 FGS 首次创建超时。现已在 `PlaybackService.onCreate` 的 channel 建立后、MediaSession 初始化前进入前台；重跑验证已通过。
 - 当前基线只验证原有互动路径，不宣称已完成下述新增 Pattern 开关。
-- 上传用户授权的免费大文件临时站，合包含 APK、mkwpack、Rainbow 预览、说明、SHA256/验收记录。上传后验证返回下载内容，给真实链接及有效期。
+- 交付完成：Filebin 两份 ZIP（APK+mkwpack / 全部现有预览）均上传并完整回下载 SHA256 一致，已向用户提供链接；有效期至 2026-11-19。附件内含说明、SHA256/验收记录。
 
 ## 随后立即做 Pattern 控制与真实预览
 

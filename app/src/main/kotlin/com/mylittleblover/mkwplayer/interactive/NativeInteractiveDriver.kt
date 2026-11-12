@@ -10,6 +10,8 @@ internal class NativeInteractiveDriver(
     private val outros: Map<Int,Int>,
     private val fast: Int?,
     private val request: (Int)->String?,
+    private val versions: List<InteractivePlaybackPlan.Version> = emptyList(),
+    private val outroVariants: Map<Int,List<Int>> = emptyMap(),
 ) {
     data class Observation(val segment: Int,val sourceFrame: Long?,val transitioning: Boolean=false,
                            val paused: Boolean=false,val voices: Int=1,val error: String?=null,val failureCount: Long=0,
@@ -21,11 +23,18 @@ internal class NativeInteractiveDriver(
     private var heardVoices=false
     private var previousError: String?=null
     private var previousFailures=0L
-    private val available: Boolean get()=pending==null && observation?.transitioning==false && observation?.paused==false && !finished
+    private val available: Boolean get()=pending==null && observation?.transitioning==false && observation?.paused==false && !finished &&
+        !(currentVersion!=null && (observation?.voices ?: 0)>1)
     val canAdvance: Boolean get()=available && next[current]!=null
     val canEnd: Boolean get()=available && outroRules().isNotEmpty()
-    val isFast: Boolean get()=current==fast
-    val canFast: Boolean get()=available && fast!=null && rule(fast)!=null
+    val currentVersion: Int? get()=versions.singleOrNull { current==it.main || current==it.fast }?.number
+    val isFast: Boolean get()=current==fast || versions.any { current==it.fast }
+    private val fastTarget: Int? get()=versions.singleOrNull { current==it.main }?.fast ?: fast
+    val availableVersions: Set<Int> get()=if(!available) emptySet() else versions.filter { v ->
+        val target=if(isFast) v.fast else v.main
+        target!=null && target!=current && rule(target)!=null
+    }.map { it.number }.toSet()
+    val canFast: Boolean get()=available && fastTarget?.let { rule(it)!=null }==true
     val finished: Boolean get()=heardVoices && observation?.let { it.voices==0 && !it.paused && !it.transitioning && pending==null }==true
 
     fun observe(value: Observation) {
@@ -39,7 +48,8 @@ internal class NativeInteractiveDriver(
         previousError=value.error;previousFailures=value.failureCount
     }
     private fun rule(target: Int)=spec.transitions.singleOrNull { current in it.sources && target in it.destinations }
-    private fun outroRules()=spec.transitions.filter { current in it.sources && it.destinations.singleOrNull() in outros.values }
+    private val outroTargets: Set<Int> get()=(outros.values+outroVariants.values.flatten()).toSet()
+    private fun outroRules()=spec.transitions.filter { current in it.sources && it.destinations.singleOrNull() in outroTargets }
     private fun submit(target: Int): String? {
         if(!available) return "Waiting for the Native transition"
         if(rule(target)==null) return "No source transition for this section"
@@ -69,11 +79,17 @@ internal class NativeInteractiveDriver(
         return submit(target)
     }
     fun takeOutro(number: Int): String? {
-        val target=outros[number] ?: return "No such Outro"
+        val targets=listOfNotNull(outros[number])+outroVariants[number].orEmpty()
+        val target=targets.singleOrNull { rule(it)!=null } ?: return "No confirmed Outro from this section"
         return submit(target)
     }
+    fun selectVersion(number: Int): String? {
+        val version=versions.singleOrNull { it.number==number } ?: return "No such recording version"
+        val target=if(isFast) version.fast else version.main
+        return if(target==null) "No matching version for this section" else submit(target)
+    }
     fun enterFast(): String? {
-        val target=fast ?: return "No Fast arrangement"
+        val target=fastTarget ?: return "No Fast arrangement"
         return submit(target)
     }
 }

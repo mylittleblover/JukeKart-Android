@@ -1,0 +1,5 @@
+<resources>
+    <string name="recording_version">Recording version</string>
+    <string name="recording_version_number">Version %1$d</string>
+    <string name="recording_version_hint">Switches at the current musical position with a one-second crossfade.</string>
+</resources>

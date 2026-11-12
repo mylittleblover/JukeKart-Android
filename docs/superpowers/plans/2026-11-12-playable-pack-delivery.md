@@ -55,6 +55,14 @@ Files: create `app/src/androidTest/kotlin/com/mylittleblover/mkwplayer/ResearchP
 
 ### Task 4: Upload verified deliverables
 
-- [ ] Combine alpha07 APK, the tested pack, corrected Rainbow preview ZIP, instructions and SHA256 table; test ZIP CRC and every member hash.
-- [ ] Upload to the user-authorized free temporary host and verify returned download bytes/size/hash.
-- [ ] Give the actual download link and expiry, then resume the pending map/official-route/multilingual work.
+- [x] Combine alpha07 APK, the tested pack, corrected Rainbow preview ZIP, instructions and SHA256 table; test ZIP CRC and every member hash.
+- [x] Upload to the user-authorized free temporary host and verify returned download bytes/size/hash.
+- [x] Give the actual download link and expiry, then resume the pending map/official-route/multilingual work.
+
+## Delivery evidence
+
+- Commit f183aa3, actual Android 30/30 output and FirstCircuit transition passed.
+- Uploaded APK/pack ZIP 445750587 bytes; downloaded SHA256 6c9516316a8b2f9e68e61398472f8fc2b2c2b929dcccad80e250c7fc80b033de.
+- Uploaded all previews ZIP 725990630 bytes; downloaded SHA256 04d00ee4fe5c0f9231946fa60b5da410a30b701064e928869bf57f420e552f45.
+- Litterbox and temp.sh returned HTTP 500 on large files; Filebin accepted both, direct downloads were checked in full. Current expiry 2026-11-19 UTC.
+- Next work order supersedes original last bullet: user newly prioritizes Donkey/Cinema/Snow Pattern controls before map. Execution continues in 2026-11-12-pattern-controls.md.

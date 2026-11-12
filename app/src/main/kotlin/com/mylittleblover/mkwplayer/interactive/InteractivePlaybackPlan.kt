@@ -11,7 +11,12 @@ internal data class InteractivePlaybackPlan(
     val name: String,val spec: G.Spec,val packet: ByteArray,val assetPaths: List<String>,
     val entry: Int,val next: Map<Int,Int>,val outros: Map<Int,Int>,val fast: Int?,
     val labels: Map<Int,String>,val standard: StageFlowCompiler.Compiled?=null,val streamed: Boolean=false,
+    val versions: List<Version> = emptyList(),
+    val fastByMain: Map<Int,Int> = emptyMap(),
+    val outroVariants: Map<Int,List<Int>> = emptyMap(),
 ) {
+    data class Version(val number: Int,val main: Int,val fast: Int?)
+
     /** Authored Outro markers lead into the next looping prelude without another user event. */
     val automaticNext: Map<Int,Int> get()=outros.values.mapNotNull { from -> next[from]?.let { from to it } }.toMap()
     companion object {
@@ -26,8 +31,9 @@ internal data class InteractivePlaybackPlan(
             val next=listOf(StageFlow.Role.Pre,StageFlow.Role.PreShort).mapNotNull { roles[it]?.let { id -> id to main } }.toMap()
             val labels=roles.entries.associate { it.value to it.key.name }+
                 compiled.segmentByOutro.entries.associate { it.value to "Outro%02d".format(it.key) }
-            return InteractivePlaybackPlan(flow.name,prepared.spec,compiled.packet,compiled.assetPaths,entry,next,
+            val base=InteractivePlaybackPlan(flow.name,prepared.spec,compiled.packet,compiled.assetPaths,entry,next,
                 compiled.segmentByOutro,roles[StageFlow.Role.Fast],labels,compiled)
+            return FullVersionCompiler.extend(base,flow,bytes,catalog)
         }
         fun rainbow(bytes: Map<String,ByteArray>,catalog: MinfCatalog): InteractivePlaybackPlan {
             val sources=RainbowInteractiveCompiler.roles.map { role ->

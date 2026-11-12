@@ -154,6 +154,10 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val hasFast: Boolean = false,
         /** True when the fast arrangement is the one playing. */
         val fastPlaying: Boolean = false,
+        val versionNumbers: List<Int> = emptyList(),
+        val selectedVersion: Int? = null,
+        val availableVersions: Set<Int> = emptySet(),
+        val canFast: Boolean = false,
         /**
          * The next-stage event is available.
          *
@@ -721,6 +725,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             frames = FlowPresentation.totalFrames(flow),
             startSegment = entry,
             autoAdvance = plan?.automaticNext ?: emptyMap(),
+            streamed = plan?.streamed ?: false,
         )
         if (state.detail != null) {
             _ui.value = _ui.value.copy(status = "Cannot play this flow", detail = state.detail)
@@ -752,6 +757,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                 isProvisional = flow.isProvisional,
                 outros = compiled.segmentByOutro.keys.sorted(),
                 hasFast = compiled.segmentByRole.containsKey(StageFlow.Role.Fast),
+                versionNumbers = plan?.versions?.map { it.number }.orEmpty(),
             ),
             detail = buildList {
                 if (rejected.isNotEmpty()) add("Skipped: " + rejected.joinToString("; "))
@@ -1030,7 +1036,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                 nativePerformance=null
             }
             if(nativePerformance==null) nativePerformance=NativeInteractiveDriver(plan.spec,plan.entry,plan.next,plan.outros,plan.fast,
-                request={ segment -> session.playSegment(segment).detail })
+                request={ segment -> session.playSegment(segment).detail },versions=plan.versions,outroVariants=plan.outroVariants)
             session.interactiveObservation()?.let { nativePerformance!!.observe(it) }
             publishNativePerformance(fromAction=true)
             return
@@ -1285,6 +1291,11 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             )
         }
     }
+    fun selectRecordingVersion(number: Int) {
+        startPerformance()
+        val driver=nativePerformance ?: return
+        publishNativePerformance(driver.selectVersion(number),true)
+    }
     private fun publishNativePerformance(error: String?=null,fromAction: Boolean=false) {
         val driver=nativePerformance ?: return
         val plan=interactivePlan ?: return
@@ -1294,7 +1305,8 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         _ui.value=_ui.value.copy(detail=if(fromAction) error else driver.diagnostic ?: _ui.value.detail,flow=current.copy(
             activeSegment=driver.current,performing=!driver.finished,
             performanceStage=if(driver.finished) "Finished" else label+pending,
-            canAdvance=driver.canAdvance,canEnd=driver.canEnd,fastPlaying=driver.isFast))
+            canAdvance=driver.canAdvance,canEnd=driver.canEnd,fastPlaying=driver.isFast,canFast=driver.canFast,
+            selectedVersion=driver.currentVersion,availableVersions=driver.availableVersions))
     }
     private fun publish(state: PlaybackSession.State) {
         creditListening(state)

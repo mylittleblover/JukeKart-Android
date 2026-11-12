@@ -47,15 +47,19 @@ internal object PackInteractiveSources {
         }
         val canonical=identities.resolve(playable.flow,playable.bytes)
             ?: error("Known stage source could not restore its interactive identity")
+        val alternateBytes=if(owner.stage in setOf("Cinema","SnowMountain")) declared.filter { digest ->
+            identities.identityForDigest(digest)?.let { it.stage=="${owner.stage}_Pattern2" && it.role in setOf("Main","Fast") }==true
+        }.associate { load(it) } else emptyMap()
+        val canonicalBytes=canonical.bytes+alternateBytes
         val fast=sources("Fast")
         require(fast.size<=1) { "Multiple Fast sources declared for ${owner.stage}" }
         if(fast.isEmpty() || canonical.flow.part(StageFlow.Role.Fast)!=null)
-            return Resolved.Normal(canonical.flow,canonical.bytes,canonical.title)
+            return Resolved.Normal(canonical.flow,canonicalBytes,canonical.title)
         val (name,data)=load(fast.single())
         val header=(BwavHeader.read(data) as? BwavHeader.Result.Ok)?.info
             ?: error("Unreadable Fast source for ${owner.stage}")
         val part=StageFlow.Part(StageFlow.Role.Fast,name,header.frames.toLong(),header.sampleRate,header.channels,
             header.loopStart?.toLong(),header.loopEnd?.toLong())
-        return Resolved.Normal(canonical.flow.copy(parts=canonical.flow.parts+part),canonical.bytes+(name to data),canonical.title)
+        return Resolved.Normal(canonical.flow.copy(parts=canonical.flow.parts+part),canonicalBytes+(name to data),canonical.title)
     }
 }
