@@ -18,6 +18,7 @@ import com.mylittleblover.mkwplayer.interactive.MinfCatalog
 import com.mylittleblover.mkwplayer.interactive.InteractivePlaybackPlan
 import com.mylittleblover.mkwplayer.interactive.NativeInteractiveDriver
 import com.mylittleblover.mkwplayer.interactive.InteractiveAudioIdentities
+import com.mylittleblover.mkwplayer.interactive.PackInteractiveSources
 import com.mylittleblover.mkwplayer.library.LibraryStore
 import com.mylittleblover.mkwplayer.library.StageFlow
 import com.mylittleblover.mkwplayer.library.StageFlowDiscovery
@@ -203,6 +204,13 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      * and getting nothing is indistinguishable from a broken app.
      */
     fun selectStage(code: String) {
+        pack?.let { installed ->
+            val stage=installed.manifest.stages.firstOrNull { it.code.removeSuffix("_00").equals(code.removeSuffix("_00"),true) }
+            if(stage!=null) {
+                stage.tracks.firstNotNullOfOrNull { installed.manifest.track(it) }?.let { openPackTrack(it) }
+                return
+            }
+        }
         val match = _ui.value.tracks.firstOrNull {
             it.name.contains(code.removeSuffix("_00"), ignoreCase = true)
         }
@@ -219,7 +227,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val logical=code.removeSuffix("_00")
         if(interactivePlan?.name?.removePrefix("BGM_Stage_")?.equals(logical,true)==true) return true
         val installed=pack ?: return false
-        return installed.manifest.stages.any { stage -> stage.code.equals(code,true) && stage.tracks.any { installed.manifest.track(it)!=null } }
+        return installed.manifest.stages.any { stage -> stage.code.removeSuffix("_00").equals(logical,true) && stage.tracks.any { installed.manifest.track(it)!=null } }
     }
 
     /** Resolve the selected course by its stable code before starting any playback. */
@@ -227,7 +235,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val logical=code.removeSuffix("_00")
         if(interactivePlan?.name?.removePrefix("BGM_Stage_")?.equals(logical,true)==true) { startPerformance();return }
         val installed=pack
-        val stage=installed?.manifest?.stages?.singleOrNull { it.code.equals(code,true) }
+        val stage=installed?.manifest?.stages?.singleOrNull { it.code.removeSuffix("_00").equals(logical,true) }
         val track=stage?.tracks?.firstNotNullOfOrNull { installed?.manifest?.track(it) }
         if(track==null) { _ui.value=_ui.value.copy(detail="No playable source for $code. Import its audio first.");return }
         if(openPackTrack(track)) startPerformance()
@@ -759,20 +767,21 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         return true
     }
 
-    private fun startRainbow(bytes: Map<String,ByteArray>,notes: List<String>) {
+    private fun startRainbow(bytes: Map<String,ByteArray>,notes: List<String>,displayTitle: String="Rainbow"): Boolean {
         val plan=try { InteractivePlaybackPlan.rainbow(bytes,minfCatalog) } catch(e: Exception) {
-            _ui.value=_ui.value.copy(status="Cannot prepare Rainbow",detail=e.message);return
+            _ui.value=_ui.value.copy(status="Cannot prepare Rainbow",detail=e.message);return false
         }
         val frames=plan.spec.segments.sumOf { it.exit }
-        val state=session.loadFlow("Rainbow",plan.packet,plan.assetPaths.map { it to bytes.getValue(it) },frames,plan.entry,streamed=true,autoAdvance=plan.automaticNext)
-        if(state.detail!=null) { _ui.value=_ui.value.copy(status="Cannot play Rainbow",detail=state.detail);return }
+        val state=session.loadFlow(displayTitle,plan.packet,plan.assetPaths.map { it to bytes.getValue(it) },frames,plan.entry,streamed=true,autoAdvance=plan.automaticNext)
+        if(state.detail!=null) { _ui.value=_ui.value.copy(status="Cannot play Rainbow",detail=state.detail);return false }
         interactivePlan=plan;nativePerformance=null;performance=null;flow=null;flowCompiled=null;flowBytes=bytes
         totalFrames=frames;rate=48000
         val sections=plan.spec.segments.map { FlowPresentation.Section(it.index,plan.labels.getValue(it.index),it.exit,48000) }
-        _ui.value=_ui.value.copy(title="Rainbow",status="Playing",detail=notes.joinToString("; ").ifEmpty { null },
+        _ui.value=_ui.value.copy(title=displayTitle,status="Playing",detail=notes.joinToString("; ").ifEmpty { null },
             canPause=true,canStop=true,outputActive=session.hasOutput,
-            flow=FlowUi("Rainbow",sections,plan.entry,"Area1 → Area2 → Area3 → Final","MINF timing; bar exits confirmed",true,outros=plan.outros.keys.sorted()))
+            flow=FlowUi(displayTitle,sections,plan.entry,"Area1 → Area2 → Area3 → Final","MINF timing; bar exits confirmed",true,outros=plan.outros.keys.sorted()))
         PlaybackService.start(getApplication());requestNotificationPermissionIfNeeded();startPolling()
+        return true
     }
 
     /**
@@ -942,10 +951,14 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             }
             is PackPlayback.Result.Ok -> {
                 val playable = prepared.playable
-                val resolved=try { interactiveIdentities.resolve(playable.flow,playable.bytes) } catch(e: Exception) {
+                val resolved=try { PackInteractiveSources.resolve(installed.manifest,track,installed.directory,playable,interactiveIdentities) } catch(e: Exception) {
                     _ui.value=_ui.value.copy(status="Cannot identify interactive sources",detail=e.message);return false
                 }
-                startFlow(resolved?.flow ?: playable.flow,resolved?.bytes ?: playable.bytes,playable.notes,resolved?.title ?: playable.flow.name)
+                when(resolved) {
+                    is PackInteractiveSources.Resolved.Rainbow -> startRainbow(resolved.bytes,playable.notes,resolved.title)
+                    is PackInteractiveSources.Resolved.Normal -> startFlow(resolved.flow,resolved.bytes,playable.notes,resolved.title)
+                    null -> startFlow(playable.flow,playable.bytes,playable.notes)
+                }
             }
         }
     }

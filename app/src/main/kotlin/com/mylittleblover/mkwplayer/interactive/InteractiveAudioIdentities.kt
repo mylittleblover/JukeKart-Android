@@ -8,6 +8,7 @@ import java.security.MessageDigest
 internal class InteractiveAudioIdentities private constructor(private val rows: Map<String,Identity>) {
     data class Identity(val stage: String,val role: String,val fileName: String)
     data class Resolved(val flow: StageFlow,val bytes: Map<String,ByteArray>,val title: String=flow.name)
+    fun identityForDigest(sha256: String): Identity? = rows[sha256]
     fun resolve(flow: StageFlow,bytes: Map<String,ByteArray>): Resolved? {
         fun identity(data: ByteArray)=rows[MessageDigest.getInstance("SHA-256").digest(data).joinToString("") { "%02x".format(it) }]
         val main=flow.part(StageFlow.Role.Main) ?: return null

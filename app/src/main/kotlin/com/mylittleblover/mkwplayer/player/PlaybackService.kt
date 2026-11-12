@@ -25,7 +25,7 @@ import com.mylittleblover.mkwplayer.R
  * with what you hear.
  *
  * Foreground rules this follows:
- *  - `startForeground` runs immediately in `onStartCommand`, because a service declared
+ *  - `startForeground` runs in `onCreate` before media-session setup, because a service declared
  *    as media playback must show its notification within a few seconds of starting
  *  - the notification is always built from the current session state, never cached
  *  - `stopSelf` is called when the session goes inactive, so the service does not linger
@@ -96,6 +96,9 @@ class PlaybackService : Service() {
         session = PlaybackHolder.get()
         manager = getSystemService(NotificationManager::class.java)
         createChannel()
+        // MediaSession/receiver initialization can involve slow Binder calls. Meet the
+        // platform deadline before that work, then refresh the richer notification later.
+        startForeground(NOTIFICATION_ID, buildNotification())
 
         focus = AudioFocusManager(this) { event -> handleFocusEvent(event) }
 

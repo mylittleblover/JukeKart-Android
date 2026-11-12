@@ -35,7 +35,8 @@ internal object MinfInteractiveCompiler {
         if(bridge!=null) require(bridgeExit!=null && bridgeExit>=0 && bridgeExit<=bridgePart!!.frames) {
             "$stage requires a separately verified layered/missing-marker bridge plan"
         }
-        val confirmed=ConfirmedOutroCatalog.forStage(stage) ?: error("No confirmed Outro mapping for $stage")
+        val confirmed=ConfirmedOutroCatalog.forStage(stage)
+            ?: if(flow.outros().isEmpty()) emptyMap() else error("No confirmed Outro mapping for $stage")
         var cueIndex=1000
         val segments=ordered.map { part ->
             val id=indices.getValue(part.fileName)
