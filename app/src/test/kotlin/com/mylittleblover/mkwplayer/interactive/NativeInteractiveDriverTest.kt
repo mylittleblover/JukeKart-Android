@@ -49,7 +49,7 @@ class NativeInteractiveDriverTest {
         val d=driver();d.observe(NativeInteractiveDriver.Observation(100,null,voices=0))
         assertFalse(d.finished)
         d.observe(NativeInteractiveDriver.Observation(100,50,voices=1))
-        d.observe(NativeInteractiveDriver.Observation(102,500,voices=0))
+        d.observe(NativeInteractiveDriver.Observation(102,500,voices=0,stopped=true))
         assertTrue(d.finished)
     }
     @Test fun persistentNativeErrorDoesNotPreventRetryOrEraseTheAcceptedRetry() {
@@ -74,4 +74,14 @@ class NativeInteractiveDriverTest {
         d.observe(NativeInteractiveDriver.Observation(101,1))
         assertNull(d.pending);assertEquals(101,d.current)
     }
+    @Test fun anExhaustedVoiceAtLoopBoundaryDoesNotFinishAStillPlayingTransport() {
+        val d=driver();d.observe(NativeInteractiveDriver.Observation(101,999,voices=1))
+        d.observe(NativeInteractiveDriver.Observation(101,null,voices=0,stopped=false))
+        assertFalse(d.finished)
+        d.observe(NativeInteractiveDriver.Observation(101,101,voices=1))
+        assertFalse(d.finished)
+        d.observe(NativeInteractiveDriver.Observation(102,500,voices=0,stopped=true))
+        assertTrue(d.finished)
+    }
+
 }

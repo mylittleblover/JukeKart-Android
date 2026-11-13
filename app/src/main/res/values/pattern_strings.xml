@@ -2,4 +2,8 @@
     <string name="recording_version">Recording version</string>
     <string name="recording_version_number">Version %1$d</string>
     <string name="recording_version_hint">Switches at the current musical position with a one-second crossfade.</string>
+    <string name="music_region">Music region</string>
+    <string name="music_region_number">Region %1$d</string>
+    <string name="music_region_hint">Changes at the next bar boundary. Return to region 1 to use its ending or Fast arrangement.</string>
+    <string name="cancel_pending_transition">Cancel queued change</string>
 </resources>

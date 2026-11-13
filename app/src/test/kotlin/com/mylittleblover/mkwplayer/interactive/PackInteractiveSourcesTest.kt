@@ -67,6 +67,14 @@ class PackInteractiveSourcesTest {
             }
         } finally { f.root.deleteRecursively() }
     }
+    @Test fun donkeyGroupLoadsDeclaredRegionSourcesWithoutChangingBasePartRoles() {
+        val f=fixture("DonkeyKong",listOf("Main","Fast"),(2..5).map { "DonkeyKong_Pattern$it" to "Main" })
+        try {
+            val r=PackInteractiveSources.resolve(f.manifest,f.track("DonkeyKong"),f.root,f.playable("DonkeyKong"),f.identities) as PackInteractiveSources.Resolved.Normal
+            assertEquals(6,r.bytes.size)
+            assertEquals(setOf(StageFlow.Role.Main,StageFlow.Role.Fast),r.flow.parts.map { it.role }.toSet())
+        } finally { f.root.deleteRecursively() }
+    }
     @Test fun rainbowUsesAllFifteenDeclaredGroupAssetsInsteadOfTheSinglePrimary() {
         val f=fixture("Rainbow",RainbowInteractiveCompiler.roles)
         try {

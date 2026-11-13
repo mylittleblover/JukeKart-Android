@@ -211,6 +211,14 @@ void EngineRuntime::execute(const api::EngineCommand& command,int depth) noexcep
             if(last_==EngineStatus::Ok && albumActive_){albumActive_=false;albumState_.phase=api::AlbumFlowPhase::Overridden;}
             if(last_==EngineStatus::Ok && musicalLoopActive_){musicalLoopActive_=false;musicalLoopState_.phase=api::MusicalLoopPhase::Overridden;}
             break;
+        case EngineCommandKind::CancelPendingTransition:
+            if(!transition_.active || transition_.sourceLeft || transition_.destinationStarted || transition_.bridgeStarted) {
+                last_=EngineStatus::InvalidRequest;
+            } else {
+                queuedTransition_=-1; queuedSwitch_=false;
+                cancelTransition();
+            }
+            break;
         case EngineCommandKind::Stop:
             if(command.target==-1) resetStopped();
             else last_=stopObject(command.target,command.number,command.value==1);

@@ -7,6 +7,8 @@ import kotlin.test.*
 class InteractiveObservationTest {
     private class Device : SessionAudioEngine {
         val requests=mutableListOf<Int>()
+        var cancellations=0
+        override fun cancelPendingTransition(): Int { cancellations++;return 0 }
         var raw=LongArray(65).apply { this[0]=8;this[1]=9999999;this[2]=1;this[3]=1;this[11]=100 }
         var source: LongArray?=LongArray(207).apply { this[0]=4;this[1]=1;this[4]=100;this[10]=12345 }
         override val sampleRate=48000
@@ -58,4 +60,16 @@ class InteractiveObservationTest {
         assertNull(s.interactiveObservation()!!.destination)
         s.poll();assertEquals(listOf(100,101),d.requests)
     }
+    @Test fun cancellationUsesNativePhaseAndDoesNotResubmitAnAutomaticTarget() {
+        val d=Device();val s=session(d,mapOf(100 to 101));s.poll()
+        d.raw[24]=1;d.raw[27]=101;d.raw[37]=0
+        assertTrue(s.interactiveObservation()!!.canCancel)
+        assertNull(s.cancelPendingTransition());assertEquals(1,d.cancellations)
+        d.raw[24]=0
+        assertNull(s.interactiveObservation()!!.destination)
+        s.poll();assertEquals(listOf(100,101),d.requests)
+        d.raw[24]=1;d.raw[37]=1
+        assertFalse(s.interactiveObservation()!!.canCancel)
+    }
+
 }

@@ -52,11 +52,16 @@ internal object FullVersionCompiler {
         }
         val spec=base.spec.copy(assets=base.spec.assets+other.assets,segments=base.spec.segments+segments,
             tracks=base.spec.tracks+tracks,transitions=base.spec.transitions+transitions+switches)
+        val immediateSegments=setOf(main,fast,otherMain,otherFast)
+        val preparedAssets=spec.tracks.filter { it.segment in immediateSegments }.flatMap { it.clips }.map { spec.assets[it.asset].path }.toSet()
+        require(spec.assets.filter { it.path in preparedAssets }.sumOf { it.frames*it.channels*4L }<=128L*1024*1024) {
+            "$stage immediate version sources exceed the Native prepared budget"
+        }
         val packet=G.build(spec)
         val paths=base.assetPaths+prepared.compiled.assetPaths
         val labels=base.labels+mapOf(otherMain to "Main Pattern2",otherFast to "Fast Pattern2")+
             prepared.compiled.segmentByOutro.entries.associate { id(it.value) to "Outro%02d Pattern2".format(it.key) }
-        return base.copy(spec=spec,packet=packet,assetPaths=paths,labels=labels,streamed=true,
+        return base.copy(spec=spec,packet=packet,assetPaths=paths,labels=labels,streamed=true,preparedAssets=preparedAssets,
             standard=base.standard.copy(packet=packet,assetPaths=paths),
             versions=listOf(InteractivePlaybackPlan.Version(1,main,fast),InteractivePlaybackPlan.Version(2,otherMain,otherFast)),
             fastByMain=mapOf(main to fast,otherMain to otherFast),

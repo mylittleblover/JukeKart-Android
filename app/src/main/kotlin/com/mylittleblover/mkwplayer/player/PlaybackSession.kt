@@ -95,7 +95,7 @@ internal class PlaybackSession(
             it.first==segment && it.third==raw[6]
         }?.second
         return NativeInteractiveDriver.Observation(segment,sourceFrame,raw[24]!=0L,raw[2]==2L,raw[3].toInt(),
-            if(raw[7]!=0L) "Native playback: ${AudioStatusText.engine(raw[7].toInt())}" else null,raw[6],destination)
+            if(raw[7]!=0L) "Native playback: ${AudioStatusText.engine(raw[7].toInt())}" else null,raw[6],destination,canCancel=raw[24]!=0L && raw[37]==0L,stopped=raw[2]==0L)
     }
 
     /**
@@ -115,6 +115,7 @@ internal class PlaybackSession(
         startSegment: Int,
         streamed: Boolean = false,
         autoAdvance: Map<Int,Int> = emptyMap(),
+        preparedAssets: Set<String> = emptySet(),
     ): State {
         var current = engine
         if (current == null) {
@@ -131,7 +132,7 @@ internal class PlaybackSession(
         // One bind per part. A flow that bound only its first asset would play the prelude and
         // then fail silently at the first transition.
         assets.forEachIndexed { index, (name, bytes) ->
-            val status = if(streamed) current.bindStreamedBwav(index,bytes,name) else current.bindBwav(index, bytes, name)
+            val status = if(streamed && name !in preparedAssets) current.bindStreamedBwav(index,bytes,name) else current.bindBwav(index, bytes, name)
             if (status != AudioEngine.STATUS_OK) {
                 return fail("Could not bind '$name': ${AudioStatusText.engineHint(status) ?: AudioStatusText.engine(status)}")
             }
@@ -199,6 +200,15 @@ internal class PlaybackSession(
         // has not been processed by the engine yet.
         _state.value = published.copy(loaded = true)
         return _state.value
+    }
+
+    /** Queue cancellation, preserving the current source and transport. Native owns the start boundary. */
+    fun cancelPendingTransition(): String? {
+        val current=engine ?: return "No audio session"
+        val status=current.cancelPendingTransition()
+        if(status!=AudioEngine.STATUS_OK) return "Could not cancel: ${AudioStatusText.engine(status)}"
+        automaticPending=null
+        return null
     }
 
     fun pause(): State {

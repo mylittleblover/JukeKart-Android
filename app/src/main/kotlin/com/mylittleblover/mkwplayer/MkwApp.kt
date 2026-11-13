@@ -365,13 +365,36 @@ private fun ConsolePage(
                             }
                         }
 
+                        if (flow.canCancelPending) {
+                            OutlinedButton(onClick = { model.cancelPendingPerformance() }) {
+                                Text(androidx.compose.ui.res.stringResource(R.string.cancel_pending_transition))
+                            }
+                        }
+
+                        if (flow.regionNumbers.isNotEmpty()) {
+                            Text(androidx.compose.ui.res.stringResource(R.string.music_region))
+                            flow.regionNumbers.chunked(3).forEach { row ->
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    row.forEach { number ->
+                                        FilterChip(
+                                            selected = flow.selectedRegion == number,
+                                            onClick = { if(flow.selectedRegion != number) model.selectMusicRegion(number) },
+                                            enabled = number in flow.availableRegions || number == flow.selectedRegion,
+                                            label = { Text(androidx.compose.ui.res.stringResource(R.string.music_region_number,number)) },
+                                        )
+                                    }
+                                }
+                            }
+                            Text(androidx.compose.ui.res.stringResource(R.string.music_region_hint),style = MaterialTheme.typography.bodySmall)
+                        }
+
                         if (flow.versionNumbers.isNotEmpty()) {
                             Text(androidx.compose.ui.res.stringResource(R.string.recording_version))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 flow.versionNumbers.forEach { number ->
                                     FilterChip(
                                         selected = flow.selectedVersion == number,
-                                        onClick = { model.selectRecordingVersion(number) },
+                                        onClick = { if(flow.selectedVersion != number) model.selectRecordingVersion(number) },
                                         enabled = number in flow.availableVersions || number == flow.selectedVersion,
                                         label = { Text(androidx.compose.ui.res.stringResource(R.string.recording_version_number,number)) },
                                     )

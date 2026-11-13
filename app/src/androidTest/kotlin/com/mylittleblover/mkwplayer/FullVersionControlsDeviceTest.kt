@@ -7,6 +7,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.mylittleblover.mkwplayer.player.PlayerViewModel
+import com.mylittleblover.mkwplayer.player.PlaybackHolder
 import java.io.File
 import org.json.JSONArray
 import org.json.JSONObject
@@ -18,9 +19,22 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class FullVersionControlsDeviceTest {
     private val instrumentation get()=InstrumentationRegistry.getInstrumentation()
+    private var observedModel: PlayerViewModel?=null
     private fun await(reason: String,timeout: Long=120000,predicate: ()->Boolean) {
         val end=System.currentTimeMillis()+timeout
-        while(System.currentTimeMillis()<end) { if(predicate())return;Thread.sleep(100) }
+        var nextRecord=0L
+        while(System.currentTimeMillis()<end) {
+            if(predicate())return
+            if(System.currentTimeMillis()>=nextRecord) {
+                var native="unavailable"
+                instrumentation.runOnMainSync { native=PlaybackHolder.get().interactiveObservation().toString() }
+                val ui=observedModel?.ui?.value
+                File(instrumentation.targetContext.filesDir,"full-version-diagnostic.log").appendText(
+                    "${System.currentTimeMillis()} waiting=$reason title=${ui?.title} detail=${ui?.detail} flow=${ui?.flow} native=$native\n")
+                nextRecord=System.currentTimeMillis()+5000
+            }
+            Thread.sleep(100)
+        }
         fail(reason)
     }
     @Test fun importedCinemaAndSnowMountainSwitchVersionsInFullAndFast() {
@@ -32,6 +46,8 @@ class FullVersionControlsDeviceTest {
             lateinit var model: PlayerViewModel
             scenario.onActivity { activity ->
                 model=ViewModelProvider(activity,ViewModelProvider.AndroidViewModelFactory.getInstance(context.applicationContext as Application))[PlayerViewModel::class.java]
+                observedModel=model
+                File(context.filesDir,"full-version-diagnostic.log").writeText("begin\n")
                 model.importPack(Uri.fromFile(pack))
             }
             await("Pack import did not complete",900000) { !model.ui.value.busy && model.ui.value.pack!=null }

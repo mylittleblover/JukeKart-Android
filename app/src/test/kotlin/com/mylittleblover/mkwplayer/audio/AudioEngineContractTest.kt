@@ -30,6 +30,7 @@ class AudioEngineContractTest {
         assertEquals(1, AudioEngine.COMMAND_STOP)
         assertEquals(2, AudioEngine.COMMAND_PAUSE)
         assertEquals(3, AudioEngine.COMMAND_RESUME)
+        assertEquals(17, AudioEngine.COMMAND_CANCEL_PENDING)
     }
 
     @Test
@@ -62,6 +63,7 @@ class AudioEngineContractTest {
             AudioEngine.COMMAND_STOP,
             AudioEngine.COMMAND_PAUSE,
             AudioEngine.COMMAND_RESUME,
+            AudioEngine.COMMAND_CANCEL_PENDING,
         )
         assertEquals(kinds.size, kinds.toSet().size)
     }

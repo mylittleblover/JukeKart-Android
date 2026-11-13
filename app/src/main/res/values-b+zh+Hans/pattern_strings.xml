@@ -2,4 +2,8 @@
     <string name="recording_version">音乐版本</string>
     <string name="recording_version_number">版本 %1$d</string>
     <string name="recording_version_hint">保持当前乐句进度，用一秒交叉淡化切换。</string>
+    <string name="music_region">音乐区域</string>
+    <string name="music_region_number">区域 %1$d</string>
+    <string name="music_region_hint">在下一小节首拍切换。需要结束或切换 Fast 时，请先返回区域 1。</string>
+    <string name="cancel_pending_transition">取消等待中的切换</string>
 </resources>

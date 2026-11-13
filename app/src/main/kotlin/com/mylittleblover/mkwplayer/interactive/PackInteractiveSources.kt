@@ -47,8 +47,13 @@ internal object PackInteractiveSources {
         }
         val canonical=identities.resolve(playable.flow,playable.bytes)
             ?: error("Known stage source could not restore its interactive identity")
-        val alternateBytes=if(owner.stage in setOf("Cinema","SnowMountain")) declared.filter { digest ->
-            identities.identityForDigest(digest)?.let { it.stage=="${owner.stage}_Pattern2" && it.role in setOf("Main","Fast") }==true
+        val familyStages=when(owner.stage) {
+            "Cinema","SnowMountain" -> setOf("${owner.stage}_Pattern2")
+            "DonkeyKong" -> (2..5).map { "DonkeyKong_Pattern$it" }.toSet()
+            else -> emptySet()
+        }
+        val alternateBytes=if(familyStages.isNotEmpty()) declared.filter { digest ->
+            identities.identityForDigest(digest)?.let { it.stage in familyStages && it.role in setOf("Main","Fast") }==true
         }.associate { load(it) } else emptyMap()
         val canonicalBytes=canonical.bytes+alternateBytes
         val fast=sources("Fast")

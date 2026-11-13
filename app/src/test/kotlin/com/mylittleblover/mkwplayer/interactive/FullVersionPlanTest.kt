@@ -16,6 +16,9 @@ class FullVersionPlanTest {
             val groups=StageFlowDiscovery.group(bytes.map { (n,b)->StageFlowReader.readPart(n,b).getOrThrow() })
             val flow=StageFlowDiscovery.flowFor(StageFlowDiscovery.dominant(groups)!!).getOrThrow()
             val p=InteractivePlaybackPlan.normal(flow,bytes,catalog)
+            assertEquals(4,p.preparedAssets.size,"SameTime alternatives must be ready at arbitrary current positions")
+            val decodedBytes=p.spec.assets.filter { it.path in p.preparedAssets }.sumOf { it.frames*it.channels*4L }
+            assertTrue(decodedBytes<128L*1024*1024,"Keep the Native prepared buffer budget")
             val altMain=p.labels.entries.singleOrNull { it.value=="Main Pattern2" }?.key
             assertTrue(p.streamed,"Combined variants exceed the Native 128 MiB prepared budget")
             assertNotNull(altMain,"$stage alternate Full missing from production graph")

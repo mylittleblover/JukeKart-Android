@@ -221,6 +221,7 @@ class PlaybackService : Service() {
         }
 
         refresh()
+        startupGate.promoted(intent?.getLongExtra(EXTRA_START_GENERATION,0L) ?: 0L)
         return START_STICKY
     }
 
@@ -360,6 +361,10 @@ class PlaybackService : Service() {
     }
 
     companion object {
+        private const val EXTRA_START_GENERATION="playbackStartGeneration"
+        private val startupGate=PlaybackStartupGate()
+        internal suspend fun awaitForegroundPromotion() = startupGate.awaitPromotion()
+
         const val CHANNEL_ID = "mkw.playback"
         const val NOTIFICATION_ID = 1
         const val MEDIA_SESSION_TAG = "mkwplayer"
@@ -388,11 +393,14 @@ class PlaybackService : Service() {
             pendingStop?.let { stopHandler.removeCallbacks(it) }
             pendingStop = null
 
-            val intent = Intent(context, PlaybackService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            val request=startupGate.requested()
+            val intent = Intent(context, PlaybackService::class.java).putExtra(EXTRA_START_GENERATION,request)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent)
+                else context.startService(intent)
+            } catch(error: RuntimeException) {
+                startupGate.promoted(request)
+                throw error
             }
             return true
         }

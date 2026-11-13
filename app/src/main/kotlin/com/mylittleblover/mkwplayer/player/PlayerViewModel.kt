@@ -154,10 +154,14 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val hasFast: Boolean = false,
         /** True when the fast arrangement is the one playing. */
         val fastPlaying: Boolean = false,
+        val regionNumbers: List<Int> = emptyList(),
+        val selectedRegion: Int? = null,
+        val availableRegions: Set<Int> = emptySet(),
         val versionNumbers: List<Int> = emptyList(),
         val selectedVersion: Int? = null,
         val availableVersions: Set<Int> = emptySet(),
         val canFast: Boolean = false,
+        val canCancelPending: Boolean = false,
         /**
          * The next-stage event is available.
          *
@@ -208,6 +212,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      * and getting nothing is indistinguishable from a broken app.
      */
     fun selectStage(code: String) {
+        packPlaybackRequest++
         pack?.let { installed ->
             val stage=installed.manifest.stages.firstOrNull { it.code.removeSuffix("_00").equals(code.removeSuffix("_00"),true) }
             if(stage!=null) {
@@ -237,12 +242,12 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     /** Resolve the selected course by its stable code before starting any playback. */
     fun startStagePerformance(code: String) {
         val logical=code.removeSuffix("_00")
-        if(interactivePlan?.name?.removePrefix("BGM_Stage_")?.equals(logical,true)==true) { startPerformance();return }
+        if(interactivePlan?.name?.removePrefix("BGM_Stage_")?.equals(logical,true)==true) { packPlaybackRequest++;startPerformance();return }
         val installed=pack
         val stage=installed?.manifest?.stages?.singleOrNull { it.code.removeSuffix("_00").equals(logical,true) }
         val track=stage?.tracks?.firstNotNullOfOrNull { installed?.manifest?.track(it) }
         if(track==null) { _ui.value=_ui.value.copy(detail="No playable source for $code. Import its audio first.");return }
-        if(openPackTrack(track)) startPerformance()
+        openPackTrack(track,perform=true)
     }
 
     private val _ui = MutableStateFlow(Ui())
@@ -630,6 +635,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      * than giving the flow code a special case it would then have to keep working.
      */
     fun openFlow(uris: List<Uri>) {
+        packPlaybackRequest++
         if (uris.isEmpty()) return
         _ui.value = _ui.value.copy(busy = true, status = "Reading files...", detail = null)
         viewModelScope.launch {
@@ -700,6 +706,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     }
 
     private fun startFlow(flow: StageFlow, bytes: Map<String, ByteArray>, rejected: List<String>,displayTitle: String=flow.name): Boolean {
+        packPlaybackRequest++
         val plan = try {
             if(minfCatalog.part(flow.name.removePrefix("BGM_Stage_"),"Full")!=null)
                 InteractivePlaybackPlan.normal(flow,bytes,minfCatalog) else null
@@ -726,6 +733,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             startSegment = entry,
             autoAdvance = plan?.automaticNext ?: emptyMap(),
             streamed = plan?.streamed ?: false,
+            preparedAssets = plan?.preparedAssets ?: emptySet(),
         )
         if (state.detail != null) {
             _ui.value = _ui.value.copy(status = "Cannot play this flow", detail = state.detail)
@@ -758,6 +766,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                 outros = compiled.segmentByOutro.keys.sorted(),
                 hasFast = compiled.segmentByRole.containsKey(StageFlow.Role.Fast),
                 versionNumbers = plan?.versions?.map { it.number }.orEmpty(),
+                regionNumbers = plan?.regions?.keys?.sorted().orEmpty(),
             ),
             detail = buildList {
                 if (rejected.isNotEmpty()) add("Skipped: " + rejected.joinToString("; "))
@@ -774,6 +783,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     }
 
     private fun startRainbow(bytes: Map<String,ByteArray>,notes: List<String>,displayTitle: String="Rainbow"): Boolean {
+        packPlaybackRequest++
         val plan=try { InteractivePlaybackPlan.rainbow(bytes,minfCatalog) } catch(e: Exception) {
             _ui.value=_ui.value.copy(status="Cannot prepare Rainbow",detail=e.message);return false
         }
@@ -798,6 +808,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      * app cannot read.
      */
     fun openFlowFromFolder() {
+        packPlaybackRequest++
         val folder = java.io.File(getApplication<Application>().filesDir, FLOW_FOLDER)
         _ui.value = _ui.value.copy(busy = true, status = "Scanning folder...", detail = null)
         viewModelScope.launch {
@@ -947,8 +958,19 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         if (firstStage != null) openPackTrack(firstStage)
     }
 
-    /** Opens one track from the installed pack. */
-    fun openPackTrack(track: PackManifest.Track): Boolean {
+    private var packPlaybackRequest=0L
+
+    /** Newest selection waits without blocking the service's foreground promotion. */
+    fun openPackTrack(track: PackManifest.Track,perform: Boolean=false) {
+        val request=++packPlaybackRequest
+        viewModelScope.launch {
+            PlaybackService.awaitForegroundPromotion()
+            if(request!=packPlaybackRequest) return@launch
+            if(openPackTrackNow(track) && perform) startPerformance()
+        }
+    }
+
+    private fun openPackTrackNow(track: PackManifest.Track): Boolean {
         val installed = pack ?: return false
         return when (val prepared = PackPlayback.prepare(installed.manifest, track, installed.directory)) {
             is PackPlayback.Result.Refused -> {
@@ -1030,15 +1052,25 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     fun startPerformance() {
         interactivePlan?.let { plan ->
             if(!session.state.value.loaded) {
-                val state=session.loadFlow(_ui.value.flow?.title ?: plan.name,plan.packet,plan.assetPaths.map { it to flowBytes.getValue(it) },
-                    totalFrames,plan.entry,streamed=plan.streamed,autoAdvance=plan.automaticNext)
-                if(state.detail!=null) { _ui.value=_ui.value.copy(detail=state.detail);return }
-                nativePerformance=null
+                val request=++packPlaybackRequest
+                viewModelScope.launch {
+                    PlaybackService.awaitForegroundPromotion()
+                    if(request!=packPlaybackRequest || interactivePlan!==plan) return@launch
+                    val state=session.loadFlow(_ui.value.flow?.title ?: plan.name,plan.packet,plan.assetPaths.map { it to flowBytes.getValue(it) },
+                        totalFrames,plan.entry,streamed=plan.streamed,autoAdvance=plan.automaticNext,preparedAssets=plan.preparedAssets)
+                    if(state.detail!=null) { _ui.value=_ui.value.copy(detail=state.detail);return@launch }
+                    nativePerformance=null
+                    startPerformance()
+                }
+                return
             }
             if(nativePerformance==null) nativePerformance=NativeInteractiveDriver(plan.spec,plan.entry,plan.next,plan.outros,plan.fast,
-                request={ segment -> session.playSegment(segment).detail },versions=plan.versions,outroVariants=plan.outroVariants)
+                request={ segment -> session.playSegment(segment).detail },versions=plan.versions,outroVariants=plan.outroVariants,regions=plan.regions,cancelRequest=session::cancelPendingTransition)
             session.interactiveObservation()?.let { nativePerformance!!.observe(it) }
             publishNativePerformance(fromAction=true)
+            PlaybackService.start(getApplication())
+            requestNotificationPermissionIfNeeded()
+            startPolling()
             return
         }
         val compiled = flowCompiled ?: return
@@ -1083,10 +1115,12 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
     /** Stops a performance without ending the stage. */
     fun stopPerformance() {
+        packPlaybackRequest++
         if(nativePerformance!=null) {
             nativePerformance=null
             publish(session.stop())
-            _ui.value=_ui.value.copy(flow=_ui.value.flow?.copy(performing=false,performanceStage="Stopped",canAdvance=false,canEnd=false,fastPlaying=false))
+            _ui.value=_ui.value.copy(flow=_ui.value.flow?.copy(performing=false,performanceStage="Stopped",canAdvance=false,canEnd=false,fastPlaying=false,
+                canFast=false,canCancelPending=false,availableRegions=emptySet(),availableVersions=emptySet(),selectedRegion=null,selectedVersion=null))
             return
         }
         val driver = performance ?: return
@@ -1158,6 +1192,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
     /** Starts the track with the given key, or reports why it cannot start. */
     fun select(key: String) {
+        packPlaybackRequest++
         val track = _ui.value.tracks.firstOrNull { it.key == key } ?: return
         if (!track.playable) {
             _ui.value = _ui.value.copy(
@@ -1291,6 +1326,15 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             )
         }
     }
+    fun cancelPendingPerformance() {
+        val driver=nativePerformance ?: return
+        publishNativePerformance(driver.cancelPending(),true)
+    }
+    fun selectMusicRegion(number: Int) {
+        startPerformance()
+        val driver=nativePerformance ?: return
+        publishNativePerformance(driver.selectRegion(number),true)
+    }
     fun selectRecordingVersion(number: Int) {
         startPerformance()
         val driver=nativePerformance ?: return
@@ -1306,7 +1350,8 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             activeSegment=driver.current,performing=!driver.finished,
             performanceStage=if(driver.finished) "Finished" else label+pending,
             canAdvance=driver.canAdvance,canEnd=driver.canEnd,fastPlaying=driver.isFast,canFast=driver.canFast,
-            selectedVersion=driver.currentVersion,availableVersions=driver.availableVersions))
+            selectedVersion=driver.currentVersion,availableVersions=driver.availableVersions,
+            selectedRegion=driver.currentRegion,availableRegions=driver.availableRegions,canCancelPending=driver.canCancelPending))
     }
     private fun publish(state: PlaybackSession.State) {
         creditListening(state)
@@ -1357,12 +1402,14 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     }
 
     fun stop() {
+        packPlaybackRequest++
         nativePerformance=null
         performance?.stop()
         performance=null
         publish(session.stop())
         _ui.value = _ui.value.copy(progress = 0f, position = EngineSnapshot.formatPosition(0, rate),
-            flow=_ui.value.flow?.copy(performing=false,performanceStage="Stopped",canAdvance=false,canEnd=false,fastPlaying=false))
+            flow=_ui.value.flow?.copy(performing=false,performanceStage="Stopped",canAdvance=false,canEnd=false,fastPlaying=false,
+                canFast=false,canCancelPending=false,availableRegions=emptySet(),availableVersions=emptySet(),selectedRegion=null,selectedVersion=null))
         PlaybackService.stop(getApplication())
     }
 

@@ -15,6 +15,7 @@ class PlaybackSessionLeaseTest {
         override fun loadGraph(packet: ByteArray): Int = if(leased) { rejected++; 1 } else 0
         override fun bindBwav(assetIndex: Int,bytes: ByteArray,assetId: String): Int = if(leased) { rejected++;1 } else 0
         override fun bindStreamedBwav(assetIndex: Int,bytes: ByteArray,assetId: String): Int { streamedBinds++;return bindBwav(assetIndex,bytes,assetId) }
+        override fun cancelPendingTransition()=0
         override fun play(target: Int)=0
         override fun stop()=0
         override fun pause()=0
@@ -48,4 +49,10 @@ class PlaybackSessionLeaseTest {
         session.loadFlow("Rainbow",packet(),listOf("a" to byteArrayOf(1)),1000,100,streamed=true)
         assertEquals(1,d.streamedBinds)
     }
+    @Test fun immediateVersionSourcesCanBePreparedWhileOtherPartsRemainStreamed() {
+        val d=Device();val session=PlaybackSession({d},{_,_->d.output()})
+        session.loadFlow("mixed",packet(),listOf("a" to byteArrayOf(1)),1000,100,streamed=true,preparedAssets=setOf("a"))
+        assertEquals(0,d.streamedBinds)
+    }
+
 }

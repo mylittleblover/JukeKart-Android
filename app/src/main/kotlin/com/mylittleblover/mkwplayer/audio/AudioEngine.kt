@@ -69,6 +69,9 @@ internal class AudioEngine private constructor(private val handle: Long) : Sessi
     override fun stop(): Int =
         if (closed) CLOSED else NativeAudioLibrary.command(handle, COMMAND_STOP, -1, -1, 0.0, -1L)
 
+    override fun cancelPendingTransition(): Int =
+        if(closed) CLOSED else NativeAudioLibrary.command(handle,COMMAND_CANCEL_PENDING,-1,-1,0.0,-1L)
+
     override fun pause(): Int =
         if (closed) CLOSED else NativeAudioLibrary.command(handle, COMMAND_PAUSE, -1, -1, 0.0, -1L)
 
@@ -116,6 +119,8 @@ internal class AudioEngine private constructor(private val handle: Long) : Sessi
 
         /** EngineCommandKind.Resume */
         const val COMMAND_RESUME = 3
+
+        const val COMMAND_CANCEL_PENDING = 17
 
         /** The only Play target a linear runtime accepts. */
         const val PLAY_LINEAR = -1

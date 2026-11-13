@@ -12,21 +12,38 @@ internal class NativeInteractiveDriver(
     private val request: (Int)->String?,
     private val versions: List<InteractivePlaybackPlan.Version> = emptyList(),
     private val outroVariants: Map<Int,List<Int>> = emptyMap(),
+    private val regions: Map<Int,Int> = emptyMap(),
+    private val cancelRequest: ()->String? = { "Cancellation is unavailable" },
 ) {
     data class Observation(val segment: Int,val sourceFrame: Long?,val transitioning: Boolean=false,
                            val paused: Boolean=false,val voices: Int=1,val error: String?=null,val failureCount: Long=0,
-                           val destination: Int?=null)
+                           val destination: Int?=null,val canCancel: Boolean=false,val stopped: Boolean=false)
     var current: Int=entry; private set
     var pending: Int?=null; private set
     var diagnostic: String?=null; private set
     private var observation: Observation?=null
+    private var cancellationRequested=false
     private var heardVoices=false
     private var previousError: String?=null
     private var previousFailures=0L
     private val available: Boolean get()=pending==null && observation?.transitioning==false && observation?.paused==false && !finished &&
         !(currentVersion!=null && (observation?.voices ?: 0)>1)
+    val canCancelPending: Boolean get()=pending!=null && observation?.canCancel==true && !cancellationRequested
+    fun cancelPending(): String? {
+        if(!canCancelPending) return "The next section has already started or is not cancellable"
+        val error=cancelRequest()
+        diagnostic=error
+        if(error==null) cancellationRequested=true
+        return error
+    }
     val canAdvance: Boolean get()=available && next[current]!=null
     val canEnd: Boolean get()=available && outroRules().isNotEmpty()
+    val currentRegion: Int? get()=regions.entries.singleOrNull { it.value==current }?.key
+    val availableRegions: Set<Int> get()=if(!available) emptySet() else regions.filter { (_,target) -> target!=current && rule(target)!=null }.keys
+    fun selectRegion(number: Int): String? {
+        val target=regions[number] ?: return "No such region"
+        return submit(target)
+    }
     val currentVersion: Int? get()=versions.singleOrNull { current==it.main || current==it.fast }?.number
     val isFast: Boolean get()=current==fast || versions.any { current==it.fast }
     private val fastTarget: Int? get()=versions.singleOrNull { current==it.main }?.fast ?: fast
@@ -35,7 +52,7 @@ internal class NativeInteractiveDriver(
         target!=null && target!=current && rule(target)!=null
     }.map { it.number }.toSet()
     val canFast: Boolean get()=available && fastTarget?.let { rule(it)!=null }==true
-    val finished: Boolean get()=heardVoices && observation?.let { it.voices==0 && !it.paused && !it.transitioning && pending==null }==true
+    val finished: Boolean get()=heardVoices && observation?.let { it.voices==0 && it.stopped && !it.paused && !it.transitioning && pending==null }==true
 
     fun observe(value: Observation) {
         observation=value
@@ -43,7 +60,10 @@ internal class NativeInteractiveDriver(
         if(spec.segments.any { it.index==value.segment }) current=value.segment
         if(value.destination!=null && value.destination!=current) pending=value.destination
         val newFailure=value.error!=null && (value.error!=previousError || value.failureCount!=previousFailures)
-        if(newFailure) diagnostic=value.error
+        if(newFailure) { diagnostic=value.error;cancellationRequested=false }
+        if(cancellationRequested && !value.transitioning && value.destination==null) {
+            pending=null;cancellationRequested=false
+        }
         if((pending==current && !value.transitioning) || newFailure) pending=null
         previousError=value.error;previousFailures=value.failureCount
     }

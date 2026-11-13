@@ -14,6 +14,8 @@ internal data class InteractivePlaybackPlan(
     val versions: List<Version> = emptyList(),
     val fastByMain: Map<Int,Int> = emptyMap(),
     val outroVariants: Map<Int,List<Int>> = emptyMap(),
+    val regions: Map<Int,Int> = emptyMap(),
+    val preparedAssets: Set<String> = emptySet(),
 ) {
     data class Version(val number: Int,val main: Int,val fast: Int?)
 
@@ -33,7 +35,7 @@ internal data class InteractivePlaybackPlan(
                 compiled.segmentByOutro.entries.associate { it.value to "Outro%02d".format(it.key) }
             val base=InteractivePlaybackPlan(flow.name,prepared.spec,compiled.packet,compiled.assetPaths,entry,next,
                 compiled.segmentByOutro,roles[StageFlow.Role.Fast],labels,compiled)
-            return FullVersionCompiler.extend(base,flow,bytes,catalog)
+            return DonkeyRegionCompiler.extend(FullVersionCompiler.extend(base,flow,bytes,catalog),flow,bytes,catalog)
         }
         fun rainbow(bytes: Map<String,ByteArray>,catalog: MinfCatalog): InteractivePlaybackPlan {
             val sources=RainbowInteractiveCompiler.roles.map { role ->
