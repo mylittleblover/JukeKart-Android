@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="map_title">ワールドマップ</string>
+    <string name="map_subtitle">%1$d コース・ドラッグで探索</string>
+    <string name="map_official_routes">公式ルート</string>
+    <string name="map_grand_prix">グランプリ</string>
+    <string name="map_rallies">サバイバル</string>
+    <string name="map_route_stops">%1$d コース</string>
+    <string name="map_start">スタート：%1$s</string>
+    <string name="map_finish">ゴール：%1$s</string>
+    <string name="map_start_badge">スタート</string>
+    <string name="map_finish_badge">ゴール</string>
+    <string name="map_view_stops">全コースを見る</string>
+    <string name="map_clear_route">選択を解除</string>
+    <string name="map_route_readonly">公式ルートのコース順は変更できません。</string>
+    <string name="map_schematic">線はコースの順番を示し、道路の形状とは異なります。</string>
+    <string name="map_zoom_in">拡大</string>
+    <string name="map_zoom_out">縮小</string>
+    <string name="map_reset">表示をリセット</string>
+    <string name="map_course_details">コースの詳細</string>
+    <string name="map_audio_missing">再生するにはコースの音楽をインポートしてください。</string>
+    <string name="map_audio_ready">コースの音楽を再生できます</string>
+    <string name="map_back_route">ルートに戻る</string>
+    <string name="map_browse_hint">コースを選ぶか、公式ルートを探してみましょう。</string>
+    <string name="map_loading">ワールドマップを読み込み中…</string>
+    <string name="map_data_missing">マップのデータを読み込めませんでした。</string>
+    <string name="map_art_notice">マップ・コースイラスト © Nintendo。</string>
+    <string name="map_route_stop">%1$d · %2$s</string>
+    <string name="map_pin_occurrences">%1$s。ルート順：%2$s</string>
+    <string name="map_stop_separator">、</string>
+    <string name="map_course">コース</string>
+    <string name="map_close">閉じる</string>
+</resources>

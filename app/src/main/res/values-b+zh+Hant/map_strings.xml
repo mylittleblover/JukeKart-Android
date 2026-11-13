@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="map_title">世界地圖</string>
+    <string name="map_subtitle">%1$d 條賽道 · 拖曳探索</string>
+    <string name="map_official_routes">官方路線</string>
+    <string name="map_grand_prix">大獎賽</string>
+    <string name="map_rallies">生存賽</string>
+    <string name="map_route_stops">%1$d 站</string>
+    <string name="map_start">起點：%1$s</string>
+    <string name="map_finish">終點：%1$s</string>
+    <string name="map_start_badge">起點</string>
+    <string name="map_finish_badge">終點</string>
+    <string name="map_view_stops">查看全部站點</string>
+    <string name="map_clear_route">清除選擇</string>
+    <string name="map_route_readonly">官方路線依原有順序顯示，不可編輯。</string>
+    <string name="map_schematic">連線僅表示經過順序，不代表道路形狀。</string>
+    <string name="map_zoom_in">放大</string>
+    <string name="map_zoom_out">縮小</string>
+    <string name="map_reset">重設視角</string>
+    <string name="map_course_details">查看賽道詳情</string>
+    <string name="map_audio_missing">匯入這條賽道的音訊後即可播放。</string>
+    <string name="map_audio_ready">賽道音訊已就緒</string>
+    <string name="map_back_route">返回路線</string>
+    <string name="map_browse_hint">選擇賽道，或瀏覽一條官方路線。</string>
+    <string name="map_loading">正在載入世界地圖…</string>
+    <string name="map_data_missing">無法載入地圖資料。</string>
+    <string name="map_art_notice">地圖與賽道插畫 © Nintendo。</string>
+    <string name="map_route_stop">%1$d · %2$s</string>
+    <string name="map_pin_occurrences">%1$s。路線站點：%2$s</string>
+    <string name="map_stop_separator">、</string>
+    <string name="map_course">賽道</string>
+    <string name="map_close">關閉</string>
+</resources>

@@ -78,4 +78,23 @@ internal class NavState(
      * the activity. Returning `this` instead would trap the user in the app.
      */
     fun back(): NavState? = if (detail != null) NavState(tab, detail = null) else null
+    /** Stable identity snapshot; translated labels are never saved as navigation keys. */
+    fun snapshot(): List<String> = when (val page = detail) {
+        null -> listOf(tab.name, "root")
+        is Detail.Course -> listOf(tab.name, "course", page.code)
+        Detail.Flow -> listOf(tab.name, "flow")
+    }
+
+    companion object {
+        fun restore(state: List<String>): NavState {
+            val tab = Tab.entries.firstOrNull { it.name == state.firstOrNull() } ?: return NavState()
+            val detail = when (state.getOrNull(1)) {
+                "course" -> state.getOrNull(2)?.takeIf { it.isNotBlank() }?.let(Detail::Course)
+                "flow" -> Detail.Flow
+                else -> null
+            }
+            return NavState(tab, detail)
+        }
+    }
+
 }

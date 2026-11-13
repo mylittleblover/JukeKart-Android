@@ -24,10 +24,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
@@ -41,8 +46,12 @@ import com.mylittleblover.mkwplayer.ui.UiMapping
 import com.mylittleblover.mkwplayer.ui.detail.DetailScreen
 import com.mylittleblover.mkwplayer.ui.library.LibraryScreen
 import com.mylittleblover.mkwplayer.ui.play.PlayScreen
-import com.mylittleblover.mkwplayer.ui.routes.FullMap
-import com.mylittleblover.mkwplayer.ui.routes.MAP_IMAGE_ASPECT
+import com.mylittleblover.mkwplayer.ui.routes.OfficialMapScreen
+import com.mylittleblover.mkwplayer.ui.routes.WorldMapState
+import com.mylittleblover.mkwplayer.routes.OfficialRouteCatalog
+import com.mylittleblover.mkwplayer.routes.LocalizedNames
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.mylittleblover.mkwplayer.ui.routes.RoutesScreen
 import com.mylittleblover.mkwplayer.ui.settings.importItems
 import com.mylittleblover.mkwplayer.ui.settings.settingsItems
@@ -63,7 +72,8 @@ internal fun MkwApp(
     ui: PlayerViewModel.Ui,
     modifier: Modifier = Modifier,
 ) {
-    var nav by remember { mutableStateOf(NavState()) }
+    var nav by rememberSaveable(stateSaver = listSaver<NavState, String>(save = { it.snapshot() }, restore = { NavState.restore(it) })) { mutableStateOf(NavState()) }
+    val mapState = rememberSaveable(saver = WorldMapState.Saver) { WorldMapState() }
 
     // The pack picker. It is the only import path a normal listener needs: one file carries the audio, the
     // stage structures and the timings. Kept here rather than inside a page so the library's empty state and
@@ -124,7 +134,7 @@ internal fun MkwApp(
                 }
                 else -> when (nav.tab) {
                     Tab.LIBRARY -> LibraryPage(model, ui, openPack, openFiles)
-                    Tab.WORLD_MAP -> MapPage(model, ui)
+                    Tab.WORLD_MAP -> MapPage(model, ui, mapState) { code -> nav = nav.open(NavState.Detail.Course(code)) }
                     Tab.INTERACTIVE -> ConsolePage(model, ui, openPack, openFiles)
                     Tab.MY_ROUTES -> RoutesPage()
                 }
@@ -204,15 +214,20 @@ private fun LibraryPage(
 /** A course's detail page, reached from the map or the library. */
 @Composable
 private fun CoursePage(model: PlayerViewModel, ui: PlayerViewModel.Ui, code: String,onInteractive: () -> Unit) {
+    val context = LocalContext.current
+    val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
+    val names = remember { runCatching { LocalizedNames.parse(context.assets.open("localized_names.json").bufferedReader().use { it.readText() }) }.getOrNull() }
+    val active = ui.flow.takeIf { model.isStageOpen(code) }
+    val title = names?.name(code, languageTag) ?: androidx.compose.ui.res.stringResource(R.string.map_course)
     DetailScreen(
-        header = UiMapping.detailHeader(ui.flow),
+        header = UiMapping.detailHeader(active).copy(title = title),
         cues = emptyList(),
         cueWarning = null,
-        structure = UiMapping.structure(ui.flow),
-        provenance = UiMapping.provenance(ui.flow),
+        structure = UiMapping.structure(active),
+        provenance = UiMapping.provenance(active),
         onPlay = { model.startStagePerformance(code) },
         onInteractive = onInteractive,
-        canPlay = model.canStartStage(code) && ui.flow?.performanceBlocker == null,
+        canPlay = model.canStartStage(code) && active?.performanceBlocker == null,
         modifier = Modifier.fillMaxSize(),
     )
 }
@@ -225,50 +240,47 @@ private fun CoursePage(model: PlayerViewModel, ui: PlayerViewModel.Ui, code: Str
  * pushed off-screen with one flick is a map that has to be reloaded.
  */
 @Composable
-private fun MapPage(model: PlayerViewModel, ui: PlayerViewModel.Ui) {
-    val anchors = remember { model.mapAnchors }
-    val pins = UiMapping.pins(anchors, ui.unlock)
-    val context = LocalContext.current
-    // Decoded once and held: the map is redrawn on every frame of a drag, and decoding a 2500x2400 image per
-    // frame would be the slowest thing on the screen.
-    val image: androidx.compose.ui.graphics.ImageBitmap? = remember {
-        runCatching {
-            android.graphics.BitmapFactory
-                .decodeResource(context.resources, R.drawable.world_map)
-                .asImageBitmap()
-        }.getOrNull()
-    }
-
-    Column(Modifier.fillMaxSize()) {
-        if (image == null) {
-            // The fallback states what is missing rather than showing an empty frame, which would read as
-            // "the game has no map".
-            Text(
-                "The map artwork is missing from this build. The stage list is below.",
-                modifier = Modifier.padding(Tokens.Spacing.md),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        } else {
-            FullMap(
-                image = image,
-                imageAspect = MAP_IMAGE_ASPECT,
-                pins = pins,
-                onPin = { model.selectStage(it) },
-                modifier = Modifier.weight(1f),
-            )
-        }
-
-        // The accessible equivalent, and the only rendering for a stage whose anchor is missing.
-        val unplaced = pins.filter { !it.hasPosition }
-        if (unplaced.isNotEmpty()) {
-            Text(
-                "Stages without an established position: ${unplaced.joinToString { it.label }}",
-                modifier = Modifier.padding(Tokens.Spacing.md),
-                style = MaterialTheme.typography.bodySmall,
-            )
+private fun MapPage(model: PlayerViewModel, ui: PlayerViewModel.Ui, state: WorldMapState, onOpenCourse: (String) -> Unit) {
+    val context = LocalContext.current.applicationContext
+    val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
+    val loaded by produceState<Result<MapResources>?>(null, model) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                val anchors = requireNotNull(model.mapAnchors)
+                val routes = requireNotNull(OfficialRouteCatalog.parse(
+                    context.assets.open("official_routes.json").bufferedReader().use { it.readText() },
+                    anchors.stages.map { it.code }.toSet(),
+                ))
+                val names = requireNotNull(LocalizedNames.parse(context.assets.open("localized_names.json").bufferedReader().use { it.readText() }))
+                val image = requireNotNull(android.graphics.BitmapFactory.decodeResource(context.resources, R.drawable.world_map)).asImageBitmap()
+                MapResources(image, anchors, routes, names)
+            }
         }
     }
+    val data = loaded?.getOrNull()
+    if (data == null) {
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (loaded == null) androidx.compose.material3.CircularProgressIndicator()
+                Text(androidx.compose.ui.res.stringResource(if (loaded == null) R.string.map_loading else R.string.map_data_missing))
+            }
+        }
+        return
+    }
+    val playable = remember(ui.pack, ui.flow?.title, data) { data.routes.stageCodes(true).filter(model::canStartStage).toSet() }
+    OfficialMapScreen(
+        image = data.image, anchors = data.anchors, routes = data.routes, names = data.names,
+        languageTag = languageTag, specialUnlocked = com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(ui.unlock),
+        playableStages = playable, state = state, onOpenCourse = onOpenCourse,
+    )
 }
+
+private data class MapResources(
+    val image: androidx.compose.ui.graphics.ImageBitmap,
+    val anchors: com.mylittleblover.mkwplayer.library.MapAnchors.Catalog,
+    val routes: OfficialRouteCatalog,
+    val names: LocalizedNames,
+)
 
 /** The routes page. No saved routes exist yet, and it says so rather than showing an empty list. */
 @Composable

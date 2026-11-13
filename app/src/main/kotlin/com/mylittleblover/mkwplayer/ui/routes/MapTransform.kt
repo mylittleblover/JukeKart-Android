@@ -39,6 +39,21 @@ internal class MapTransform private constructor(
         return create(viewportWidth, viewportHeight, imageAspect, next, fitPadding).camera
     }
 
+    fun fitTo(points: List<Offset>, padding: Float): MapCamera {
+        val valid = points.filter { it.x.isFinite() && it.y.isFinite() && it.x in 0f..1f && it.y in 0f..1f }
+        if (valid.isEmpty() || drawnWidth <= 0f || drawnHeight <= 0f) return camera
+        val minU = valid.minOf { it.x }; val maxU = valid.maxOf { it.x }
+        val minV = valid.minOf { it.y }; val maxV = valid.maxOf { it.y }
+        val inset = padding.finiteOr(0f).coerceAtLeast(0f)
+        val width = (viewportWidth - 2f * inset).coerceAtLeast(1f)
+        val height = (viewportHeight - 2f * inset).coerceAtLeast(1f)
+        val horizontal = if (maxU > minU) width / ((maxU - minU) * drawnWidth / camera.zoom) else Float.POSITIVE_INFINITY
+        val vertical = if (maxV > minV) height / ((maxV - minV) * drawnHeight / camera.zoom) else Float.POSITIVE_INFINITY
+        val zoom = min(horizontal, vertical).finiteOr(3f).coerceIn(MIN_ZOOM, MAX_ZOOM)
+        return create(viewportWidth, viewportHeight, imageAspect,
+            MapCamera(zoom, (minU + maxU) / 2f, (minV + maxV) / 2f), fitPadding).camera
+    }
+
     companion object {
         const val MIN_ZOOM = 1f
         const val MAX_ZOOM = 6f
@@ -62,8 +77,8 @@ internal class MapTransform private constructor(
             val drawnWidth = fittedWidth * zoom
             val drawnHeight = fittedHeight * zoom
             fun center(value: Float, viewport: Float, drawn: Float): Float {
-                if (drawn <= viewport || drawn == 0f) return .5f
-                val limit = viewport / (2f * drawn)
+                if (drawn <= viewport - 2f * padding || drawn == 0f) return .5f
+                val limit = (viewport / 2f - padding) / drawn
                 return value.finiteOr(.5f).coerceIn(limit, 1f - limit)
             }
             val corrected = MapCamera(zoom, center(camera.centerU, width, drawnWidth), center(camera.centerV, height, drawnHeight))

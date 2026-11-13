@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="map_title">World map</string>
+    <string name="map_subtitle">%1$d courses · drag to explore</string>
+    <string name="map_official_routes">Official routes</string>
+    <string name="map_grand_prix">Grand Prix</string>
+    <string name="map_rallies">Knockout Tour</string>
+    <string name="map_route_stops">%1$d stops</string>
+    <string name="map_start">Start: %1$s</string>
+    <string name="map_finish">Finish: %1$s</string>
+    <string name="map_start_badge">Start</string>
+    <string name="map_finish_badge">Finish</string>
+    <string name="map_view_stops">View stops</string>
+    <string name="map_clear_route">Clear selection</string>
+    <string name="map_route_readonly">Official routes keep their published order.</string>
+    <string name="map_schematic">Lines show stop order, not road geometry.</string>
+    <string name="map_zoom_in">Zoom in</string>
+    <string name="map_zoom_out">Zoom out</string>
+    <string name="map_reset">Reset view</string>
+    <string name="map_course_details">View course details</string>
+    <string name="map_audio_missing">Import the course audio to play it.</string>
+    <string name="map_audio_ready">Course audio available</string>
+    <string name="map_back_route">Back to route</string>
+    <string name="map_browse_hint">Choose a course or explore an official route.</string>
+    <string name="map_loading">Loading world map…</string>
+    <string name="map_data_missing">Map data could not be loaded.</string>
+    <string name="map_art_notice">Map and course illustrations © Nintendo.</string>
+    <string name="map_route_stop">%1$d · %2$s</string>
+    <string name="map_pin_occurrences">%1$s. Route stops: %2$s</string>
+    <string name="map_stop_separator">", "</string>
+    <string name="map_course">Course</string>
+    <string name="map_close">Close</string>
+</resources>

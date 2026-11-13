@@ -39,8 +39,10 @@ import com.mylittleblover.mkwplayer.player.PlayerViewModel
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = true
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightNavigationBars = true
         setContent {
-            MaterialTheme {
+            com.mylittleblover.mkwplayer.ui.MkwTheme {
                 val model: PlayerViewModel = viewModel()
                 val ui by model.ui.collectAsStateWithLifecycle()
                 MkwApp(model = model, ui = ui)

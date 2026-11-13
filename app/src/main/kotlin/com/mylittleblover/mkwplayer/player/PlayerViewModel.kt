@@ -232,6 +232,9 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         select(match.key)
     }
 
+    internal fun isStageOpen(code: String): Boolean =
+        interactivePlan?.name?.removePrefix("BGM_Stage_")?.removeSuffix("_00")?.equals(code.removeSuffix("_00"), true) == true
+
     fun canStartStage(code: String): Boolean {
         val logical=code.removeSuffix("_00")
         if(interactivePlan?.name?.removePrefix("BGM_Stage_")?.equals(logical,true)==true) return true

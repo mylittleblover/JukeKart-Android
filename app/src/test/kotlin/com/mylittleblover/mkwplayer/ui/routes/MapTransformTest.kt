@@ -91,4 +91,21 @@ class MapTransformTest {
         assertTrue(last.x <= 336f && last.y <= 696f)
     }
 
+    @Test fun zoomedEdgePanningKeepsSpaceForTheEntireStageTouchTarget() {
+        val transform = MapTransform.create(360f, 720f, 1f, MapCamera(3f, -100f, -100f), fitPadding = 24f)
+        assertEquals(24f, transform.left, .001f)
+        assertEquals(24f, transform.top, .001f)
+    }
+    @Test fun officialStopBoundsFitWithoutChangingTheirCoordinates() {
+        val points = listOf(Offset(.2f, .3f), Offset(.7f, .7f), Offset(.5f, .4f))
+        val base = MapTransform.create(600f, 800f, 1f, MapCamera(2.4f), fitPadding = 24f)
+        val focused = MapTransform.create(600f, 800f, 1f, base.fitTo(points, 48f), fitPadding = 24f)
+        for (point in points) {
+            val screen = focused.project(point.x, point.y)
+            assertTrue(screen.x >= 47.99f && screen.x <= 552.01f)
+            assertTrue(screen.y >= 47.99f && screen.y <= 752.01f)
+        }
+        assertEquals(base.camera, base.fitTo(emptyList(), 48f))
+    }
+
 }
