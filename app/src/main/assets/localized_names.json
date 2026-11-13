@@ -1,0 +1,555 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "id": "FirstCircuit",
+      "names": {
+        "en": "Mario Bros. Circuit",
+        "ja": "マリオブラザーズサーキット",
+        "zh-Hans": "马力欧兄弟赛道",
+        "zh-Hant": "瑪利歐兄弟賽道"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Mario_Bros._Circuit",
+      "sourceSha256": "132e0f705be6a93a5f8e833339e5f7753df46db1ae8cf6fef80ed6f34f9da2b6"
+    },
+    {
+      "id": "WestCity",
+      "names": {
+        "en": "Crown City",
+        "ja": "トロフィーシティ",
+        "zh-Hans": "奖杯城",
+        "zh-Hant": "獎盃城"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Crown_City",
+      "sourceSha256": "d48a4b1c3dacb8edbc71912e163e980c51af98e7465cce783fecae8d0d71dfdd"
+    },
+    {
+      "id": "Coaster",
+      "names": {
+        "en": "Whistlestop Summit",
+        "ja": "シュポポコースター",
+        "zh-Hans": "阳光铁道",
+        "zh-Hant": "陽光鐵道"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Whistlestop_Summit",
+      "sourceSha256": "d16856f3d524f761f0112708240d1a935a5a86b82d3aca9e70867d8ad0a7866b"
+    },
+    {
+      "id": "DonkeyKong",
+      "names": {
+        "en": "DK Spaceport",
+        "ja": "DKうちゅうセンター",
+        "zh-Hans": "DK太空中心",
+        "zh-Hant": "DK太空中心"
+      },
+      "sourceUrl": "https://www.mariowiki.com/DK_Spaceport",
+      "sourceSha256": "04348bbb29e872597356cc0ba149d89fe8f7a3461dd6af284fa6a5a03c2b7bc9"
+    },
+    {
+      "id": "DesertHills",
+      "names": {
+        "en": "Desert Hills",
+        "ja": "サンサンさばく",
+        "zh-Hans": "阳光沙漠",
+        "zh-Hant": "陽光沙漠"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Desert_Hills",
+      "sourceSha256": "7aeaae6c95dcd60ecf9ce0cab696c1dbeb1c963c4cc7ecadc57b558a21ca252c"
+    },
+    {
+      "id": "ShyGuyBazaar",
+      "names": {
+        "en": "Shy Guy Bazaar",
+        "ja": "ヘイホーカーニバル",
+        "zh-Hans": "嘿呵嘉年华",
+        "zh-Hant": "嘿呵嘉年華"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Shy_Guy_Bazaar",
+      "sourceSha256": "6dfa4ddbd5148d093d20ce2f9cf40af41932cfed8bdbb511844e181bfcc619ec"
+    },
+    {
+      "id": "WarioStadium",
+      "names": {
+        "en": "Wario Stadium",
+        "ja": "ワリオスタジアム",
+        "zh-Hans": "瓦力欧竞技场",
+        "zh-Hant": "瓦利歐競技場"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Wario_Stadium_(Mario_Kart_64)",
+      "sourceSha256": "237e3bbaaa9b8b541bb27570c3a4b170b04b2c91e4f12b44f621ecbe07680de0"
+    },
+    {
+      "id": "AirshipFortress",
+      "names": {
+        "en": "Airship Fortress",
+        "ja": "キラーシップ",
+        "zh-Hans": "炮弹刺客飞船",
+        "zh-Hant": "炮彈刺客飛船"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Airship_Fortress",
+      "sourceSha256": "f41eff36f4d5211d1e18dd30a292439841173498ac8e366a8da235dc91acd549"
+    },
+    {
+      "id": "DKPass",
+      "names": {
+        "en": "DK Pass",
+        "ja": "DKスノーマウンテン",
+        "zh-Hans": "DK雪山",
+        "zh-Hant": "DK雪山"
+      },
+      "sourceUrl": "https://www.mariowiki.com/DK_Pass",
+      "sourceSha256": "4255f344f8a2d5627ff4e33bd5b9a310ef786f61306ad1ef6cb3ba9fe78a5bca"
+    },
+    {
+      "id": "SnowMountain",
+      "names": {
+        "en": "Starview Peak",
+        "ja": "ロゼッタてんもんだい",
+        "zh-Hans": "罗莎塔天文台",
+        "zh-Hant": "羅潔塔天文台"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Starview_Peak",
+      "sourceSha256": "d009a50657b5b14026724634a623b7e9938b1184db7d91e62774af451495d171"
+    },
+    {
+      "id": "IceBuildings",
+      "names": {
+        "en": "Sky-High Sundae",
+        "ja": "アイスビルディング",
+        "zh-Hans": "冰品摩天楼",
+        "zh-Hant": "冰品摩天樓"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Sky-High_Sundae",
+      "sourceSha256": "ea3d8315275b785dd8db801fa4b8e5e5582e701a6a6d336b216e8a2fd24cffc4"
+    },
+    {
+      "id": "WarioShipyard",
+      "names": {
+        "en": "Wario Shipyard",
+        "ja": "ワリオシップ",
+        "zh-Hans": "瓦力欧之船",
+        "zh-Hant": "瓦利歐之船"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Wario_Shipyard",
+      "sourceSha256": "407afaa1dc1c631dd7adb80d2324d29a2b3094ce17d0f255e2ebdf8a4f4e8d3c"
+    },
+    {
+      "id": "KoopaTroopaBeach",
+      "names": {
+        "en": "Koopa Troopa Beach",
+        "ja": "ノコノコビーチ",
+        "zh-Hans": "慢慢龟海滩",
+        "zh-Hant": "慢慢龜海灘"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Koopa_Troopa_Beach",
+      "sourceSha256": "2d4bd546ed1c89c4837c1c0523db8666fb34fd546105ebbe8a14288e6e63334f"
+    },
+    {
+      "id": "DKJungleParkway",
+      "names": {
+        "en": "Faraway Oasis",
+        "ja": "リバーサイドサファリ",
+        "zh-Hans": "河畔探险区",
+        "zh-Hant": "河畔探險區"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Faraway_Oasis",
+      "sourceSha256": "04d30ea38f13c9309ff21444a818aa3e97c14c0953b836335d3df68dc5949a98"
+    },
+    {
+      "id": "Central",
+      "names": {
+        "en": "Peach Stadium",
+        "ja": "ピーチスタジアム",
+        "zh-Hans": "碧姬竞技场",
+        "zh-Hant": "碧姬競技場"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Peach_Stadium",
+      "sourceSha256": "9358584bc2ab29e22393ad98c166bdeb356e53e6e8bb7fd6d279e0898359f3ce"
+    },
+    {
+      "id": "PeachBeach",
+      "names": {
+        "en": "Peach Beach",
+        "ja": "ピーチビーチ",
+        "zh-Hans": "碧姬海滩",
+        "zh-Hant": "碧姬海灘"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Peach_Beach",
+      "sourceSha256": "7268d42c994ae1d9ccef4224cad859d52a48cee91f17d7e7b57495f87402b7b2"
+    },
+    {
+      "id": "LagoonCity",
+      "names": {
+        "en": "Salty Salty Speedway",
+        "ja": "ソルティータウン",
+        "zh-Hans": "海盐城镇",
+        "zh-Hant": "海鹽城鎮"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Salty_Salty_Speedway",
+      "sourceSha256": "869747f19ba5930e7da8517cc9cd768bb62ae9f2444420847e838e5217f7c0f9"
+    },
+    {
+      "id": "DinoDinoJungle",
+      "names": {
+        "en": "Dino Dino Jungle",
+        "ja": "ディノディノジャングル",
+        "zh-Hans": "龙龙丛林",
+        "zh-Hant": "龍龍叢林"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Dino_Dino_Jungle",
+      "sourceSha256": "a5160a5aa449e3d9ba890180da5ce12246506e9137f05b2e563217b270dc9653"
+    },
+    {
+      "id": "StormClouds",
+      "names": {
+        "en": "Great ? Block Ruins",
+        "ja": "ハテナしんでん",
+        "zh-Hans": "？神殿",
+        "zh-Hant": "？神殿"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Great_%3F_Block_Ruins",
+      "sourceSha256": "73247003fd82dcd3c5356f06606f6b4862615fc256e42f194743a956c418090e"
+    },
+    {
+      "id": "RaftingRiver",
+      "names": {
+        "en": "Cheep Cheep Falls",
+        "ja": "プクプクフォールズ",
+        "zh-Hans": "泡泡鱼瀑布",
+        "zh-Hant": "泡泡魚瀑布"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Cheep_Cheep_Falls_(race_course)",
+      "sourceSha256": "b349045b145f5bc5b8d71fbdda5c556c80bca6ce669b4761ede30685634a03bc"
+    },
+    {
+      "id": "Cave",
+      "names": {
+        "en": "Dandelion Depths",
+        "ja": "ショーニューロード",
+        "zh-Hans": "钟乳洞之路",
+        "zh-Hant": "鐘乳洞之路"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Dandelion_Depths",
+      "sourceSha256": "3cfc34abd2d95d5c5e2b5914dda75c1d3f968c413c92899bc8eead4d3d024b9f"
+    },
+    {
+      "id": "Cinema",
+      "names": {
+        "en": "Boo Cinema",
+        "ja": "おばけシネマ",
+        "zh-Hans": "幽灵影院",
+        "zh-Hant": "幽靈影院"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Boo_Cinema",
+      "sourceSha256": "92f7a0ccc6dfa07ee38bc2ff8dec76216645180c4873d91d18853d61a459a640"
+    },
+    {
+      "id": "DinoBones",
+      "names": {
+        "en": "Dry Bones Burnout",
+        "ja": "ホネホネツイスター",
+        "zh-Hans": "骨骨扭扭乐",
+        "zh-Hant": "骨骨扭扭樂"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Dry_Bones_Burnout",
+      "sourceSha256": "070b1ec5361ec79e36d4f6ce08a8e8b1a2afae39052d8139db15fc6289817cfa"
+    },
+    {
+      "id": "MooMooFarm",
+      "names": {
+        "en": "Moo Moo Meadows",
+        "ja": "モーモーカントリー",
+        "zh-Hans": "哞哞乡村",
+        "zh-Hant": "牛牛農場"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Moo_Moo_Meadows",
+      "sourceSha256": "ddb23bbbf4152c0340b6364e00079892861482db2f2377d3c347adeb1f220d08"
+    },
+    {
+      "id": "ChocoMountain",
+      "names": {
+        "en": "Choco Mountain",
+        "ja": "チョコマウンテン",
+        "zh-Hans": "巧克力山",
+        "zh-Hant": "巧克力山"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Choco_Mountain",
+      "sourceSha256": "8472f0ebbf6154f183eb47c2af0078896a5e0bcce978d996e2f3cd77618f87e2"
+    },
+    {
+      "id": "ToadFactory",
+      "names": {
+        "en": "Toad's Factory",
+        "ja": "キノピオファクトリー",
+        "zh-Hans": "奇诺比奥工厂",
+        "zh-Hant": "奇諾比奧工廠"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Toad%27s_Factory",
+      "sourceSha256": "71c068ce66b22bfe6dec1ecaec08376d734951c2eabbb53de1ee181c9d99e7e3"
+    },
+    {
+      "id": "Lava",
+      "names": {
+        "en": "Bowser's Castle",
+        "ja": "クッパキャッスル",
+        "zh-Hans": "酷霸城堡",
+        "zh-Hant": "庫巴城堡"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Bowser%27s_Castle_(Mario_Kart_World)",
+      "sourceSha256": "ef2c25415ea4888c00dd4556a73c860c0beb0f4e88df7576b89ba176c0267d58"
+    },
+    {
+      "id": "BigTree",
+      "names": {
+        "en": "Acorn Heights",
+        "ja": "どんぐりツリーハウス",
+        "zh-Hans": "橡栗树屋",
+        "zh-Hant": "橡栗樹屋"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Acorn_Heights",
+      "sourceSha256": "da198f51c9d45953087848d880876b0b6593d9b3f08bf1e98268c943c517ca7b"
+    },
+    {
+      "id": "SFCMarioCircuit",
+      "names": {
+        "en": "Mario Circuit",
+        "ja": "マリオサーキット",
+        "zh-Hans": "马力欧赛道",
+        "zh-Hant": "瑪利歐賽道"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Mario_Circuit_(Mario_Kart_World)",
+      "sourceSha256": "9b6b88b322f1898513d1f125aa34446296e39007cdd747362037988438cca308"
+    },
+    {
+      "id": "Rainbow",
+      "names": {
+        "en": "Rainbow Road",
+        "ja": "レインボーロード",
+        "zh-Hans": "彩虹之路",
+        "zh-Hant": "彩虹之路"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Rainbow_Road_(Mario_Kart_World)",
+      "sourceSha256": "c1b2af500620b2e6f5dc3c38708bc8b0d6c77d6d1b77fc03d12be7a69df6b273"
+    },
+    {
+      "id": "mushroom_cup",
+      "names": {
+        "en": "Mushroom Cup",
+        "ja": "キノコカップ",
+        "zh-Hans": "蘑菇杯",
+        "zh-Hant": "蘑菇盃"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Mushroom_Cup",
+      "sourceSha256": "f29c5ea608208cab515949fd6757f653e73dc8196e5f09c729e6916158fce7f1"
+    },
+    {
+      "id": "flower_cup",
+      "names": {
+        "en": "Flower Cup",
+        "ja": "フラワーカップ",
+        "zh-Hans": "鲜花杯",
+        "zh-Hant": "花朵盃"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Flower_Cup",
+      "sourceSha256": "4453020281ae367d4f9099cc18ac7285063bdde795037f779b2bc26f0c90c30d"
+    },
+    {
+      "id": "star_cup",
+      "names": {
+        "en": "Star Cup",
+        "ja": "スターカップ",
+        "zh-Hans": "星星杯",
+        "zh-Hant": "星星盃"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Star_Cup",
+      "sourceSha256": "8392b707eba10c8bc2996faf3ce31b911f55890af1fbda584a4dfba25ee6f94b"
+    },
+    {
+      "id": "shell_cup",
+      "names": {
+        "en": "Shell Cup",
+        "ja": "こうらカップ",
+        "zh-Hans": "龟壳杯",
+        "zh-Hant": "龜殼盃"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Shell_Cup",
+      "sourceSha256": "4b0b2a406dcdde401e3edb6dd4728720ab9c9417fbce5a0bec44eadb02c196bf"
+    },
+    {
+      "id": "banana_cup",
+      "names": {
+        "en": "Banana Cup",
+        "ja": "バナナカップ",
+        "zh-Hans": "香蕉杯",
+        "zh-Hant": "香蕉盃"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Banana_Cup",
+      "sourceSha256": "bc1b62065f34353954d38a7eea93782c611b9b4fbf84b657d250f5e76b236863"
+    },
+    {
+      "id": "leaf_cup",
+      "names": {
+        "en": "Leaf Cup",
+        "ja": "このはカップ",
+        "zh-Hans": "树叶杯",
+        "zh-Hant": "樹葉盃"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Leaf_Cup",
+      "sourceSha256": "143ac4e53e5c0b1bc2d874019c1fbdbaec3580b0677d1bbe5a6181498e26a20d"
+    },
+    {
+      "id": "lightning_cup",
+      "names": {
+        "en": "Lightning Cup",
+        "ja": "サンダーカップ",
+        "zh-Hans": "闪电杯",
+        "zh-Hant": "閃電盃"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Lightning_Cup",
+      "sourceSha256": "3257c278b39da8a15bd6262dab1f5e2ee78c44492ace1b01793b6230ca8ae7c8"
+    },
+    {
+      "id": "special_cup",
+      "names": {
+        "en": "Special Cup",
+        "ja": "スペシャルカップ",
+        "zh-Hans": "特别杯",
+        "zh-Hant": "特別盃"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Special_Cup",
+      "sourceSha256": "6ecf5ba0f1b276f76998fc33a828ae2ba1634549a954758d1344ec2d43113c29"
+    },
+    {
+      "id": "golden_rally",
+      "names": {
+        "en": "Golden Rally",
+        "ja": "パワフルラリー",
+        "zh-Hans": "强力拉力赛",
+        "zh-Hant": "強力拉力賽"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Golden_Rally",
+      "sourceSha256": "c1e17024bdad44323471adf4442759bef69902a710b56d65da06e76bc61fe81d"
+    },
+    {
+      "id": "ice_rally",
+      "names": {
+        "en": "Ice Rally",
+        "ja": "アイスラリー",
+        "zh-Hans": "冰品拉力赛",
+        "zh-Hant": "冰品拉力賽"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Ice_Rally",
+      "sourceSha256": "f8ee61e3d225fec4c14e1f19aa5158b468c42dd1549b40de538401f8e7988bc7"
+    },
+    {
+      "id": "moon_rally",
+      "names": {
+        "en": "Moon Rally",
+        "ja": "ムーンラリー",
+        "zh-Hans": "月亮拉力赛",
+        "zh-Hant": "月亮拉力賽"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Moon_Rally",
+      "sourceSha256": "85d41bd0d325369f130aa17a7b9a3f082bbbe054ad9214fb932d3c1f1bf6b58b"
+    },
+    {
+      "id": "spiny_rally",
+      "names": {
+        "en": "Spiny Rally",
+        "ja": "トゲゾーラリー",
+        "zh-Hans": "刺刺龟拉力赛",
+        "zh-Hant": "刺刺龜拉力賽"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Spiny_Rally",
+      "sourceSha256": "1446717d5af6343447284ef7d98985418d287dd970cd9d0c417a46f7f974b9b7"
+    },
+    {
+      "id": "cherry_rally",
+      "names": {
+        "en": "Cherry Rally",
+        "ja": "チェリーラリー",
+        "zh-Hans": "樱桃拉力赛",
+        "zh-Hant": "櫻桃拉力賽"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Cherry_Rally",
+      "sourceSha256": "b9759043d6b8cc641d3ae3fc0e76abd85170ac0d112caf2678f674bb07d79870"
+    },
+    {
+      "id": "acorn_rally",
+      "names": {
+        "en": "Acorn Rally",
+        "ja": "どんぐりラリー",
+        "zh-Hans": "橡栗拉力赛",
+        "zh-Hant": "橡栗拉力賽"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Acorn_Rally",
+      "sourceSha256": "11b62e62cb2209611f0065eb3c23ee978ab227ab4784ebced33a68a09e6f99f6"
+    },
+    {
+      "id": "cloud_rally",
+      "names": {
+        "en": "Cloud Rally",
+        "ja": "くもラリー",
+        "zh-Hans": "云朵拉力赛",
+        "zh-Hant": "雲朵拉力賽"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Cloud_Rally",
+      "sourceSha256": "c06e1d02bf527d6d1f4d4f2fbe57cc461efb6ba1fbd4893ee974a5df08679491"
+    },
+    {
+      "id": "heart_rally",
+      "names": {
+        "en": "Heart Rally",
+        "ja": "ハートラリー",
+        "zh-Hans": "爱心拉力赛",
+        "zh-Hant": "愛心拉力賽"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Heart_Rally",
+      "sourceSha256": "9ab16ec45efc59acf15cd2b990c476898bcd1bdf646160a7ab25a43c6a7acfc5"
+    },
+    {
+      "id": "drill_rally",
+      "names": {
+        "en": "Drill Rally",
+        "ja": "ドリルラリー",
+        "zh-Hans": "钻头拉力赛",
+        "zh-Hant": "鑽頭拉力賽"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Drill_Rally",
+      "sourceSha256": "87ab367b323c4cd635a00828c32ec8e7b310305da7513fe1573a0dcbd6bab321"
+    },
+    {
+      "id": "boomerang_rally",
+      "names": {
+        "en": "Boomerang Rally",
+        "ja": "ブーメランラリー",
+        "zh-Hans": "回旋镖拉力赛",
+        "zh-Hant": "迴旋鏢拉力賽"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Boomerang_Rally",
+      "sourceSha256": "f1f062df569cf5308cef4a16a845cb48d3433ab9fdceb9e1f9bc5f6ebbe8375d"
+    },
+    {
+      "id": "propeller_rally",
+      "names": {
+        "en": "Propeller Rally",
+        "ja": "プロペララリー",
+        "zh-Hans": "螺旋桨拉力赛",
+        "zh-Hant": "螺旋槳拉力賽"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Propeller_Rally",
+      "sourceSha256": "c0d64fbbb4dda1891fdd2b2b9374dacd3148fb8854b80c21e5ca76ef962bdc9a"
+    },
+    {
+      "id": "turnip_rally",
+      "names": {
+        "en": "Turnip Rally",
+        "ja": "カブラリー",
+        "zh-Hans": "大头菜拉力赛",
+        "zh-Hant": "大頭菜拉力賽"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Turnip_Rally",
+      "sourceSha256": "515614a4317cb64feb47067eaee9172469ab4e2e23201ce4563d6287fd2ce597"
+    }
+  ]
+}

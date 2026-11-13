@@ -1,0 +1,1007 @@
+{
+  "schemaVersion": 1,
+  "sourceRevision": 5544799,
+  "geometry": "ordered_stops_only",
+  "routes": [
+    {
+      "id": "mushroom_cup",
+      "kind": "grand_prix",
+      "names": {
+        "en": "Mushroom Cup",
+        "ja": "キノコカップ",
+        "zh-Hans": "蘑菇杯",
+        "zh-Hant": "蘑菇盃"
+      },
+      "requiresSpecialUnlock": false,
+      "stops": [
+        {
+          "ordinal": 1,
+          "stage": "FirstCircuit"
+        },
+        {
+          "ordinal": 2,
+          "stage": "WestCity"
+        },
+        {
+          "ordinal": 3,
+          "stage": "Coaster"
+        },
+        {
+          "ordinal": 4,
+          "stage": "DonkeyKong"
+        }
+      ],
+      "sourceUrl": "https://www.mariowiki.com/Mushroom_Cup"
+    },
+    {
+      "id": "flower_cup",
+      "kind": "grand_prix",
+      "names": {
+        "en": "Flower Cup",
+        "ja": "フラワーカップ",
+        "zh-Hans": "鲜花杯",
+        "zh-Hant": "花朵盃"
+      },
+      "requiresSpecialUnlock": false,
+      "stops": [
+        {
+          "ordinal": 1,
+          "stage": "DesertHills"
+        },
+        {
+          "ordinal": 2,
+          "stage": "ShyGuyBazaar"
+        },
+        {
+          "ordinal": 3,
+          "stage": "WarioStadium"
+        },
+        {
+          "ordinal": 4,
+          "stage": "AirshipFortress"
+        }
+      ],
+      "sourceUrl": "https://www.mariowiki.com/Flower_Cup"
+    },
+    {
+      "id": "star_cup",
+      "kind": "grand_prix",
+      "names": {
+        "en": "Star Cup",
+        "ja": "スターカップ",
+        "zh-Hans": "星星杯",
+        "zh-Hant": "星星盃"
+      },
+      "requiresSpecialUnlock": false,
+      "stops": [
+        {
+          "ordinal": 1,
+          "stage": "DKPass"
+        },
+        {
+          "ordinal": 2,
+          "stage": "SnowMountain"
+        },
+        {
+          "ordinal": 3,
+          "stage": "IceBuildings"
+        },
+        {
+          "ordinal": 4,
+          "stage": "WarioShipyard"
+        }
+      ],
+      "sourceUrl": "https://www.mariowiki.com/Star_Cup"
+    },
+    {
+      "id": "shell_cup",
+      "kind": "grand_prix",
+      "names": {
+        "en": "Shell Cup",
+        "ja": "こうらカップ",
+        "zh-Hans": "龟壳杯",
+        "zh-Hant": "龜殼盃"
+      },
+      "requiresSpecialUnlock": false,
+      "stops": [
+        {
+          "ordinal": 1,
+          "stage": "KoopaTroopaBeach"
+        },
+        {
+          "ordinal": 2,
+          "stage": "DKJungleParkway"
+        },
+        {
+          "ordinal": 3,
+          "stage": "WestCity"
+        },
+        {
+          "ordinal": 4,
+          "stage": "Central"
+        }
+      ],
+      "sourceUrl": "https://www.mariowiki.com/Shell_Cup"
+    },
+    {
+      "id": "banana_cup",
+      "kind": "grand_prix",
+      "names": {
+        "en": "Banana Cup",
+        "ja": "バナナカップ",
+        "zh-Hans": "香蕉杯",
+        "zh-Hant": "香蕉盃"
+      },
+      "requiresSpecialUnlock": false,
+      "stops": [
+        {
+          "ordinal": 1,
+          "stage": "PeachBeach"
+        },
+        {
+          "ordinal": 2,
+          "stage": "LagoonCity"
+        },
+        {
+          "ordinal": 3,
+          "stage": "DinoDinoJungle"
+        },
+        {
+          "ordinal": 4,
+          "stage": "StormClouds"
+        }
+      ],
+      "sourceUrl": "https://www.mariowiki.com/Banana_Cup"
+    },
+    {
+      "id": "leaf_cup",
+      "kind": "grand_prix",
+      "names": {
+        "en": "Leaf Cup",
+        "ja": "このはカップ",
+        "zh-Hans": "树叶杯",
+        "zh-Hant": "樹葉盃"
+      },
+      "requiresSpecialUnlock": false,
+      "stops": [
+        {
+          "ordinal": 1,
+          "stage": "RaftingRiver"
+        },
+        {
+          "ordinal": 2,
+          "stage": "Cave"
+        },
+        {
+          "ordinal": 3,
+          "stage": "Cinema"
+        },
+        {
+          "ordinal": 4,
+          "stage": "DinoBones"
+        }
+      ],
+      "sourceUrl": "https://www.mariowiki.com/Leaf_Cup"
+    },
+    {
+      "id": "lightning_cup",
+      "kind": "grand_prix",
+      "names": {
+        "en": "Lightning Cup",
+        "ja": "サンダーカップ",
+        "zh-Hans": "闪电杯",
+        "zh-Hant": "閃電盃"
+      },
+      "requiresSpecialUnlock": false,
+      "stops": [
+        {
+          "ordinal": 1,
+          "stage": "MooMooFarm"
+        },
+        {
+          "ordinal": 2,
+          "stage": "ChocoMountain"
+        },
+        {
+          "ordinal": 3,
+          "stage": "ToadFactory"
+        },
+        {
+          "ordinal": 4,
+          "stage": "Lava"
+        }
+      ],
+      "sourceUrl": "https://www.mariowiki.com/Lightning_Cup"
+    },
+    {
+      "id": "special_cup",
+      "kind": "grand_prix",
+      "names": {
+        "en": "Special Cup",
+        "ja": "スペシャルカップ",
+        "zh-Hans": "特别杯",
+        "zh-Hant": "特別盃"
+      },
+      "requiresSpecialUnlock": true,
+      "stops": [
+        {
+          "ordinal": 1,
+          "stage": "BigTree"
+        },
+        {
+          "ordinal": 2,
+          "stage": "SFCMarioCircuit"
+        },
+        {
+          "ordinal": 3,
+          "stage": "Central"
+        },
+        {
+          "ordinal": 4,
+          "stage": "Rainbow"
+        }
+      ],
+      "sourceUrl": "https://www.mariowiki.com/Special_Cup"
+    },
+    {
+      "id": "golden_rally",
+      "kind": "rally",
+      "names": {
+        "en": "Golden Rally",
+        "ja": "パワフルラリー",
+        "zh-Hans": "强力拉力赛",
+        "zh-Hant": "強力拉力賽"
+      },
+      "requiresSpecialUnlock": false,
+      "stops": [
+        {
+          "ordinal": 1,
+          "stage": "DesertHills"
+        },
+        {
+          "ordinal": 2,
+          "stage": "FirstCircuit"
+        },
+        {
+          "ordinal": 3,
+          "stage": "ChocoMountain"
+        },
+        {
+          "ordinal": 4,
+          "stage": "MooMooFarm"
+        },
+        {
+          "ordinal": 5,
+          "stage": "SFCMarioCircuit"
+        },
+        {
+          "ordinal": 6,
+          "stage": "BigTree"
+        }
+      ],
+      "sourceUrl": "https://www.mariowiki.com/Golden_Rally"
+    },
+    {
+      "id": "ice_rally",
+      "kind": "rally",
+      "names": {
+        "en": "Ice Rally",
+        "ja": "アイスラリー",
+        "zh-Hans": "冰品拉力赛",
+        "zh-Hant": "冰品拉力賽"
+      },
+      "requiresSpecialUnlock": false,
+      "stops": [
+        {
+          "ordinal": 1,
+          "stage": "IceBuildings"
+        },
+        {
+          "ordinal": 2,
+          "stage": "SnowMountain"
+        },
+        {
+          "ordinal": 3,
+          "stage": "Cave"
+        },
+        {
+          "ordinal": 4,
+          "stage": "RaftingRiver"
+        },
+        {
+          "ordinal": 5,
+          "stage": "Central"
+        },
+        {
+          "ordinal": 6,
+          "stage": "WestCity"
+        }
+      ],
+      "sourceUrl": "https://www.mariowiki.com/Ice_Rally"
+    },
+    {
+      "id": "moon_rally",
+      "kind": "rally",
+      "names": {
+        "en": "Moon Rally",
+        "ja": "ムーンラリー",
+        "zh-Hans": "月亮拉力赛",
+        "zh-Hant": "月亮拉力賽"
+      },
+      "requiresSpecialUnlock": false,
+      "stops": [
+        {
+          "ordinal": 1,
+          "stage": "Lava"
+        },
+        {
+          "ordinal": 2,
+          "stage": "ToadFactory"
+        },
+        {
+          "ordinal": 3,
+          "stage": "MooMooFarm"
+        },
+        {
+          "ordinal": 4,
+          "stage": "Cave"
+        },
+        {
+          "ordinal": 5,
+          "stage": "RaftingRiver"
+        },
+        {
+          "ordinal": 6,
+          "stage": "DKJungleParkway"
+        }
+      ],
+      "sourceUrl": "https://www.mariowiki.com/Moon_Rally"
+    },
+    {
+      "id": "spiny_rally",
+      "kind": "rally",
+      "names": {
+        "en": "Spiny Rally",
+        "ja": "トゲゾーラリー",
+        "zh-Hans": "刺刺龟拉力赛",
+        "zh-Hant": "刺刺龜拉力賽"
+      },
+      "requiresSpecialUnlock": false,
+      "stops": [
+        {
+          "ordinal": 1,
+          "stage": "Cinema"
+        },
+        {
+          "ordinal": 2,
+          "stage": "SnowMountain"
+        },
+        {
+          "ordinal": 3,
+          "stage": "DKPass"
+        },
+        {
+          "ordinal": 4,
+          "stage": "LagoonCity"
+        },
+        {
+          "ordinal": 5,
+          "stage": "PeachBeach"
+        },
+        {
+          "ordinal": 6,
+          "stage": "WarioShipyard"
+        }
+      ],
+      "sourceUrl": "https://www.mariowiki.com/Spiny_Rally"
+    },
+    {
+      "id": "cherry_rally",
+      "kind": "rally",
+      "names": {
+        "en": "Cherry Rally",
+        "ja": "チェリーラリー",
+        "zh-Hans": "樱桃拉力赛",
+        "zh-Hant": "櫻桃拉力賽"
+      },
+      "requiresSpecialUnlock": false,
+      "stops": [
+        {
+          "ordinal": 1,
+          "stage": "PeachBeach"
+        },
+        {
+          "ordinal": 2,
+          "stage": "DinoDinoJungle"
+        },
+        {
+          "ordinal": 3,
+          "stage": "KoopaTroopaBeach"
+        },
+        {
+          "ordinal": 4,
+          "stage": "DonkeyKong"
+        },
+        {
+          "ordinal": 5,
+          "stage": "Coaster"
+        },
+        {
+          "ordinal": 6,
+          "stage": "DesertHills"
+        }
+      ],
+      "sourceUrl": "https://www.mariowiki.com/Cherry_Rally"
+    },
+    {
+      "id": "acorn_rally",
+      "kind": "rally",
+      "names": {
+        "en": "Acorn Rally",
+        "ja": "どんぐりラリー",
+        "zh-Hans": "橡栗拉力赛",
+        "zh-Hant": "橡栗拉力賽"
+      },
+      "requiresSpecialUnlock": false,
+      "stops": [
+        {
+          "ordinal": 1,
+          "stage": "ToadFactory"
+        },
+        {
+          "ordinal": 2,
+          "stage": "WarioStadium"
+        },
+        {
+          "ordinal": 3,
+          "stage": "ChocoMountain"
+        },
+        {
+          "ordinal": 4,
+          "stage": "Central"
+        },
+        {
+          "ordinal": 5,
+          "stage": "RaftingRiver"
+        },
+        {
+          "ordinal": 6,
+          "stage": "DKPass"
+        }
+      ],
+      "sourceUrl": "https://www.mariowiki.com/Acorn_Rally"
+    },
+    {
+      "id": "cloud_rally",
+      "kind": "rally",
+      "names": {
+        "en": "Cloud Rally",
+        "ja": "くもラリー",
+        "zh-Hans": "云朵拉力赛",
+        "zh-Hant": "雲朵拉力賽"
+      },
+      "requiresSpecialUnlock": false,
+      "stops": [
+        {
+          "ordinal": 1,
+          "stage": "AirshipFortress"
+        },
+        {
+          "ordinal": 2,
+          "stage": "ShyGuyBazaar"
+        },
+        {
+          "ordinal": 3,
+          "stage": "FirstCircuit"
+        },
+        {
+          "ordinal": 4,
+          "stage": "WestCity"
+        },
+        {
+          "ordinal": 5,
+          "stage": "DKJungleParkway"
+        },
+        {
+          "ordinal": 6,
+          "stage": "StormClouds"
+        }
+      ],
+      "sourceUrl": "https://www.mariowiki.com/Cloud_Rally"
+    },
+    {
+      "id": "heart_rally",
+      "kind": "rally",
+      "names": {
+        "en": "Heart Rally",
+        "ja": "ハートラリー",
+        "zh-Hans": "爱心拉力赛",
+        "zh-Hant": "愛心拉力賽"
+      },
+      "requiresSpecialUnlock": false,
+      "stops": [
+        {
+          "ordinal": 1,
+          "stage": "ShyGuyBazaar"
+        },
+        {
+          "ordinal": 2,
+          "stage": "AirshipFortress"
+        },
+        {
+          "ordinal": 3,
+          "stage": "DinoBones"
+        },
+        {
+          "ordinal": 4,
+          "stage": "SFCMarioCircuit"
+        },
+        {
+          "ordinal": 5,
+          "stage": "MooMooFarm"
+        },
+        {
+          "ordinal": 6,
+          "stage": "Central"
+        }
+      ],
+      "sourceUrl": "https://www.mariowiki.com/Heart_Rally"
+    },
+    {
+      "id": "drill_rally",
+      "kind": "rally",
+      "names": {
+        "en": "Drill Rally",
+        "ja": "ドリルラリー",
+        "zh-Hans": "钻头拉力赛",
+        "zh-Hant": "鑽頭拉力賽"
+      },
+      "requiresSpecialUnlock": false,
+      "stops": [
+        {
+          "ordinal": 1,
+          "stage": "WarioShipyard"
+        },
+        {
+          "ordinal": 2,
+          "stage": "DKPass"
+        },
+        {
+          "ordinal": 3,
+          "stage": "Cave"
+        },
+        {
+          "ordinal": 4,
+          "stage": "SFCMarioCircuit"
+        },
+        {
+          "ordinal": 5,
+          "stage": "DinoBones"
+        },
+        {
+          "ordinal": 6,
+          "stage": "Lava"
+        }
+      ],
+      "sourceUrl": "https://www.mariowiki.com/Drill_Rally"
+    },
+    {
+      "id": "boomerang_rally",
+      "kind": "rally",
+      "names": {
+        "en": "Boomerang Rally",
+        "ja": "ブーメランラリー",
+        "zh-Hans": "回旋镖拉力赛",
+        "zh-Hant": "迴旋鏢拉力賽"
+      },
+      "requiresSpecialUnlock": false,
+      "stops": [
+        {
+          "ordinal": 1,
+          "stage": "LagoonCity"
+        },
+        {
+          "ordinal": 2,
+          "stage": "RaftingRiver"
+        },
+        {
+          "ordinal": 3,
+          "stage": "MooMooFarm"
+        },
+        {
+          "ordinal": 4,
+          "stage": "ChocoMountain"
+        },
+        {
+          "ordinal": 5,
+          "stage": "FirstCircuit"
+        },
+        {
+          "ordinal": 6,
+          "stage": "Coaster"
+        }
+      ],
+      "sourceUrl": "https://www.mariowiki.com/Boomerang_Rally"
+    },
+    {
+      "id": "propeller_rally",
+      "kind": "rally",
+      "names": {
+        "en": "Propeller Rally",
+        "ja": "プロペララリー",
+        "zh-Hans": "螺旋桨拉力赛",
+        "zh-Hant": "螺旋槳拉力賽"
+      },
+      "requiresSpecialUnlock": false,
+      "stops": [
+        {
+          "ordinal": 1,
+          "stage": "BigTree"
+        },
+        {
+          "ordinal": 2,
+          "stage": "Cinema"
+        },
+        {
+          "ordinal": 3,
+          "stage": "Cave"
+        },
+        {
+          "ordinal": 4,
+          "stage": "MooMooFarm"
+        },
+        {
+          "ordinal": 5,
+          "stage": "ToadFactory"
+        },
+        {
+          "ordinal": 6,
+          "stage": "AirshipFortress"
+        }
+      ],
+      "sourceUrl": "https://www.mariowiki.com/Propeller_Rally"
+    },
+    {
+      "id": "turnip_rally",
+      "kind": "rally",
+      "names": {
+        "en": "Turnip Rally",
+        "ja": "カブラリー",
+        "zh-Hans": "大头菜拉力赛",
+        "zh-Hant": "大頭菜拉力賽"
+      },
+      "requiresSpecialUnlock": false,
+      "stops": [
+        {
+          "ordinal": 1,
+          "stage": "DKPass"
+        },
+        {
+          "ordinal": 2,
+          "stage": "RaftingRiver"
+        },
+        {
+          "ordinal": 3,
+          "stage": "Central"
+        },
+        {
+          "ordinal": 4,
+          "stage": "ChocoMountain"
+        },
+        {
+          "ordinal": 5,
+          "stage": "WarioStadium"
+        },
+        {
+          "ordinal": 6,
+          "stage": "ShyGuyBazaar"
+        }
+      ],
+      "sourceUrl": "https://www.mariowiki.com/Turnip_Rally"
+    }
+  ],
+  "stages": [
+    {
+      "id": "FirstCircuit",
+      "names": {
+        "en": "Mario Bros. Circuit",
+        "ja": "マリオブラザーズサーキット",
+        "zh-Hans": "马力欧兄弟赛道",
+        "zh-Hant": "瑪利歐兄弟賽道"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Mario_Bros._Circuit"
+    },
+    {
+      "id": "WestCity",
+      "names": {
+        "en": "Crown City",
+        "ja": "トロフィーシティ",
+        "zh-Hans": "奖杯城",
+        "zh-Hant": "獎盃城"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Crown_City"
+    },
+    {
+      "id": "Coaster",
+      "names": {
+        "en": "Whistlestop Summit",
+        "ja": "シュポポコースター",
+        "zh-Hans": "阳光铁道",
+        "zh-Hant": "陽光鐵道"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Whistlestop_Summit"
+    },
+    {
+      "id": "DonkeyKong",
+      "names": {
+        "en": "DK Spaceport",
+        "ja": "DKうちゅうセンター",
+        "zh-Hans": "DK太空中心",
+        "zh-Hant": "DK太空中心"
+      },
+      "sourceUrl": "https://www.mariowiki.com/DK_Spaceport"
+    },
+    {
+      "id": "DesertHills",
+      "names": {
+        "en": "Desert Hills",
+        "ja": "サンサンさばく",
+        "zh-Hans": "阳光沙漠",
+        "zh-Hant": "陽光沙漠"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Desert_Hills"
+    },
+    {
+      "id": "ShyGuyBazaar",
+      "names": {
+        "en": "Shy Guy Bazaar",
+        "ja": "ヘイホーカーニバル",
+        "zh-Hans": "嘿呵嘉年华",
+        "zh-Hant": "嘿呵嘉年華"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Shy_Guy_Bazaar"
+    },
+    {
+      "id": "WarioStadium",
+      "names": {
+        "en": "Wario Stadium",
+        "ja": "ワリオスタジアム",
+        "zh-Hans": "瓦力欧竞技场",
+        "zh-Hant": "瓦利歐競技場"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Wario_Stadium_(Mario_Kart_64)"
+    },
+    {
+      "id": "AirshipFortress",
+      "names": {
+        "en": "Airship Fortress",
+        "ja": "キラーシップ",
+        "zh-Hans": "炮弹刺客飞船",
+        "zh-Hant": "炮彈刺客飛船"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Airship_Fortress"
+    },
+    {
+      "id": "DKPass",
+      "names": {
+        "en": "DK Pass",
+        "ja": "DKスノーマウンテン",
+        "zh-Hans": "DK雪山",
+        "zh-Hant": "DK雪山"
+      },
+      "sourceUrl": "https://www.mariowiki.com/DK_Pass"
+    },
+    {
+      "id": "SnowMountain",
+      "names": {
+        "en": "Starview Peak",
+        "ja": "ロゼッタてんもんだい",
+        "zh-Hans": "罗莎塔天文台",
+        "zh-Hant": "羅潔塔天文台"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Starview_Peak"
+    },
+    {
+      "id": "IceBuildings",
+      "names": {
+        "en": "Sky-High Sundae",
+        "ja": "アイスビルディング",
+        "zh-Hans": "冰品摩天楼",
+        "zh-Hant": "冰品摩天樓"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Sky-High_Sundae"
+    },
+    {
+      "id": "WarioShipyard",
+      "names": {
+        "en": "Wario Shipyard",
+        "ja": "ワリオシップ",
+        "zh-Hans": "瓦力欧之船",
+        "zh-Hant": "瓦利歐之船"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Wario_Shipyard"
+    },
+    {
+      "id": "KoopaTroopaBeach",
+      "names": {
+        "en": "Koopa Troopa Beach",
+        "ja": "ノコノコビーチ",
+        "zh-Hans": "慢慢龟海滩",
+        "zh-Hant": "慢慢龜海灘"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Koopa_Troopa_Beach"
+    },
+    {
+      "id": "DKJungleParkway",
+      "names": {
+        "en": "Faraway Oasis",
+        "ja": "リバーサイドサファリ",
+        "zh-Hans": "河畔探险区",
+        "zh-Hant": "河畔探險區"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Faraway_Oasis"
+    },
+    {
+      "id": "Central",
+      "names": {
+        "en": "Peach Stadium",
+        "ja": "ピーチスタジアム",
+        "zh-Hans": "碧姬竞技场",
+        "zh-Hant": "碧姬競技場"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Peach_Stadium"
+    },
+    {
+      "id": "PeachBeach",
+      "names": {
+        "en": "Peach Beach",
+        "ja": "ピーチビーチ",
+        "zh-Hans": "碧姬海滩",
+        "zh-Hant": "碧姬海灘"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Peach_Beach"
+    },
+    {
+      "id": "LagoonCity",
+      "names": {
+        "en": "Salty Salty Speedway",
+        "ja": "ソルティータウン",
+        "zh-Hans": "海盐城镇",
+        "zh-Hant": "海鹽城鎮"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Salty_Salty_Speedway"
+    },
+    {
+      "id": "DinoDinoJungle",
+      "names": {
+        "en": "Dino Dino Jungle",
+        "ja": "ディノディノジャングル",
+        "zh-Hans": "龙龙丛林",
+        "zh-Hant": "龍龍叢林"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Dino_Dino_Jungle"
+    },
+    {
+      "id": "StormClouds",
+      "names": {
+        "en": "Great ? Block Ruins",
+        "ja": "ハテナしんでん",
+        "zh-Hans": "？神殿",
+        "zh-Hant": "？神殿"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Great_%3F_Block_Ruins"
+    },
+    {
+      "id": "RaftingRiver",
+      "names": {
+        "en": "Cheep Cheep Falls",
+        "ja": "プクプクフォールズ",
+        "zh-Hans": "泡泡鱼瀑布",
+        "zh-Hant": "泡泡魚瀑布"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Cheep_Cheep_Falls_(race_course)"
+    },
+    {
+      "id": "Cave",
+      "names": {
+        "en": "Dandelion Depths",
+        "ja": "ショーニューロード",
+        "zh-Hans": "钟乳洞之路",
+        "zh-Hant": "鐘乳洞之路"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Dandelion_Depths"
+    },
+    {
+      "id": "Cinema",
+      "names": {
+        "en": "Boo Cinema",
+        "ja": "おばけシネマ",
+        "zh-Hans": "幽灵影院",
+        "zh-Hant": "幽靈影院"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Boo_Cinema"
+    },
+    {
+      "id": "DinoBones",
+      "names": {
+        "en": "Dry Bones Burnout",
+        "ja": "ホネホネツイスター",
+        "zh-Hans": "骨骨扭扭乐",
+        "zh-Hant": "骨骨扭扭樂"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Dry_Bones_Burnout"
+    },
+    {
+      "id": "MooMooFarm",
+      "names": {
+        "en": "Moo Moo Meadows",
+        "ja": "モーモーカントリー",
+        "zh-Hans": "哞哞乡村",
+        "zh-Hant": "牛牛農場"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Moo_Moo_Meadows"
+    },
+    {
+      "id": "ChocoMountain",
+      "names": {
+        "en": "Choco Mountain",
+        "ja": "チョコマウンテン",
+        "zh-Hans": "巧克力山",
+        "zh-Hant": "巧克力山"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Choco_Mountain"
+    },
+    {
+      "id": "ToadFactory",
+      "names": {
+        "en": "Toad's Factory",
+        "ja": "キノピオファクトリー",
+        "zh-Hans": "奇诺比奥工厂",
+        "zh-Hant": "奇諾比奧工廠"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Toad%27s_Factory"
+    },
+    {
+      "id": "Lava",
+      "names": {
+        "en": "Bowser's Castle",
+        "ja": "クッパキャッスル",
+        "zh-Hans": "酷霸城堡",
+        "zh-Hant": "庫巴城堡"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Bowser%27s_Castle_(Mario_Kart_World)"
+    },
+    {
+      "id": "BigTree",
+      "names": {
+        "en": "Acorn Heights",
+        "ja": "どんぐりツリーハウス",
+        "zh-Hans": "橡栗树屋",
+        "zh-Hant": "橡栗樹屋"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Acorn_Heights"
+    },
+    {
+      "id": "SFCMarioCircuit",
+      "names": {
+        "en": "Mario Circuit",
+        "ja": "マリオサーキット",
+        "zh-Hans": "马力欧赛道",
+        "zh-Hant": "瑪利歐賽道"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Mario_Circuit_(Mario_Kart_World)"
+    },
+    {
+      "id": "Rainbow",
+      "names": {
+        "en": "Rainbow Road",
+        "ja": "レインボーロード",
+        "zh-Hans": "彩虹之路",
+        "zh-Hant": "彩虹之路"
+      },
+      "sourceUrl": "https://www.mariowiki.com/Rainbow_Road_(Mario_Kart_World)"
+    }
+  ],
+  "sourceUrl": "https://www.mariowiki.com/index.php?title=Mario_Kart_World&oldid=5544799",
+  "sourceSnapshotSha256": "675bfb74c555bfdebb01a5d9de317222c7286c28b8f41d778dc424d609d706a9"
+}
