@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -73,33 +74,38 @@ internal fun SettingsScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(Tokens.Spacing.sm),
     ) {
-        item(key = "settings-heading") {
-            Text(
-                text = "Settings",
-                fontSize = Tokens.Type.pageTitle,
-                fontWeight = FontWeight.Bold,
-                color = Tokens.Palette.navy900,
-            )
-        }
+        settingsItems(rows, rightsNotice)
+    }
+}
 
-        // Shown above the list rather than only on the rows that need it: a page of mostly
-        // unavailable controls looks broken, and this line says it is not.
-        item(key = "settings-intro") {
-            Text(
-                text = "Only the rows marked available do anything in this build. Every other row " +
-                    "says what is missing rather than hiding the feature.",
-                fontSize = Tokens.Type.secondary,
-                color = Tokens.Palette.ink900,
-            )
-        }
+/** Items shared with the single scrolling interactive page. */
+internal fun LazyListScope.settingsItems(rows: List<SettingRow>, rightsNotice: String) {
+    item(key = "settings-heading") {
+        Text(
+            text = "Settings",
+            fontSize = Tokens.Type.pageTitle,
+            fontWeight = FontWeight.Bold,
+            color = Tokens.Palette.navy900,
+        )
+    }
 
-        items(rows, key = { it.key }) { row ->
-            SettingRowView(row)
-        }
+    // Shown above the list rather than only on the rows that need it: a page of mostly
+    // unavailable controls looks broken, and this line says it is not.
+    item(key = "settings-intro") {
+        Text(
+            text = "Only the rows marked available do anything in this build. Every other row " +
+                "says what is missing rather than hiding the feature.",
+            fontSize = Tokens.Type.secondary,
+            color = Tokens.Palette.ink900,
+        )
+    }
 
-        item(key = "rights") {
-            RightsNotice(text = rightsNotice)
-        }
+    items(rows, key = { it.key }) { row ->
+        SettingRowView(row)
+    }
+
+    item(key = "rights") {
+        RightsNotice(text = rightsNotice)
     }
 }
 
@@ -234,88 +240,93 @@ internal fun ImportScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(Tokens.Spacing.sm),
     ) {
-        item(key = "import-heading") {
+        importItems(summary, onScan)
+    }
+}
+
+/** Items shared with the single scrolling interactive page. */
+internal fun LazyListScope.importItems(summary: ImportSummary, onScan: () -> Unit) {
+    item(key = "import-heading") {
+        Text(
+            text = "Import and repair",
+            fontSize = Tokens.Type.pageTitle,
+            fontWeight = FontWeight.Bold,
+            color = Tokens.Palette.navy900,
+        )
+    }
+
+    item(key = "import-summary") {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(Tokens.Radius.md),
+            colors = CardDefaults.cardColors(containerColor = Tokens.Palette.white),
+        ) {
+            Column(
+                modifier = Modifier.padding(Tokens.Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Tokens.Spacing.xs),
+            ) {
+                Text(
+                    text = summary.headline,
+                    fontSize = Tokens.Type.body,
+                    color = Tokens.Palette.ink900,
+                )
+                // The two counts are only printed when the scan actually measured something.
+                // They are never printed on their own as "0 imported": that is the reading the
+                // headline's missing-folder branch exists to make impossible.
+                if (summary.added > 0 || summary.rejected > 0) {
+                    Text(
+                        text = "${summary.added} imported, ${summary.rejected} skipped",
+                        fontSize = Tokens.Type.secondary,
+                        fontWeight = FontWeight.Bold,
+                        color = Tokens.Palette.ink900,
+                    )
+                }
+            }
+        }
+    }
+
+    item(key = "import-scan") {
+        OutlinedButton(
+            onClick = onScan,
+            // The token, not the Material default: the default is 40 dp, below the 48 dp the
+            // pack requires, on the page's only control.
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = Tokens.Component.touchTargetMin),
+        ) {
             Text(
-                text = "Import and repair",
-                fontSize = Tokens.Type.pageTitle,
+                text = "Scan the stages folder",
+                fontSize = Tokens.Type.body,
                 fontWeight = FontWeight.Bold,
-                color = Tokens.Palette.navy900,
+            )
+        }
+    }
+
+    if (summary.rejectedReasons.isNotEmpty()) {
+        item(key = "import-rejected-heading") {
+            Text(
+                text = "Files that were skipped",
+                modifier = Modifier.padding(top = Tokens.Spacing.xs),
+                fontSize = Tokens.Type.sectionTitle,
+                fontWeight = FontWeight.Bold,
+                color = Tokens.Palette.ink900,
             )
         }
 
-        item(key = "import-summary") {
+        // The reasons are the scanner's own lines, each naming a file. No key: two files can
+        // produce the same sentence, and a duplicate key makes LazyColumn throw.
+        items(summary.rejectedReasons) { reason ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(Tokens.Radius.md),
+                shape = RoundedCornerShape(Tokens.Radius.sm),
                 colors = CardDefaults.cardColors(containerColor = Tokens.Palette.white),
             ) {
-                Column(
-                    modifier = Modifier.padding(Tokens.Spacing.md),
-                    verticalArrangement = Arrangement.spacedBy(Tokens.Spacing.xs),
-                ) {
-                    Text(
-                        text = summary.headline,
-                        fontSize = Tokens.Type.body,
-                        color = Tokens.Palette.ink900,
-                    )
-                    // The two counts are only printed when the scan actually measured something.
-                    // They are never printed on their own as "0 imported": that is the reading the
-                    // headline's missing-folder branch exists to make impossible.
-                    if (summary.added > 0 || summary.rejected > 0) {
-                        Text(
-                            text = "${summary.added} imported, ${summary.rejected} skipped",
-                            fontSize = Tokens.Type.secondary,
-                            fontWeight = FontWeight.Bold,
-                            color = Tokens.Palette.ink900,
-                        )
-                    }
-                }
-            }
-        }
-
-        item(key = "import-scan") {
-            OutlinedButton(
-                onClick = onScan,
-                // The token, not the Material default: the default is 40 dp, below the 48 dp the
-                // pack requires, on the page's only control.
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = Tokens.Component.touchTargetMin),
-            ) {
                 Text(
-                    text = "Scan the stages folder",
-                    fontSize = Tokens.Type.body,
-                    fontWeight = FontWeight.Bold,
+                    text = reason,
+                    modifier = Modifier.padding(Tokens.Spacing.sm),
+                    fontSize = Tokens.Type.secondary,
+                    color = Tokens.Palette.errorText,
                 )
-            }
-        }
-
-        if (summary.rejectedReasons.isNotEmpty()) {
-            item(key = "import-rejected-heading") {
-                Text(
-                    text = "Files that were skipped",
-                    modifier = Modifier.padding(top = Tokens.Spacing.xs),
-                    fontSize = Tokens.Type.sectionTitle,
-                    fontWeight = FontWeight.Bold,
-                    color = Tokens.Palette.ink900,
-                )
-            }
-
-            // The reasons are the scanner's own lines, each naming a file. No key: two files can
-            // produce the same sentence, and a duplicate key makes LazyColumn throw.
-            items(summary.rejectedReasons) { reason ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(Tokens.Radius.sm),
-                    colors = CardDefaults.cardColors(containerColor = Tokens.Palette.white),
-                ) {
-                    Text(
-                        text = reason,
-                        modifier = Modifier.padding(Tokens.Spacing.sm),
-                        fontSize = Tokens.Type.secondary,
-                        color = Tokens.Palette.errorText,
-                    )
-                }
             }
         }
     }

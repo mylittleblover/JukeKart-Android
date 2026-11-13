@@ -1,13 +1,13 @@
 package com.mylittleblover.mkwplayer
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Button
@@ -44,8 +44,8 @@ import com.mylittleblover.mkwplayer.ui.play.PlayScreen
 import com.mylittleblover.mkwplayer.ui.routes.FullMap
 import com.mylittleblover.mkwplayer.ui.routes.MAP_IMAGE_ASPECT
 import com.mylittleblover.mkwplayer.ui.routes.RoutesScreen
-import com.mylittleblover.mkwplayer.ui.settings.ImportScreen
-import com.mylittleblover.mkwplayer.ui.settings.SettingsScreen
+import com.mylittleblover.mkwplayer.ui.settings.importItems
+import com.mylittleblover.mkwplayer.ui.settings.settingsItems
 
 /**
  * The app: four tabs and the pages reached from them.
@@ -297,151 +297,153 @@ private fun ConsolePage(
     onOpenFiles: () -> Unit,
 ) {
     val flow = ui.flow
-    val scroll = rememberScrollState()
 
-    Column(
+    LazyColumn(
         Modifier
             .fillMaxSize()
-            .verticalScroll(scroll)
+            .testTag("interactive-page")
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Console", style = MaterialTheme.typography.headlineSmall)
+        item(key = "performance-console") {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Console", style = MaterialTheme.typography.headlineSmall)
 
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (flow == null) {
-                    Text(
-                        "No stage is open. Open one from the library first.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = onOpenPack) { Text("Import a pack") }
-                        OutlinedButton(onClick = onOpenFiles) { Text("Add .bwav files") }
-                        OutlinedButton(onClick = { model.openFlowFromFolder() }) {
-                            Text("Scan stages folder")
-                        }
-                    }
-                } else {
-                    Text(flow.title, style = MaterialTheme.typography.titleMedium)
-                    Text(flow.summary, style = MaterialTheme.typography.bodySmall)
-                    Text(
-                        flow.performanceStage.ifEmpty { "Not started" },
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-
-                    if (flow.performanceBlocker != null) {
-                        // A disabled button with no explanation reads as a broken app.
-                        Text(flow.performanceBlocker, style = MaterialTheme.typography.bodySmall)
-                    } else {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
-                                onClick = { model.startPerformance() },
-                                enabled = !flow.performing,
-                            ) { Text("Start") }
-
-                            // The next-stage event. The prelude loops until this is pressed, which is what
-                            // the game does: the race start is an event, not a timer.
-                            OutlinedButton(
-                                onClick = { model.advancePerformance() },
-                                enabled = flow.canAdvance,
-                            ) { Text("Next stage") }
-
-                            OutlinedButton(
-                                onClick = { model.stopPerformance() },
-                                enabled = flow.performing,
-                            ) { Text("Stop") }
-                        }
-
-                        if (flow.hasFast) {
-                            // The same music at another tempo. The compiled rule crossfades it at a bar
-                            // line, so the switch is not a cut.
-                            OutlinedButton(
-                                onClick = { model.toggleFast() },
-                                enabled = flow.canFast || (flow.versionNumbers.isEmpty() && flow.canEnd && !flow.fastPlaying),
-                            ) {
-                                Text(if (flow.fastPlaying) "Fast playing" else "Fast version")
-                            }
-                        }
-
-                        if (flow.canCancelPending) {
-                            OutlinedButton(onClick = { model.cancelPendingPerformance() }) {
-                                Text(androidx.compose.ui.res.stringResource(R.string.cancel_pending_transition))
-                            }
-                        }
-
-                        if (flow.regionNumbers.isNotEmpty()) {
-                            Text(androidx.compose.ui.res.stringResource(R.string.music_region))
-                            flow.regionNumbers.chunked(3).forEach { row ->
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    row.forEach { number ->
-                                        FilterChip(
-                                            selected = flow.selectedRegion == number,
-                                            onClick = { if(flow.selectedRegion != number) model.selectMusicRegion(number) },
-                                            enabled = number in flow.availableRegions || number == flow.selectedRegion,
-                                            label = { Text(androidx.compose.ui.res.stringResource(R.string.music_region_number,number)) },
-                                        )
-                                    }
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (flow == null) {
+                            Text(
+                                "No stage is open. Open one from the library first.",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = onOpenPack) { Text("Import a pack") }
+                                OutlinedButton(onClick = onOpenFiles) { Text("Add .bwav files") }
+                                OutlinedButton(onClick = { model.openFlowFromFolder() }) {
+                                    Text("Scan stages folder")
                                 }
                             }
-                            Text(androidx.compose.ui.res.stringResource(R.string.music_region_hint),style = MaterialTheme.typography.bodySmall)
-                        }
+                        } else {
+                            Text(flow.title, style = MaterialTheme.typography.titleMedium)
+                            Text(flow.summary, style = MaterialTheme.typography.bodySmall)
+                            Text(
+                                flow.performanceStage.ifEmpty { "Not started" },
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
 
-                        if (flow.versionNumbers.isNotEmpty()) {
-                            Text(androidx.compose.ui.res.stringResource(R.string.recording_version))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                flow.versionNumbers.forEach { number ->
-                                    FilterChip(
-                                        selected = flow.selectedVersion == number,
-                                        onClick = { if(flow.selectedVersion != number) model.selectRecordingVersion(number) },
-                                        enabled = number in flow.availableVersions || number == flow.selectedVersion,
-                                        label = { Text(androidx.compose.ui.res.stringResource(R.string.recording_version_number,number)) },
+                            if (flow.performanceBlocker != null) {
+                                // A disabled button with no explanation reads as a broken app.
+                                Text(flow.performanceBlocker, style = MaterialTheme.typography.bodySmall)
+                            } else {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(
+                                        onClick = { model.startPerformance() },
+                                        enabled = !flow.performing,
+                                    ) { Text("Start") }
+
+                                    // The next-stage event. The prelude loops until this is pressed, which is what
+                                    // the game does: the race start is an event, not a timer.
+                                    OutlinedButton(
+                                        onClick = { model.advancePerformance() },
+                                        enabled = flow.canAdvance,
+                                    ) { Text("Next stage") }
+
+                                    OutlinedButton(
+                                        onClick = { model.stopPerformance() },
+                                        enabled = flow.performing,
+                                    ) { Text("Stop") }
+                                }
+
+                                if (flow.hasFast) {
+                                    // The same music at another tempo. The compiled rule crossfades it at a bar
+                                    // line, so the switch is not a cut.
+                                    OutlinedButton(
+                                        onClick = { model.toggleFast() },
+                                        enabled = flow.canFast || (flow.versionNumbers.isEmpty() && flow.canEnd && !flow.fastPlaying),
+                                    ) {
+                                        Text(if (flow.fastPlaying) "Fast playing" else "Fast version")
+                                    }
+                                }
+
+                                if (flow.canCancelPending) {
+                                    OutlinedButton(onClick = { model.cancelPendingPerformance() }) {
+                                        Text(androidx.compose.ui.res.stringResource(R.string.cancel_pending_transition))
+                                    }
+                                }
+
+                                if (flow.regionNumbers.isNotEmpty()) {
+                                    Text(androidx.compose.ui.res.stringResource(R.string.music_region))
+                                    flow.regionNumbers.chunked(3).forEach { row ->
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            row.forEach { number ->
+                                                FilterChip(
+                                                    selected = flow.selectedRegion == number,
+                                                    onClick = { if(flow.selectedRegion != number) model.selectMusicRegion(number) },
+                                                    enabled = number in flow.availableRegions || number == flow.selectedRegion,
+                                                    label = { Text(androidx.compose.ui.res.stringResource(R.string.music_region_number,number)) },
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Text(androidx.compose.ui.res.stringResource(R.string.music_region_hint),style = MaterialTheme.typography.bodySmall)
+                                }
+
+                                if (flow.versionNumbers.isNotEmpty()) {
+                                    Text(androidx.compose.ui.res.stringResource(R.string.recording_version))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        flow.versionNumbers.forEach { number ->
+                                            FilterChip(
+                                                selected = flow.selectedVersion == number,
+                                                onClick = { if(flow.selectedVersion != number) model.selectRecordingVersion(number) },
+                                                enabled = number in flow.availableVersions || number == flow.selectedVersion,
+                                                label = { Text(androidx.compose.ui.res.stringResource(R.string.recording_version_number,number)) },
+                                            )
+                                        }
+                                    }
+                                    Text(androidx.compose.ui.res.stringResource(R.string.recording_version_hint),style = MaterialTheme.typography.bodySmall)
+                                }
+
+                                if (flow.canEnd) {
+                                    // The ending is chosen by how far into the loop playback has got; the console
+                                    // offers the event, not a menu of files.
+                                    Button(onClick = { model.takeOutro() }) { Text("End the stage") }
+                                    Text(
+                                        "The ending nearest to the current position is chosen.",
+                                        style = MaterialTheme.typography.bodySmall,
                                     )
                                 }
                             }
-                            Text(androidx.compose.ui.res.stringResource(R.string.recording_version_hint),style = MaterialTheme.typography.bodySmall)
-                        }
 
-                        if (flow.canEnd) {
-                            // The ending is chosen by how far into the loop playback has got; the console
-                            // offers the event, not a menu of files.
-                            Button(onClick = { model.takeOutro() }) { Text("End the stage") }
-                            Text(
-                                "The ending nearest to the current position is chosen.",
-                                style = MaterialTheme.typography.bodySmall,
-                            )
+                            Text(flow.provenance, style = MaterialTheme.typography.bodySmall)
                         }
                     }
-
-                    Text(flow.provenance, style = MaterialTheme.typography.bodySmall)
                 }
+
+                PlayScreen(
+                    transport = UiMapping.transport(ui),
+                    sections = UiMapping.sections(flow),
+                    title = ui.title,
+                    provenance = UiMapping.provenanceLine(flow),
+                    onPlay = { model.startPerformance() },
+                    onPause = { model.pause() },
+                    onResume = { model.resume() },
+                    onStop = { model.stopPerformance() },
+                    onSection = { model.playSection(it) },
+                    modifier = Modifier.fillMaxWidth(),
+                    scrollable = false,
+                )
             }
         }
 
-        PlayScreen(
-            transport = UiMapping.transport(ui),
-            sections = UiMapping.sections(flow),
-            title = ui.title,
-            provenance = UiMapping.provenanceLine(flow),
-            onPlay = { model.startPerformance() },
-            onPause = { model.pause() },
-            onResume = { model.resume() },
-            onStop = { model.stopPerformance() },
-            onSection = { model.playSection(it) },
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        SettingsScreen(
+        settingsItems(
             rows = UiMapping.settings(),
             rightsNotice = com.mylittleblover.mkwplayer.ui.art.CupArt.NOTICE,
-            modifier = Modifier.fillMaxWidth(),
         )
 
-        ImportScreen(
+        importItems(
             summary = UiMapping.importSummary(ui),
             onScan = { model.openFlowFromFolder() },
-            modifier = Modifier.fillMaxWidth(),
         )
     }
 }

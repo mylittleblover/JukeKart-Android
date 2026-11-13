@@ -81,12 +81,13 @@ internal fun PlayScreen(
     onStop: () -> Unit,
     onSection: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    scrollable: Boolean = true,
 ) {
     Column(
         modifier = modifier
             .fillMaxWidth()
             .background(Tokens.Palette.cream100)
-            .verticalScroll(rememberScrollState())
+            .then(if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier)
             .padding(horizontal = Tokens.Spacing.md, vertical = Tokens.Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Tokens.Spacing.lg),
     ) {
