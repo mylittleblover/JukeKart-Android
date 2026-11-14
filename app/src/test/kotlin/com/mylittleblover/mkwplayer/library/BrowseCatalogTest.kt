@@ -60,4 +60,10 @@ class BrowseCatalogTest {
         assertEquals(emptyList(), catalog.routes(OfficialRouteKind.GRAND_PRIX, false, "Special Cup"))
     }
 
+    @Test fun supplementaryJapaneseCharactersRemainSearchable() {
+        val root = JSONObject(File("src/main/assets/localized_names.json").readText())
+        root.getJSONArray("entries").getJSONObject(0).getJSONObject("names").put("ja", "𠮷野のコース")
+        assertEquals(listOf("FirstCircuit"), assertNotNull(catalog(root.toString())).searchCourses("𠮷", true))
+    }
+
 }

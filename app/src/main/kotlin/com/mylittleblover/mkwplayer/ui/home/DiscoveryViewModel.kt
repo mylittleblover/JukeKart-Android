@@ -1,0 +1,100 @@
+package com.mylittleblover.mkwplayer.ui.home
+
+import android.app.Application
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.mylittleblover.mkwplayer.library.DailySelectionStore
+import com.mylittleblover.mkwplayer.library.FavoriteStore
+import com.mylittleblover.mkwplayer.library.RecommendationCandidate
+import com.mylittleblover.mkwplayer.library.millisUntilNextMidnight
+import java.io.File
+import java.time.LocalDate
+import java.time.ZonedDateTime
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+internal class DiscoveryViewModel(application: Application) : AndroidViewModel(application) {
+    enum class Error { FAVORITES_READ, FAVORITES_WRITE, DAILY_SELECTION }
+    data class State(
+        val favorites: Set<String> = emptySet(), val day: LocalDate = LocalDate.now(),
+        val dailyIds: List<String> = emptyList(), val favoritesReady: Boolean = false, val dailyReady: Boolean = false,
+        val favoritesError: Error? = null, val dailyError: Error? = null,
+    ) {
+        val error: Error? get() = favoritesError ?: dailyError
+    }
+    private val favorites = FavoriteStore(File(application.filesDir, "user-favorites.json"))
+    private val daily = DailySelectionStore(File(application.filesDir, "daily-selection.json"))
+    private val candidates = MutableStateFlow<List<RecommendationCandidate>?>(null)
+    private val favoriteOperations = Mutex()
+    private val day = MutableStateFlow(LocalDate.now())
+    private val _state = MutableStateFlow(State())
+    val state = _state.asStateFlow()
+    private val dateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) { refreshDate() }
+    }
+    init {
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_DATE_CHANGED); addAction(Intent.ACTION_TIME_CHANGED); addAction(Intent.ACTION_TIMEZONE_CHANGED)
+        }
+        if (Build.VERSION.SDK_INT >= 33) application.registerReceiver(dateReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        else application.registerReceiver(dateReceiver, filter)
+        reloadFavorites()
+        viewModelScope.launch {
+            while (isActive) {
+                refreshDate()
+                delay(millisUntilNextMidnight(ZonedDateTime.now()).coerceAtMost(60_000L))
+            }
+        }
+        viewModelScope.launch {
+            combine(day, candidates) { date, pool -> pool?.let { date to it } }.filterNotNull().collectLatest { (date, pool) ->
+                val selected = withContext(Dispatchers.IO) { daily.select(date, pool) }
+                selected.onSuccess { ids -> _state.update { it.copy(day = date, dailyIds = ids, dailyReady = true, dailyError = null) } }
+                    .onFailure { _state.update { it.copy(day = date, dailyReady = true, dailyError = Error.DAILY_SELECTION) } }
+            }
+        }
+    }
+    fun updateEligible(values: List<RecommendationCandidate>) { candidates.value = values.toList() }
+    fun refreshDate() { day.value = LocalDate.now() }
+    fun reloadFavorites() {
+        viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            favoriteOperations.withLock {
+                val loaded = withContext(Dispatchers.IO) { favorites.read() }
+                loaded.onSuccess { value -> _state.update { it.copy(favorites = value, favoritesReady = true, favoritesError = null) } }
+                    .onFailure { _state.update { it.copy(favoritesReady = true, favoritesError = Error.FAVORITES_READ) } }
+            }
+        }
+    }
+    fun toggleFavorite(id: String) {
+        viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            withContext(NonCancellable) {
+                favoriteOperations.withLock {
+                    val result = withContext(Dispatchers.IO) { favorites.toggle(id) }
+                    result.onSuccess { value -> _state.update { it.copy(favorites = value, favoritesReady = true, favoritesError = null) } }
+                        .onFailure { _state.update { it.copy(favoritesError = Error.FAVORITES_WRITE) } }
+                }
+            }
+        }
+    }
+    override fun onCleared() {
+        getApplication<Application>().unregisterReceiver(dateReceiver)
+        super.onCleared()
+    }
+}

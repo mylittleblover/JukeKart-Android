@@ -128,5 +128,14 @@ private fun isSourceUrl(value: String): Boolean = value.startsWith("https://www.
 private val SOURCE_DIGEST = Regex("[0-9a-f]{64}")
 private val STABLE_ID = Regex("[A-Za-z][A-Za-z0-9_]*")
 
-private fun searchKey(value: String): String = Normalizer.normalize(value, Normalizer.Form.NFKC)
-    .lowercase(Locale.ROOT).filter { it.isLetterOrDigit() || it == 'ー' }
+private fun searchKey(value: String): String {
+    val normalized = Normalizer.normalize(value, Normalizer.Form.NFKC).lowercase(Locale.ROOT)
+    return buildString {
+        var offset = 0
+        while (offset < normalized.length) {
+            val codePoint = normalized.codePointAt(offset)
+            if (Character.isLetterOrDigit(codePoint) || codePoint == 0x30FC) appendCodePoint(codePoint)
+            offset += Character.charCount(codePoint)
+        }
+    }
+}
