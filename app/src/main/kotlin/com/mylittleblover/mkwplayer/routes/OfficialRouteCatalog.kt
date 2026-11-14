@@ -2,6 +2,7 @@ package com.mylittleblover.mkwplayer.routes
 
 import java.util.Collections
 import java.util.Locale
+import java.text.Normalizer
 import com.mylittleblover.mkwplayer.i18n.languageKey
 import org.json.JSONObject
 
@@ -82,6 +83,15 @@ internal class LocalizedNames private constructor(private val entries: Map<Strin
     fun name(id: String, languageTag: String): String? =
         entries[id.removeSuffix("_00")]?.let { translatedName(it, languageTag) }
 
+    fun matches(id: String, query: String): Boolean {
+        val canonical = id.removeSuffix("_00")
+        val names = entries[canonical] ?: return false
+        if (query.isBlank()) return true
+        val key = searchKey(query)
+        if (key.isEmpty()) return false
+        return (names.values + canonical).any { searchKey(it).contains(key) }
+    }
+
     companion object {
         fun parse(text: String): LocalizedNames? = runCatching {
             val root = JSONObject(text)
@@ -117,3 +127,6 @@ private fun readNames(value: JSONObject): Map<String, String> {
 private fun isSourceUrl(value: String): Boolean = value.startsWith("https://www.mariowiki.com/")
 private val SOURCE_DIGEST = Regex("[0-9a-f]{64}")
 private val STABLE_ID = Regex("[A-Za-z][A-Za-z0-9_]*")
+
+private fun searchKey(value: String): String = Normalizer.normalize(value, Normalizer.Form.NFKC)
+    .lowercase(Locale.ROOT).filter { it.isLetterOrDigit() || it == 'ー' }
