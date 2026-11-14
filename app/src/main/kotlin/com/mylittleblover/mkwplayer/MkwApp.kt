@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Button
@@ -46,6 +47,10 @@ import com.mylittleblover.mkwplayer.ui.UiMapping
 import com.mylittleblover.mkwplayer.ui.detail.DetailScreen
 import com.mylittleblover.mkwplayer.ui.library.LibraryScreen
 import com.mylittleblover.mkwplayer.ui.play.PlayScreen
+import com.mylittleblover.mkwplayer.ui.AppHeader
+import com.mylittleblover.mkwplayer.ui.tabTitle
+import com.mylittleblover.mkwplayer.ui.settings.AppSettingsScreen
+import com.mylittleblover.mkwplayer.i18n.AppLanguageSettings
 import com.mylittleblover.mkwplayer.ui.routes.OfficialMapScreen
 import com.mylittleblover.mkwplayer.ui.routes.WorldMapState
 import com.mylittleblover.mkwplayer.routes.OfficialRouteCatalog
@@ -104,15 +109,27 @@ internal fun MkwApp(
         }
     }
 
+    BackHandler(enabled = nav.canGoBack) { nav = nav.back() ?: nav }
+    val context = LocalContext.current
+    val language = AppLanguageSettings.current(context)
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        topBar = {
+            val title = when (nav.detail) {
+                NavState.Detail.Settings -> androidx.compose.ui.res.stringResource(R.string.settings_title)
+                is NavState.Detail.Course -> androidx.compose.ui.res.stringResource(R.string.nav_course)
+                else -> tabTitle(nav.tab)
+            }
+            AppHeader(title, nav.canGoBack, nav.detail != NavState.Detail.Settings,
+                onBack = { nav = nav.back() ?: nav }, onSettings = { nav = nav.open(NavState.Detail.Settings) })
+        },
         bottomBar = {
             NavigationBar {
                 Tab.ordered().forEach { tab ->
                     NavigationBarItem(
                         selected = nav.tab == tab,
                         onClick = { nav = nav.select(tab) },
-                        label = { Text(tab.label) },
+                        label = { Text(tabTitle(tab)) },
                         icon = {},
                     )
                 }
@@ -120,14 +137,12 @@ internal fun MkwApp(
         },
     ) { inner ->
         Column(Modifier.padding(inner).fillMaxSize()) {
-            // Back is handled by the system; the visible affordance matters because a detail page with no
-            // way back reads as a dead end.
-            if (nav.canGoBack) {
-                TextButton(onClick = { nav = nav.back() ?: nav }) { Text("Back") }
-            }
-
             val detail = nav.detail
             when {
+                detail == NavState.Detail.Settings -> AppSettingsScreen(
+                    language = language, onLanguage = { AppLanguageSettings.select(context, it) },
+                    busy = ui.busy, sourceName = ui.pack?.name, onOpenPack = openPack, onOpenFiles = openFiles,
+                )
                 detail is NavState.Detail.Course -> CoursePage(model, ui, detail.code) {
                     model.startStagePerformance(detail.code)
                     nav=nav.select(Tab.INTERACTIVE)

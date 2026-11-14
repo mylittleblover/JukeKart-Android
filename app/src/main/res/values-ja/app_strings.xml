@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">設定</string>
+    <string name="app_language_title">アプリの言語</string>
+    <string name="language_follow_system">システム設定に従う</string>
+    <string name="settings_language_hint">アプリの表示言語を選んでください。</string>
+    <string name="settings_library">音楽ライブラリ</string>
+    <string name="settings_library_hint">音楽ファイルをインポートして再生できます。</string>
+    <string name="settings_import_pack">.mkwpack をインポート</string>
+    <string name="settings_open_files">BWAV ファイルを開く</string>
+    <string name="settings_importing">音楽をインポート中…</string>
+    <string name="settings_about">このアプリについて</string>
+    <string name="settings_version">バージョン %1$s</string>
+    <string name="common_back">戻る</string>
+    <string name="nav_library">ライブラリ</string>
+    <string name="nav_map">マップ</string>
+    <string name="nav_interactive">インタラクティブ</string>
+    <string name="nav_routes">ルート</string>
+    <string name="nav_course">コース</string>
+</resources>

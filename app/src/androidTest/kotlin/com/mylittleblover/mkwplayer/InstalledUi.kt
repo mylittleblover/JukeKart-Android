@@ -48,7 +48,18 @@ internal class InstalledUi {
             visit(instrumentation.uiAutomation.rootInActiveWindow)
             if (bounds == null) SystemClock.sleep(500)
         }
-        val target = bounds ?: throw AssertionError("Visible touch target missing")
+        val target = bounds ?: run {
+            capture("ui-touch-missing.png")
+            val rows = mutableListOf<String>()
+            fun dump(node: AccessibilityNodeInfo?, depth: Int) {
+                if (node == null) return
+                rows += "${" ".repeat(depth)}text=${node.text} desc=${node.contentDescription} enabled=${node.isEnabled} visible=${node.isVisibleToUser}"
+                for (index in 0 until node.childCount) dump(node.getChild(index), depth + 1)
+            }
+            dump(instrumentation.uiAutomation.rootInActiveWindow, 0)
+            File(instrumentation.targetContext.filesDir, "ui-touch-missing.txt").writeText(rows.joinToString("\n"))
+            throw AssertionError("Visible touch target missing")
+        }
         val time = SystemClock.uptimeMillis()
         for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
             val event = MotionEvent.obtain(time, SystemClock.uptimeMillis(), action, target.exactCenterX(), target.exactCenterY(), 0)

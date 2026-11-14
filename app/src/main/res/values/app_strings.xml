@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">Settings</string>
+    <string name="app_language_title">App language</string>
+    <string name="language_follow_system">Follow system</string>
+    <string name="settings_language_hint">Choose the language used by this app.</string>
+    <string name="settings_library">Music library</string>
+    <string name="settings_library_hint">Import your music files to listen.</string>
+    <string name="settings_import_pack">Import .mkwpack</string>
+    <string name="settings_open_files">Open BWAV files</string>
+    <string name="settings_importing">Importing music…</string>
+    <string name="settings_about">About</string>
+    <string name="settings_version">Version %1$s</string>
+    <string name="common_back">Back</string>
+    <string name="nav_library">Library</string>
+    <string name="nav_map">Map</string>
+    <string name="nav_interactive">Interactive</string>
+    <string name="nav_routes">Routes</string>
+    <string name="nav_course">Course</string>
+    <string name="language_zh_hans_native" translatable="false">简体中文</string>
+    <string name="language_zh_hant_native" translatable="false">繁體中文</string>
+    <string name="language_en_native" translatable="false">English</string>
+    <string name="language_ja_native" translatable="false">日本語</string>
+</resources>

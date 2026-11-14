@@ -37,8 +37,13 @@ import com.mylittleblover.mkwplayer.audio.TimingDiagnosis
 import com.mylittleblover.mkwplayer.player.PlayerViewModel
 
 class MainActivity : ComponentActivity() {
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(com.mylittleblover.mkwplayer.i18n.AppLanguageSettings.wrapLegacy(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.mylittleblover.mkwplayer.i18n.AppLanguageSettings.migratePlatformChoice(this)
         androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = true
         androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightNavigationBars = true
         setContent {

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">设置</string>
+    <string name="app_language_title">应用语言</string>
+    <string name="language_follow_system">跟随系统</string>
+    <string name="settings_language_hint">选择应用的显示语言。</string>
+    <string name="settings_library">音乐资源库</string>
+    <string name="settings_library_hint">导入你的音乐文件，开始收听。</string>
+    <string name="settings_import_pack">导入 .mkwpack</string>
+    <string name="settings_open_files">打开 BWAV 文件</string>
+    <string name="settings_importing">正在导入音乐…</string>
+    <string name="settings_about">关于</string>
+    <string name="settings_version">版本 %1$s</string>
+    <string name="common_back">返回</string>
+    <string name="nav_library">曲库</string>
+    <string name="nav_map">地图</string>
+    <string name="nav_interactive">互动</string>
+    <string name="nav_routes">路线</string>
+    <string name="nav_course">赛道详情</string>
+</resources>

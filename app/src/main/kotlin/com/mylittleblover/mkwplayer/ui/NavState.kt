@@ -61,6 +61,8 @@ internal class NavState(
 
         /** The flow currently loaded, with its sections. */
         data object Flow : Detail
+
+        data object Settings : Detail
     }
 
     /** True when back would leave the detail rather than the tab. */
@@ -83,6 +85,7 @@ internal class NavState(
         null -> listOf(tab.name, "root")
         is Detail.Course -> listOf(tab.name, "course", page.code)
         Detail.Flow -> listOf(tab.name, "flow")
+        Detail.Settings -> listOf(tab.name, "settings")
     }
 
     companion object {
@@ -91,6 +94,7 @@ internal class NavState(
             val detail = when (state.getOrNull(1)) {
                 "course" -> state.getOrNull(2)?.takeIf { it.isNotBlank() }?.let(Detail::Course)
                 "flow" -> Detail.Flow
+                "settings" -> Detail.Settings
                 else -> null
             }
             return NavState(tab, detail)
