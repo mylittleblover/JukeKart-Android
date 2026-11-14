@@ -1,6 +1,14 @@
 package com.mylittleblover.mkwplayer.ui.home
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -22,11 +30,21 @@ import com.mylittleblover.mkwplayer.routes.OfficialRouteKind
 import com.mylittleblover.mkwplayer.ui.art.StageArt
 
 @Composable
-private fun CourseTile(code: String, name: String, favorite: Boolean, onOpen: () -> Unit, onFavorite: () -> Unit) {
+private fun CourseTile(code: String, name: String, favorite: Boolean, map: ImageBitmap?,
+    anchors: com.mylittleblover.mkwplayer.library.MapAnchors.Catalog?, onOpen: () -> Unit, onFavorite: () -> Unit) {
     Card(onClick = onOpen, modifier = Modifier.width(310.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                StageArt.resolve(code)?.let { Image(painterResource(it), null, Modifier.fillMaxSize()) }
+                val anchor = anchors?.stageTolerant(code)
+                if (map != null && anchor != null) Canvas(Modifier.fillMaxSize()) {
+                    val cropW = (map.width * .24f).toInt().coerceAtLeast(1)
+                    val cropH = (map.height * .18f).toInt().coerceAtLeast(1)
+                    val left = (anchor.u * map.width - cropW / 2).toInt().coerceIn(0, map.width - cropW)
+                    val top = (anchor.v * map.height - cropH / 2).toInt().coerceIn(0, map.height - cropH)
+                    drawImage(map, srcOffset = IntOffset(left, top), srcSize = IntSize(cropW, cropH),
+                        dstSize = IntSize(size.width.toInt().coerceAtLeast(1), size.height.toInt().coerceAtLeast(1)))
+                }
+                StageArt.resolve(code)?.let { Image(painterResource(it), null, Modifier.size(92.dp)) }
             }
             Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 2)
             Text(stringResource(R.string.discovery_placeholder), style = MaterialTheme.typography.labelSmall)
@@ -39,13 +57,22 @@ private fun CourseTile(code: String, name: String, favorite: Boolean, onOpen: ()
 internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.State, language: String, unlocked: Boolean,
                            onOpen: (String) -> Unit, onFavorite: (String) -> Unit,
                            onImport: () -> Unit, onPlayer: () -> Unit, hasPlayer: Boolean) {
+    val context = LocalContext.current
+    val map by produceState<ImageBitmap?>(null, context) {
+        value = withContext(Dispatchers.IO) {
+            android.graphics.BitmapFactory.decodeResource(context.resources, R.drawable.world_map)?.asImageBitmap()
+        }
+    }
+    val anchors = remember(context) { runCatching {
+        com.mylittleblover.mkwplayer.library.MapAnchors.parse(context.assets.open("map_anchors.json").bufferedReader().use { it.readText() })
+    }.getOrNull() }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { Text(stringResource(R.string.discovery_daily), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
         if (catalog == null || state.dailyIds.none { it in catalog.courses(unlocked) }) item { Text(stringResource(R.string.discovery_empty)) }
         else item {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(state.dailyIds.filter { it in catalog.courses(unlocked) }, key = { it }) { id ->
-                    CourseTile(id, catalog.displayName(id, language) ?: id, id in state.favorites, { onOpen(id) }, { onFavorite(id) })
+                    CourseTile(id, catalog.displayName(id, language) ?: id, id in state.favorites, map, anchors, { onOpen(id) }, { onFavorite(id) })
                 }
             }
         }
@@ -55,7 +82,7 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
         if (favorites.isNotEmpty()) {
             item { Text(stringResource(R.string.discovery_favorites), style = MaterialTheme.typography.titleLarge) }
             item { LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(favorites, key = { it }) { id -> CourseTile(id, catalog?.displayName(id, language) ?: id, true, { onOpen(id) }, { onFavorite(id) }) }
+                items(favorites, key = { it }) { id -> CourseTile(id, catalog?.displayName(id, language) ?: id, true, map, anchors, { onOpen(id) }, { onFavorite(id) }) }
             } }
         }
     }
