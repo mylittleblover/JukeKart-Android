@@ -12,4 +12,3 @@ internal fun languageKey(languageTag: String): String {
         else -> locale.language
     }
 }
-
