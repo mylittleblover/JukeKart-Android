@@ -115,16 +115,90 @@ internal fun DiscoveryCup(route: OfficialRoute?, catalog: BrowseCatalog?, langua
 }
 
 @Composable
-internal fun DiscoveryPlaylists(catalog: BrowseCatalog?, unlocked: Boolean, language: String, onCup: (String) -> Unit) {
+internal fun DiscoveryPlaylists(catalog: BrowseCatalog?, unlocked: Boolean, language: String,
+    state: DiscoveryViewModel.State, onCreate: (String) -> Unit,
+    onPlaylist: (String) -> Unit, onCup: (String) -> Unit) {
     val routes = catalog?.routes(OfficialRouteKind.GRAND_PRIX, unlocked).orEmpty() + catalog?.routes(OfficialRouteKind.RALLY, unlocked).orEmpty()
+    var creating by rememberSaveable { mutableStateOf(false) }
+    var name by rememberSaveable { mutableStateOf("") }
+    var showAll by rememberSaveable { mutableStateOf(false) }
+    if (creating) AlertDialog(onDismissRequest = { creating = false },
+        title = { Text(stringResource(R.string.discovery_create_playlist)) },
+        text = { OutlinedTextField(name, { name = it.take(120) }, label = { Text(stringResource(R.string.discovery_playlist_name)) }, singleLine = true) },
+        confirmButton = { TextButton(onClick = { onCreate(name); name = ""; creating = false }, enabled = name.isNotBlank()) { Text(stringResource(R.string.discovery_create)) } },
+        dismissButton = { TextButton(onClick = { creating = false }) { Text(stringResource(R.string.discovery_cancel)) } })
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text(stringResource(R.string.discovery_ordinary_lists), style = MaterialTheme.typography.titleLarge) }
-        item { Text(stringResource(R.string.discovery_no_saved)) }
+        item { OutlinedButton(onClick = { creating = true }) { Text(stringResource(R.string.discovery_create_playlist)) } }
+        if (state.playlistError != null) item { Text(stringResource(R.string.discovery_save_failed), color = MaterialTheme.colorScheme.error) }
+        if (state.playlists.isEmpty()) item { Text(stringResource(R.string.discovery_no_saved)) }
+        items(if (showAll) state.playlists else state.playlists.take(5), key = { "playlist:${it.id}" }) { playlist ->
+            Card(onClick = { onPlaylist(playlist.id) }, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(18.dp)) { Text(playlist.name, style = MaterialTheme.typography.titleMedium); Text(playlist.courseIds.size.toString()) }
+            }
+        }
+        if (!showAll && state.playlists.size > 5) item { TextButton(onClick = { showAll = true }) { Text(stringResource(R.string.discovery_show_all)) } }
         item { Text(stringResource(R.string.discovery_my_routes), style = MaterialTheme.typography.titleLarge) }
         item { Text(stringResource(R.string.discovery_no_saved)) }
         item { Text(stringResource(R.string.discovery_gp), style = MaterialTheme.typography.titleLarge) }
         items(routes.filter { it.kind == OfficialRouteKind.GRAND_PRIX }, key = { it.id }) { route -> RouteRow(route, language) { onCup(route.id) } }
         item { Text(stringResource(R.string.discovery_rally), style = MaterialTheme.typography.titleLarge) }
         items(routes.filter { it.kind == OfficialRouteKind.RALLY }, key = { it.id }) { route -> RouteRow(route, language) { onCup(route.id) } }
+    }
+}
+
+@Composable
+internal fun DiscoveryPlaylist(playlist: com.mylittleblover.mkwplayer.library.UserPlaylist?, catalog: BrowseCatalog?,
+    unlocked: Boolean, language: String, error: Boolean, onAdd: (String) -> Unit, onRemove: (Int) -> Unit,
+    onRename: (String) -> Unit, onMove: (Int, Int) -> Unit, onDelete: () -> Unit, onCourse: (String) -> Unit) {
+    var choosing by rememberSaveable { mutableStateOf(false) }
+    var deleting by rememberSaveable { mutableStateOf(false) }
+    var renaming by rememberSaveable { mutableStateOf(false) }
+    var newName by rememberSaveable { mutableStateOf("") }
+    val visible = catalog?.courses(unlocked).orEmpty()
+    if (choosing) AlertDialog(onDismissRequest = { choosing = false },
+        title = { Text(stringResource(R.string.discovery_choose_course)) },
+        text = { LazyColumn(Modifier.heightIn(max = 400.dp)) {
+            items(visible, key = { it }) { code -> TextButton(onClick = { onAdd(code); choosing = false }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                Text(catalog?.displayName(code, language) ?: code)
+            } }
+        } },
+        confirmButton = { TextButton(onClick = { choosing = false }) { Text(stringResource(R.string.discovery_cancel)) } })
+    if (renaming) AlertDialog(onDismissRequest = { renaming = false },
+        title = { Text(stringResource(R.string.discovery_rename)) },
+        text = { OutlinedTextField(newName, { newName = it.take(120) }, label = { Text(stringResource(R.string.discovery_playlist_name)) }, singleLine = true) },
+        confirmButton = { TextButton(onClick = { onRename(newName); renaming = false }, enabled = newName.isNotBlank()) { Text(stringResource(R.string.discovery_rename)) } },
+        dismissButton = { TextButton(onClick = { renaming = false }) { Text(stringResource(R.string.discovery_cancel)) } })
+    if (deleting) AlertDialog(onDismissRequest = { deleting = false },
+        title = { Text(stringResource(R.string.discovery_delete_playlist)) }, text = { Text(playlist?.name.orEmpty()) },
+        confirmButton = { TextButton(onClick = { deleting = false; onDelete() }) { Text(stringResource(R.string.discovery_delete_playlist)) } },
+        dismissButton = { TextButton(onClick = { deleting = false }) { Text(stringResource(R.string.discovery_cancel)) } })
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (playlist == null) item { Text(stringResource(R.string.discovery_empty)) }
+        else {
+            item { Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(playlist.name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall)
+                TextButton(onClick = { newName = playlist.name; renaming = true }) { Text(stringResource(R.string.discovery_rename)) }
+            } }
+            if (error) item { Text(stringResource(R.string.discovery_save_failed), color = MaterialTheme.colorScheme.error) }
+            item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { choosing = true }) { Text(stringResource(R.string.discovery_add_course)) }
+                OutlinedButton(onClick = { deleting = true }) { Text(stringResource(R.string.discovery_delete_playlist)) }
+            } }
+            if (playlist.courseIds.isEmpty()) item { Text(stringResource(R.string.discovery_playlist_empty)) }
+            items(playlist.courseIds.size) { index ->
+                val code = playlist.courseIds[index]
+                Card(Modifier.fillMaxWidth()) { Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { onCourse(code) }, enabled = code in visible, modifier = Modifier.weight(1f)) {
+                        Text(if (code in visible) catalog?.displayName(code, language) ?: code else stringResource(R.string.discovery_empty))
+                    }
+                    Column {
+                        TextButton(onClick = { onMove(index, index - 1) }, enabled = index > 0) { Text(stringResource(R.string.discovery_move_up)) }
+                        TextButton(onClick = { onMove(index, index + 1) }, enabled = index + 1 < playlist.courseIds.size) { Text(stringResource(R.string.discovery_move_down)) }
+                        TextButton(onClick = { onRemove(index) }) { Text(stringResource(R.string.discovery_remove)) }
+                    }
+                } }
+            }
+        }
     }
 }

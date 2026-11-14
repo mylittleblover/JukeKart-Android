@@ -146,6 +146,7 @@ internal fun MkwApp(
                 is NavState.Detail.Cup -> androidx.compose.ui.res.stringResource(R.string.discovery_gp)
                 NavState.Detail.Flow -> androidx.compose.ui.res.stringResource(R.string.discovery_interactive)
                 is NavState.Detail.Interactive -> androidx.compose.ui.res.stringResource(R.string.discovery_interactive)
+                is NavState.Detail.Playlist -> androidx.compose.ui.res.stringResource(R.string.discovery_playlists)
                 else -> tabTitle(nav.tab)
             }
             AppHeader(title, nav.canGoBack, nav.detail != NavState.Detail.Settings,
@@ -198,6 +199,13 @@ internal fun MkwApp(
                         }
                     }
                 }
+                detail is NavState.Detail.Playlist -> com.mylittleblover.mkwplayer.ui.home.DiscoveryPlaylist(
+                    discoveryState.playlists.firstOrNull { it.id == detail.id }, browse, unlocked, languageTag,
+                    discoveryState.playlistError != null,
+                    onAdd = { discovery.addToPlaylist(detail.id, it) }, onRemove = { discovery.removeFromPlaylist(detail.id, it) },
+                    onRename = { discovery.renamePlaylist(detail.id, it) }, onMove = { from, to -> discovery.moveInPlaylist(detail.id, from, to) },
+                    onDelete = { discovery.deletePlaylist(detail.id); nav = nav.back() ?: nav },
+                    onCourse = { nav = nav.open(NavState.Detail.Course(it)) })
                 detail is NavState.Detail.Cup -> com.mylittleblover.mkwplayer.ui.home.DiscoveryCup(
                     browse?.route(detail.id, unlocked), browse, languageTag) { code -> nav = nav.open(NavState.Detail.Course(code)) }
                 detail == NavState.Detail.Flow -> ConsolePage(model, ui, openPack, openFiles)
@@ -208,7 +216,10 @@ internal fun MkwApp(
                     Tab.MEDIA -> com.mylittleblover.mkwplayer.ui.home.DiscoveryMedia(browse, unlocked, languageTag,
                         onCourse = { nav = nav.open(NavState.Detail.Course(it)) }, onCup = { nav = nav.open(NavState.Detail.Cup(it)) })
                     Tab.WORLD_MAP -> MapPage(model, ui, mapState) { code -> nav = nav.open(NavState.Detail.Course(code)) }
-                    Tab.PLAYLISTS -> com.mylittleblover.mkwplayer.ui.home.DiscoveryPlaylists(browse, unlocked, languageTag) { nav = nav.open(NavState.Detail.Cup(it)) }
+                    Tab.PLAYLISTS -> com.mylittleblover.mkwplayer.ui.home.DiscoveryPlaylists(browse, unlocked, languageTag,
+                        discoveryState, onCreate = discovery::createPlaylist,
+                        onPlaylist = { nav = nav.open(NavState.Detail.Playlist(it)) },
+                        onCup = { nav = nav.open(NavState.Detail.Cup(it)) })
                 }
             }
             }
@@ -470,8 +481,7 @@ private fun ConsolePage(
                                 }
 
                                 if (flow.hasFast) {
-                                    // The same music at another tempo. The compiled rule crossfades it at a bar
-                                    // line, so the switch is not a cut.
+                                    // The Native graph owns the transition timing and shared fanfare.
                                     OutlinedButton(
                                         onClick = { model.toggleFast() },
                                         enabled = flow.canFast || (flow.versionNumbers.isEmpty() && flow.regionNumbers.isEmpty() && flow.canEnd && !flow.fastPlaying),
@@ -542,15 +552,6 @@ private fun ConsolePage(
             }
         }
 
-        settingsItems(
-            rows = UiMapping.settings(),
-            rightsNotice = com.mylittleblover.mkwplayer.ui.art.CupArt.NOTICE,
-        )
-
-        importItems(
-            summary = UiMapping.importSummary(ui),
-            onScan = { model.openFlowFromFolder() },
-        )
     }
     com.mylittleblover.mkwplayer.ui.interactive.InteractiveStopBar(
         canStop = ui.canStop,

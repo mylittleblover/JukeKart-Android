@@ -32,15 +32,18 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 internal class DiscoveryViewModel(application: Application) : AndroidViewModel(application) {
-    enum class Error { FAVORITES_READ, FAVORITES_WRITE, DAILY_SELECTION }
+    enum class Error { FAVORITES_READ, FAVORITES_WRITE, DAILY_SELECTION, PLAYLISTS }
     data class State(
         val favorites: Set<String> = emptySet(), val day: LocalDate = LocalDate.now(),
         val dailyIds: List<String> = emptyList(), val favoritesReady: Boolean = false, val dailyReady: Boolean = false,
         val favoritesError: Error? = null, val dailyError: Error? = null,
+        val playlists: List<com.mylittleblover.mkwplayer.library.UserPlaylist> = emptyList(), val playlistError: Error? = null,
     ) {
-        val error: Error? get() = favoritesError ?: dailyError
+        val error: Error? get() = favoritesError ?: dailyError ?: playlistError
     }
     private val favorites = FavoriteStore(File(application.filesDir, "user-favorites.json"))
+    private val playlists = com.mylittleblover.mkwplayer.library.PlaylistStore(File(application.filesDir, "user-playlists.json"))
+    private val playlistOperations = Mutex()
     private val daily = DailySelectionStore(File(application.filesDir, "daily-selection.json"))
     private val candidates = MutableStateFlow<List<RecommendationCandidate>?>(null)
     private val favoriteOperations = Mutex()
@@ -57,6 +60,7 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
         if (Build.VERSION.SDK_INT >= 33) application.registerReceiver(dateReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         else application.registerReceiver(dateReceiver, filter)
         reloadFavorites()
+        updatePlaylists { playlists.read() }
         viewModelScope.launch {
             while (isActive) {
                 refreshDate()
@@ -93,6 +97,23 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
             }
         }
     }
+    private fun updatePlaylists(operation: () -> Result<List<com.mylittleblover.mkwplayer.library.UserPlaylist>>) {
+        viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            withContext(NonCancellable) {
+                playlistOperations.withLock {
+                    val result = withContext(Dispatchers.IO) { operation() }
+                    result.onSuccess { value -> _state.update { it.copy(playlists = value, playlistError = null) } }
+                        .onFailure { _state.update { it.copy(playlistError = Error.PLAYLISTS) } }
+                }
+            }
+        }
+    }
+    fun createPlaylist(name: String) = updatePlaylists { playlists.create(name) }
+    fun addToPlaylist(id: String, code: String) = updatePlaylists { playlists.addCourse(id, code) }
+    fun removeFromPlaylist(id: String, index: Int) = updatePlaylists { playlists.removeCourse(id, index) }
+    fun renamePlaylist(id: String, name: String) = updatePlaylists { playlists.rename(id, name) }
+    fun moveInPlaylist(id: String, from: Int, to: Int) = updatePlaylists { playlists.moveCourse(id, from, to) }
+    fun deletePlaylist(id: String) = updatePlaylists { playlists.delete(id) }
     override fun onCleared() {
         getApplication<Application>().unregisterReceiver(dateReceiver)
         super.onCleared()

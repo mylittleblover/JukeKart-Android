@@ -24,4 +24,18 @@
     <string name="discovery_favorite_add">Add favorite</string>
     <string name="discovery_favorite_remove">Remove favorite</string>
     <string name="discovery_placeholder">Artwork placeholder</string>
+    <string name="discovery_create_playlist">Create playlist</string>
+    <string name="discovery_playlist_name">Playlist name</string>
+    <string name="discovery_create">Create</string>
+    <string name="discovery_cancel">Cancel</string>
+    <string name="discovery_add_course">Add course</string>
+    <string name="discovery_remove">Remove</string>
+    <string name="discovery_delete_playlist">Delete playlist</string>
+    <string name="discovery_show_all">Show all</string>
+    <string name="discovery_save_failed">Save failed. Check stored data.</string>
+    <string name="discovery_playlist_empty">No courses in this playlist</string>
+    <string name="discovery_choose_course">Select course</string>
+    <string name="discovery_rename">Rename</string>
+    <string name="discovery_move_up">Move up</string>
+    <string name="discovery_move_down">Move down</string>
 </resources>

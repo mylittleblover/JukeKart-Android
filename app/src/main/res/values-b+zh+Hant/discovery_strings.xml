@@ -24,4 +24,18 @@
     <string name="discovery_favorite_add">收藏</string>
     <string name="discovery_favorite_remove">取消收藏</string>
     <string name="discovery_placeholder">封面佔位圖</string>
+    <string name="discovery_create_playlist">新增播放清單</string>
+    <string name="discovery_playlist_name">播放清單名稱</string>
+    <string name="discovery_create">建立</string>
+    <string name="discovery_cancel">取消</string>
+    <string name="discovery_add_course">加入賽道</string>
+    <string name="discovery_remove">移除</string>
+    <string name="discovery_delete_playlist">刪除播放清單</string>
+    <string name="discovery_show_all">查看全部</string>
+    <string name="discovery_save_failed">儲存失敗，請檢查已儲存資料。</string>
+    <string name="discovery_playlist_empty">播放清單中暫無賽道</string>
+    <string name="discovery_choose_course">選擇賽道</string>
+    <string name="discovery_rename">重新命名</string>
+    <string name="discovery_move_up">上移</string>
+    <string name="discovery_move_down">下移</string>
 </resources>

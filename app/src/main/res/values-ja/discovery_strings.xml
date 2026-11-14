@@ -24,4 +24,18 @@
     <string name="discovery_favorite_add">お気に入りに追加</string>
     <string name="discovery_favorite_remove">お気に入りを解除</string>
     <string name="discovery_placeholder">仮のカバー画像</string>
+    <string name="discovery_create_playlist">プレイリストを作成</string>
+    <string name="discovery_playlist_name">プレイリスト名</string>
+    <string name="discovery_create">作成</string>
+    <string name="discovery_cancel">キャンセル</string>
+    <string name="discovery_add_course">コースを追加</string>
+    <string name="discovery_remove">削除</string>
+    <string name="discovery_delete_playlist">プレイリストを削除</string>
+    <string name="discovery_show_all">すべて表示</string>
+    <string name="discovery_save_failed">保存できませんでした。保存データを確認してください。</string>
+    <string name="discovery_playlist_empty">コースはまだありません</string>
+    <string name="discovery_choose_course">コースを選択</string>
+    <string name="discovery_rename">名前を変更</string>
+    <string name="discovery_move_up">上へ</string>
+    <string name="discovery_move_down">下へ</string>
 </resources>

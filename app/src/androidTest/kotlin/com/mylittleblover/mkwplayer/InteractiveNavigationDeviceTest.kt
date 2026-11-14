@@ -57,35 +57,19 @@ class InteractiveNavigationDeviceTest {
             event.recycle()
         }
     }
-    @Test fun interactiveTabOpensAndScrollsThroughPlayerSettingsAndImport() {
+    @Test fun courseInteractiveEntryReturnsThroughCup() {
         val context = instrumentation.targetContext
         context.startActivity(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
         InstalledUi().awaitOrientation(landscape = false)
-        click("Interactive")
+        click("Media")
+        click("Mushroom Cup")
+        click("Mario Bros. Circuit")
+        click("Open interactive player")
         awaitText("Interactive playback")
-        click("Choose and play a course")
-        awaitText("Search course names")
-        awaitText("Mario Bros. Circuit")
-        click("Close")
-        awaitText("Interactive playback")
-        val scrollDeadline = SystemClock.uptimeMillis() + 180_000
-        var reachedImport = false
-        while (!reachedImport && SystemClock.uptimeMillis() < scrollDeadline) {
-            val root = instrumentation.uiAutomation.rootInActiveWindow
-            reachedImport = find(root) { it.isVisibleToUser && it.text?.toString() == "Scan the stages folder" } != null
-            if (!reachedImport) {
-                // Accessibility may briefly expose the old tree while the new tab is being laid out.
-                find(root) { it.isScrollable }?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
-                SystemClock.sleep(1000)
-            }
-        }
-        assertTrue("Import control was not reached by scrolling the installed UI", reachedImport)
-        awaitText("Scan the stages folder")
-        click("Library")
-        awaitText("Open your soundtrack")
-        InstalledUi().awaitOrientation(landscape = false)
-        click("Interactive")
-        awaitText("Interactive playback")
+        assertTrue(instrumentation.uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
+        awaitText("Complete suite")
+        assertTrue(instrumentation.uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK))
+        awaitText("Mushroom Cup")
         instrumentation.uiAutomation.takeScreenshot()?.let { bitmap ->
             File(context.filesDir, "interactive-navigation-pass.png").outputStream().use {
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
