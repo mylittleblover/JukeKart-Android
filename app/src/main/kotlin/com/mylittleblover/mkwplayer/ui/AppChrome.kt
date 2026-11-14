@@ -1,5 +1,16 @@
 package com.mylittleblover.mkwplayer.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.LibraryMusic
+import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.automirrored.outlined.QueueMusic
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -39,7 +50,12 @@ internal fun AppHeader(title: String, canBack: Boolean, showSettings: Boolean, o
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (canBack) TextButton(onClick = onBack) { Text(stringResource(R.string.common_back)) }
+                if (canBack) {
+                    val backLabel = stringResource(R.string.common_back)
+                    IconButton(onClick = onBack, modifier = Modifier.size(48.dp).semantics { contentDescription = backLabel }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                    }
+                }
                 else if (LocalDensity.current.fontScale <= 1.3f) {
                     Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Text("/", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -47,15 +63,7 @@ internal fun AppHeader(title: String, canBack: Boolean, showSettings: Boolean, o
                 Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (showSettings) {
                     IconButton(onClick = onSettings, modifier = Modifier.size(48.dp).semantics { contentDescription = settingsLabel }) {
-                        val ink = LocalContentColor.current
-                        Canvas(Modifier.size(24.dp).clearAndSetSemantics { }) {
-                            drawCircle(ink, 5.dp.toPx(), style = Stroke(2.dp.toPx()))
-                            for (index in 0 until 8) {
-                                val radians = index * Math.PI / 4.0
-                                val unit = Offset(cos(radians).toFloat(), sin(radians).toFloat())
-                                drawLine(ink, center + unit * 7.dp.toPx(), center + unit * 10.dp.toPx(), 2.dp.toPx())
-                            }
-                        }
+                        Icon(Icons.Outlined.Settings, contentDescription = null)
                     }
                 }
             }
@@ -64,33 +72,14 @@ internal fun AppHeader(title: String, canBack: Boolean, showSettings: Boolean, o
     }
 }
 
-/** Compact icons remain legible without requiring an additional icon font. */
+/** Filled and outlined variants make selection visible without relying on color. */
 @Composable
-internal fun TabIcon(tab: Tab) {
-    val ink = LocalContentColor.current
-    Canvas(Modifier.size(24.dp).clearAndSetSemantics { }) {
-        val w = size.width
-        val line = 2.dp.toPx()
-        when (tab) {
-            Tab.HOME -> {
-                drawLine(ink, Offset(w * .15f, w * .47f), Offset(w * .5f, w * .16f), line)
-                drawLine(ink, Offset(w * .5f, w * .16f), Offset(w * .85f, w * .47f), line)
-                drawLine(ink, Offset(w * .25f, w * .43f), Offset(w * .25f, w * .85f), line)
-                drawLine(ink, Offset(w * .75f, w * .43f), Offset(w * .75f, w * .85f), line)
-                drawLine(ink, Offset(w * .25f, w * .85f), Offset(w * .75f, w * .85f), line)
-            }
-            Tab.MEDIA -> {
-                drawCircle(ink, w * .31f, style = Stroke(line))
-                drawCircle(ink, w * .055f)
-            }
-            Tab.WORLD_MAP -> {
-                drawCircle(ink, w * .34f, style = Stroke(line))
-                drawLine(ink, Offset(w * .16f, w * .5f), Offset(w * .84f, w * .5f), line)
-                drawLine(ink, Offset(w * .5f, w * .16f), Offset(w * .5f, w * .84f), line)
-            }
-            Tab.PLAYLISTS -> {
-                for (i in 0..2) drawLine(ink, Offset(w * .17f, w * (.25f + i * .24f)), Offset(w * .83f, w * (.25f + i * .24f)), line)
-            }
-        }
+internal fun TabIcon(tab: Tab, selected: Boolean) {
+    val icon = when (tab) {
+        Tab.HOME -> if (selected) Icons.Filled.Home else Icons.Outlined.Home
+        Tab.MEDIA -> if (selected) Icons.Filled.LibraryMusic else Icons.Outlined.LibraryMusic
+        Tab.WORLD_MAP -> if (selected) Icons.Filled.Map else Icons.Outlined.Map
+        Tab.PLAYLISTS -> if (selected) Icons.AutoMirrored.Filled.QueueMusic else Icons.AutoMirrored.Outlined.QueueMusic
     }
+    Icon(icon, contentDescription = null)
 }

@@ -1,5 +1,19 @@
 package com.mylittleblover.mkwplayer.ui.home
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.RemoveCircleOutline
+import androidx.compose.material.icons.outlined.MusicNote
+import androidx.compose.material.icons.outlined.Album
+import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -29,6 +43,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import kotlinx.coroutines.launch
 import com.mylittleblover.mkwplayer.R
 import com.mylittleblover.mkwplayer.library.BrowseCatalog
 import com.mylittleblover.mkwplayer.routes.OfficialRoute
@@ -87,6 +104,7 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
         if (catalog == null || visibleDaily.isEmpty()) item { Text(stringResource(R.string.discovery_empty)) }
         else item {
             val pager = rememberPagerState(pageCount = { visibleDaily.size })
+            val scope = rememberCoroutineScope()
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 HorizontalPager(pager, Modifier.fillMaxWidth().height(264.dp)) { index ->
                     val id = visibleDaily[index]
@@ -113,6 +131,14 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
                                 androidx.compose.material3.FilledTonalButton(onClick = { onOpen(id) }) { Text(stringResource(R.string.discovery_home_open)) }
                             }
                         }
+                        Row(Modifier.align(Alignment.BottomEnd).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            val previousLabel = stringResource(R.string.discovery_previous_recommendation)
+                            val nextLabel = stringResource(R.string.discovery_next_recommendation)
+                            IconButton(onClick = { scope.launch { pager.animateScrollToPage((index - 1 + visibleDaily.size) % visibleDaily.size) } },
+                                modifier = Modifier.semantics { contentDescription = previousLabel }) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = Color.White) }
+                            IconButton(onClick = { scope.launch { pager.animateScrollToPage((index + 1) % visibleDaily.size) } },
+                                modifier = Modifier.semantics { contentDescription = nextLabel }) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = Color.White) }
+                        }
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
@@ -137,10 +163,9 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
 
 @Composable
 internal fun DiscoveryMedia(catalog: BrowseCatalog?, unlocked: Boolean, language: String,
+                            category: Int, onCategory: (Int) -> Unit, query: String, onQuery: (String) -> Unit,
                             onCourse: (String) -> Unit, onCup: (String) -> Unit) {
-    var query by rememberSaveable { mutableStateOf("") }
-    var category by rememberSaveable { mutableIntStateOf(-1) }
-    androidx.activity.compose.BackHandler(enabled = category >= 0) { category = -1 }
+    androidx.activity.compose.BackHandler(enabled = category >= 0) { onCategory(-1) }
     val categories = listOf(R.string.discovery_gp, R.string.discovery_rally, R.string.discovery_vs,
         R.string.discovery_free, R.string.discovery_other, R.string.discovery_sounds)
     val routes = when (category) {
@@ -151,18 +176,22 @@ internal fun DiscoveryMedia(catalog: BrowseCatalog?, unlocked: Boolean, language
     }
     val courses = if ((category == 0 || category == -1) && query.isNotBlank()) catalog?.searchCourses(query, unlocked).orEmpty() else emptyList()
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.discovery_search)) }, singleLine = true) }
+        item { OutlinedTextField(query, onQuery, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.discovery_search)) },
+            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) }, singleLine = true) }
         if (category < 0) {
             item { Text(stringResource(R.string.discovery_media), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
             for (row in 0..2) item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     for (column in 0..1) {
                         val index = row * 2 + column
-                        Card(onClick = { category = index }, modifier = Modifier.weight(1f).height(112.dp),
+                        Card(onClick = { onCategory(index) }, modifier = Modifier.weight(1f).height(112.dp),
                             shape = RoundedCornerShape(20.dp)) {
                             Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.BottomStart) {
                                 val art = when (index) { 0 -> R.drawable.mode_grand_prix; 1 -> R.drawable.mode_knockout; 2 -> R.drawable.mode_vs; else -> null }
-                                art?.let { Image(painterResource(it), null, Modifier.align(Alignment.TopEnd).size(52.dp)) }
+                                if (art != null) Image(painterResource(art), null, Modifier.align(Alignment.TopEnd).size(52.dp))
+                                else Icon(when (index) { 3 -> Icons.Outlined.MusicNote; 4 -> Icons.Outlined.Album; else -> Icons.Outlined.GraphicEq },
+                                    contentDescription = null, modifier = Modifier.align(Alignment.TopEnd).size(32.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text(stringResource(categories[index]), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             }
                         }
@@ -171,7 +200,7 @@ internal fun DiscoveryMedia(catalog: BrowseCatalog?, unlocked: Boolean, language
             }
         } else item {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = { category = -1 }) { Text(stringResource(R.string.common_back)) }
+                IconButton(onClick = { onCategory(-1) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back)) }
                 Text(stringResource(categories[category]), style = MaterialTheme.typography.headlineSmall)
             }
         }
@@ -188,9 +217,15 @@ internal fun DiscoveryMedia(catalog: BrowseCatalog?, unlocked: Boolean, language
 @Composable
 private fun RouteRow(route: OfficialRoute, language: String, onClick: () -> Unit) {
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
-        Column(Modifier.padding(18.dp)) {
-            Text(route.displayName(language), style = MaterialTheme.typography.titleMedium)
-            Text("${route.stops.size}", style = MaterialTheme.typography.bodySmall)
+        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            val cup = if (route.kind == OfficialRouteKind.GRAND_PRIX)
+                com.mylittleblover.mkwplayer.ui.art.CupArt.all().firstOrNull { "${it.id}_cup" == route.id } else null
+            cup?.let { Image(painterResource(it.drawable), null, Modifier.size(56.dp)) }
+            Column(Modifier.weight(1f)) {
+                Text(route.displayName(language), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.map_route_stops, route.stops.size), style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }
@@ -225,7 +260,7 @@ internal fun DiscoveryPlaylists(catalog: BrowseCatalog?, unlocked: Boolean, lang
         dismissButton = { TextButton(onClick = { creating = false }) { Text(stringResource(R.string.discovery_cancel)) } })
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text(stringResource(R.string.discovery_ordinary_lists), style = MaterialTheme.typography.titleLarge) }
-        item { OutlinedButton(onClick = { creating = true }) { Text(stringResource(R.string.discovery_create_playlist)) } }
+        item { OutlinedButton(onClick = { creating = true }) { Icon(Icons.Filled.Add, contentDescription = null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.discovery_create_playlist)) } }
         if (state.playlistError != null) item { Text(stringResource(R.string.discovery_save_failed), color = MaterialTheme.colorScheme.error) }
         if (state.playlists.isEmpty()) item { Text(stringResource(R.string.discovery_no_saved)) }
         items(if (showAll) state.playlists else state.playlists.take(5), key = { "playlist:${it.id}" }) { playlist ->
@@ -274,12 +309,12 @@ internal fun DiscoveryPlaylist(playlist: com.mylittleblover.mkwplayer.library.Us
         else {
             item { Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(playlist.name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall)
-                TextButton(onClick = { newName = playlist.name; renaming = true }) { Text(stringResource(R.string.discovery_rename)) }
+                IconButton(onClick = { newName = playlist.name; renaming = true }) { Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.discovery_rename)) }
             } }
             if (error) item { Text(stringResource(R.string.discovery_save_failed), color = MaterialTheme.colorScheme.error) }
             item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { choosing = true }) { Text(stringResource(R.string.discovery_add_course)) }
-                OutlinedButton(onClick = { deleting = true }) { Text(stringResource(R.string.discovery_delete_playlist)) }
+                Button(onClick = { choosing = true }) { Icon(Icons.Filled.Add, contentDescription = null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.discovery_add_course)) }
+                OutlinedIconButton(onClick = { deleting = true }) { Icon(Icons.Filled.DeleteOutline, contentDescription = stringResource(R.string.discovery_delete_playlist)) }
             } }
             if (playlist.courseIds.isEmpty()) item { Text(stringResource(R.string.discovery_playlist_empty)) }
             items(playlist.courseIds.size) { index ->
@@ -288,10 +323,10 @@ internal fun DiscoveryPlaylist(playlist: com.mylittleblover.mkwplayer.library.Us
                     TextButton(onClick = { onCourse(code) }, enabled = code in visible, modifier = Modifier.weight(1f)) {
                         Text(if (code in visible) catalog?.displayName(code, language) ?: code else stringResource(R.string.discovery_empty))
                     }
-                    Column {
-                        TextButton(onClick = { onMove(index, index - 1) }, enabled = index > 0) { Text(stringResource(R.string.discovery_move_up)) }
-                        TextButton(onClick = { onMove(index, index + 1) }, enabled = index + 1 < playlist.courseIds.size) { Text(stringResource(R.string.discovery_move_down)) }
-                        TextButton(onClick = { onRemove(index) }) { Text(stringResource(R.string.discovery_remove)) }
+                    Row {
+                        IconButton(onClick = { onMove(index, index - 1) }, enabled = index > 0) { Icon(Icons.Filled.KeyboardArrowUp, contentDescription = stringResource(R.string.discovery_move_up)) }
+                        IconButton(onClick = { onMove(index, index + 1) }, enabled = index + 1 < playlist.courseIds.size) { Icon(Icons.Filled.KeyboardArrowDown, contentDescription = stringResource(R.string.discovery_move_down)) }
+                        IconButton(onClick = { onRemove(index) }) { Icon(Icons.Filled.RemoveCircleOutline, contentDescription = stringResource(R.string.discovery_remove)) }
                     }
                 } }
             }

@@ -13,10 +13,10 @@
     <string name="interactive_start">Start</string>
     <string name="interactive_next">Next stage</string>
     <string name="interactive_stop">Stop</string>
-    <string name="interactive_fast">Fast version</string>
-    <string name="interactive_fast_playing">Fast playing</string>
+    <string name="interactive_fast">Enter Final Lap</string>
+    <string name="interactive_fast_playing">Final Lap playing</string>
     <string name="interactive_end">End the stage</string>
-    <string name="interactive_ending_hint">The ending nearest to the current position is chosen.</string>
+    <string name="interactive_ending_hint">The nearest available Outro exit is selected.</string>
     <string name="interactive_pause">Pause</string>
     <string name="interactive_resume">Resume</string>
     <string name="interactive_source_position">Source position: %1$s</string>
@@ -29,5 +29,5 @@
     <string name="interactive_fade_seconds">%1$d-second fade</string>
     <string name="interactive_entry_hint">Starting section · choose while stopped</string>
     <string name="interactive_entry_pre">Prelude</string>
-    <string name="interactive_entry_short">Short prelude</string>
+    <string name="interactive_entry_short">Short Prelude</string>
 </resources>

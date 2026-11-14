@@ -1,0 +1,16 @@
+<resources>
+    <string name="stage_prelude">Prelude</string>
+    <string name="stage_short_prelude">Short Prelude</string>
+    <string name="stage_main">Main</string>
+    <string name="stage_final_lap">Final Lap</string>
+    <string name="stage_outro">Outro</string>
+    <string name="stage_bridge">Bridge</string>
+    <string name="stage_region">Region %1$d</string>
+    <string name="stage_pattern">Pattern %1$d</string>
+    <string name="stage_join">%1$s · %2$s</string>
+    <string name="stage_fanfare">Final Lap Fanfare</string>
+    <string name="stage_pending">%1$s → %2$s (queued)</string>
+    <string name="stage_stopped">Stopped</string>
+    <string name="stage_finished">Finished</string>
+    <string name="stage_not_started">Not started</string>
+</resources>

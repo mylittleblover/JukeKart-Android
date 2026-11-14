@@ -1,0 +1,16 @@
+<resources>
+    <string name="stage_prelude">序曲</string>
+    <string name="stage_short_prelude">短い序曲</string>
+    <string name="stage_main">メイン</string>
+    <string name="stage_final_lap">ファイナルラップ</string>
+    <string name="stage_outro">アウトロ</string>
+    <string name="stage_bridge">ブリッジ</string>
+    <string name="stage_region">エリア %1$d</string>
+    <string name="stage_pattern">バージョン %1$d</string>
+    <string name="stage_join">%1$s · %2$s</string>
+    <string name="stage_fanfare">ファイナルラップファンファーレ</string>
+    <string name="stage_pending">%1$s → %2$s（切替待ち）</string>
+    <string name="stage_stopped">停止中</string>
+    <string name="stage_finished">終了</string>
+    <string name="stage_not_started">未開始</string>
+</resources>

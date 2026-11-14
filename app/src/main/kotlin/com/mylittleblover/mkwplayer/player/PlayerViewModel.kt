@@ -146,6 +146,9 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val performing: Boolean = false,
         /** Where the performance is, in words. Empty when nothing is performing. */
         val performanceStage: String = "",
+        /** Stable source identifiers; localized only when rendered. */
+        val stageKey: String? = null,
+        val pendingStageKey: String? = null,
         /**
          * Why the performance cannot start, or null when it can.
          *
@@ -1127,7 +1130,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             flow = _ui.value.flow?.copy(
                 activeSegment = segment,
                 performing = false,
-                performanceStage = "",
+                performanceStage = "", stageKey = null, pendingStageKey = null,
                 canAdvance = false,
                 canEnd = false,
                 fastPlaying = false,
@@ -1218,7 +1221,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         publish(session.stop())
         nativePerformance = null
         interactivePlan = plan.copy(entry = segment)
-        _ui.value = _ui.value.copy(flow = _ui.value.flow?.copy(activeSegment=null, performanceStage="", performing=false))
+        _ui.value = _ui.value.copy(flow = _ui.value.flow?.copy(activeSegment=null, performanceStage="", stageKey=null, pendingStageKey=null, performing=false))
     }
 
     internal val canFadeStop: Boolean
@@ -1241,7 +1244,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         if(nativePerformance!=null) {
             nativePerformance=null
             publish(session.stop())
-            _ui.value=_ui.value.copy(flow=_ui.value.flow?.copy(performing=false,performanceStage="Stopped",canAdvance=false,canEnd=false,fastPlaying=false,
+            _ui.value=_ui.value.copy(flow=_ui.value.flow?.copy(performing=false,performanceStage="Stopped",stageKey="Stopped",pendingStageKey=null,canAdvance=false,canEnd=false,fastPlaying=false,
                 canFast=false,canCancelPending=false,fading=false,fadeRemainingFrames=null,voiceCount=0,sourceFrame=null,availableRegions=emptySet(),availableVersions=emptySet(),selectedRegion=null,selectedVersion=null))
             return
         }
@@ -1251,7 +1254,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         _ui.value = _ui.value.copy(
             flow = _ui.value.flow?.copy(
                 performing = false,
-                performanceStage = "Stopped",
+                performanceStage = "Stopped", stageKey = "Stopped", pendingStageKey = null,
                 canAdvance = false,
                 canEnd = false,
                 fastPlaying = false,
@@ -1269,16 +1272,9 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         when (event) {
             is PerformanceDriver.Event.Advanced -> publishPerformance(event.segment, driver)
             is PerformanceDriver.Event.Finished -> {
-                performance = null
-                _ui.value = _ui.value.copy(
-                    flow = _ui.value.flow?.copy(
-                        performing = false,
-                        performanceStage = if (event.reason.contains("stopped")) "Stopped" else "Finished",
-                        canAdvance = false,
-                        canEnd = false,
-                        fastPlaying = false,
-                    ),
-                )
+                val finished = !event.reason.contains("stopped", ignoreCase = true)
+                stop()
+                if (finished) markPerformanceFinished()
             }
             is PerformanceDriver.Event.Blocked -> {
                 // A refused move does not stop the performance: the prelude keeps looping, which is exactly
@@ -1295,7 +1291,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             flow = _ui.value.flow?.copy(
                 activeSegment = segment,
                 performing = driver.isRunning,
-                performanceStage = driver.describe(),
+                performanceStage = driver.describe(), stageKey = null, pendingStageKey = null,
                 performanceBlocker = null,
                 fastPlaying = driver.isFast,
                 canAdvance = driver.canAdvance,
@@ -1359,15 +1355,20 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             return
         }
 
+        flow = null
+        flowCompiled = null
+        flowBytes = emptyMap()
         totalFrames = ready.frames
         rate = ready.sampleRate
 
         _ui.value = _ui.value.copy(
             selectedKey = track.key,
+            flow = null,
             title = ready.name,
             status = "Playing",
             total = EngineSnapshot.formatPosition(totalFrames, rate),
             canPause = true,
+            canResume = false,
             canStop = true,
             outputActive = session.hasOutput,
             detail = if (session.hasOutput) {
@@ -1430,7 +1431,12 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     private fun followPerformance() {
         if(nativePerformance!=null) {
             session.interactiveObservation()?.let { nativePerformance!!.observe(it) }
-            if(nativePerformance?.isFading==true && nativePerformance?.finished==true) { stop();return }
+            if (nativePerformance?.finished == true) {
+                val fading = nativePerformance?.isFading == true
+                stop()
+                if (!fading) markPerformanceFinished()
+                return
+            }
             publishNativePerformance()
             return
         }
@@ -1442,7 +1448,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         if (current.performing || driver.isRunning) {
             _ui.value = _ui.value.copy(
                 flow = current.copy(
-                    performanceStage = driver.describe(),
+                    performanceStage = driver.describe(), stageKey = null, pendingStageKey = null,
                     fastPlaying = driver.isFast,
                     canAdvance = driver.canAdvance,
                     canEnd = driver.canEnd,
@@ -1475,6 +1481,8 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         _ui.value=_ui.value.copy(detail=if(fromAction) error else driver.diagnostic ?: _ui.value.detail,flow=current.copy(
             activeSegment=driver.current,performing=!driver.finished,
             performanceStage=if(driver.finished) "Finished" else label+pending,
+            stageKey=if(driver.finished) "Finished" else label,
+            pendingStageKey=if(driver.finished) null else driver.pending?.let { plan.labels[it] },
             canAdvance=driver.canAdvance,canEnd=driver.canEnd,fastPlaying=driver.isFast,canFast=driver.canFast,
             selectedVersion=driver.currentVersion,availableVersions=driver.availableVersions,
             selectedRegion=driver.currentRegion,availableRegions=driver.availableRegions,canCancelPending=driver.canCancelPending,
@@ -1530,6 +1538,11 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         publish(session.seek(frame))
     }
 
+    private fun markPerformanceFinished() {
+        _ui.value = _ui.value.copy(flow = _ui.value.flow?.copy(
+            performing = false, performanceStage = "Finished", stageKey = "Finished", pendingStageKey = null))
+    }
+
     fun stop() {
         packPlaybackRequest++
         nativePerformance=null
@@ -1537,7 +1550,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         performance=null
         publish(session.stop())
         _ui.value = _ui.value.copy(progress = 0f, position = EngineSnapshot.formatPosition(0, rate),
-            flow=_ui.value.flow?.copy(performing=false,performanceStage="Stopped",canAdvance=false,canEnd=false,fastPlaying=false,
+            flow=_ui.value.flow?.copy(performing=false,performanceStage="Stopped",stageKey="Stopped",pendingStageKey=null,canAdvance=false,canEnd=false,fastPlaying=false,
                 canFast=false,canCancelPending=false,fading=false,fadeRemainingFrames=null,voiceCount=0,sourceFrame=null,availableRegions=emptySet(),availableVersions=emptySet(),selectedRegion=null,selectedVersion=null))
         PlaybackService.stop(getApplication())
     }

@@ -62,6 +62,7 @@ internal class NavState(
 
         /** The flow currently loaded, with its sections. */
         data object Flow : Detail
+        data object Track : Detail
         data class Cup(val id: String) : Detail
         data class Interactive(val code: String) : Detail
         data class Playlist(val id: String) : Detail
@@ -89,6 +90,7 @@ internal class NavState(
         when (page) {
             is Detail.Course -> listOf("course", page.code)
             Detail.Flow -> listOf("flow", "")
+            Detail.Track -> listOf("track", "")
             is Detail.Cup -> listOf("cup", page.id)
             is Detail.Interactive -> listOf("interactive", page.code)
             is Detail.Playlist -> listOf("playlist", page.id)
@@ -107,6 +109,7 @@ internal class NavState(
             fun page(kind: String?, value: String?): Detail? = when (kind) {
                 "course" -> value?.takeIf { it.isNotBlank() }?.let(Detail::Course)
                 "flow" -> Detail.Flow
+                "track" -> Detail.Track
                 "cup" -> value?.takeIf { it.isNotBlank() }?.let(Detail::Cup)
                 "interactive" -> value?.takeIf { it.isNotBlank() }?.let(Detail::Interactive)
                 "playlist" -> value?.takeIf { it.isNotBlank() }?.let(Detail::Playlist)

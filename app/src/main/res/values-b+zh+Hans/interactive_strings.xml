@@ -13,10 +13,10 @@
     <string name="interactive_start">开始</string>
     <string name="interactive_next">推进下一段</string>
     <string name="interactive_stop">停止</string>
-    <string name="interactive_fast">进入 Fast</string>
-    <string name="interactive_fast_playing">正在播放 Fast</string>
+    <string name="interactive_fast">进入最后一圈</string>
+    <string name="interactive_fast_playing">正在播放最后一圈</string>
     <string name="interactive_end">结束赛道</string>
-    <string name="interactive_ending_hint">按当前位置选择最近的可用 Outro 退出点。</string>
+    <string name="interactive_ending_hint">按当前位置选择最近可用的尾奏退出点。</string>
     <string name="interactive_pause">暂停</string>
     <string name="interactive_resume">继续播放</string>
     <string name="interactive_source_position">声源位置：%1$s</string>
@@ -28,6 +28,6 @@
     <string name="interactive_fade_hint">淡出开始后不能撤销；暂停播放也会暂停淡出。</string>
     <string name="interactive_fade_seconds">%1$d 秒淡出</string>
     <string name="interactive_entry_hint">起始阶段 · 停止播放后可选择</string>
-    <string name="interactive_entry_pre">前奏</string>
-    <string name="interactive_entry_short">短前奏</string>
+    <string name="interactive_entry_pre">序曲</string>
+    <string name="interactive_entry_short">短序曲</string>
 </resources>

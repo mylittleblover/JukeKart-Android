@@ -1,5 +1,7 @@
 package com.mylittleblover.mkwplayer.ui.interactive
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.combinedClickable
@@ -58,7 +60,11 @@ internal fun InteractiveStopBar(canStop: Boolean, canFade: Boolean, fading: Bool
             color = if (canStop) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
             contentColor = if (canStop) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
         ) {
-            Box(Modifier.padding(12.dp), contentAlignment = Alignment.Center) { Text(stringResource(R.string.interactive_stop)) }
+            Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Stop, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.interactive_stop))
+            }
         }
     }
     if (showFade) AlertDialog(onDismissRequest = { showFade = false },
@@ -85,13 +91,7 @@ internal fun InteractiveEntryChooser(choices: Map<Int, String>, selected: Int?, 
         Text(stringResource(R.string.interactive_entry_hint), style = MaterialTheme.typography.labelMedium)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for ((id, label) in choices) {
-                val name = when (label) {
-                    "Pre" -> stringResource(R.string.interactive_entry_pre)
-                    "PreShort" -> stringResource(R.string.interactive_entry_short)
-                    "Main" -> "Full"
-                    "Fast" -> "Fast"
-                    else -> label
-                }
+                val name = stageText(label)
                 FilterChip(selected = id == selected, onClick = { if(id != selected) onSelect(id) }, enabled = enabled, label = { Text(name) })
             }
         }

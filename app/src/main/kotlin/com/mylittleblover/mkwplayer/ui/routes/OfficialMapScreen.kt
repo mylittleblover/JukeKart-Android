@@ -1,5 +1,9 @@
 package com.mylittleblover.mkwplayer.ui.routes
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -200,16 +204,8 @@ private fun MapSelectionPanel(
 private fun MapControl(symbol: String, label: String, enabled: Boolean = true, onClick: () -> Unit) {
     FilledTonalIconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(48.dp).semantics { contentDescription = label },
         colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface)) {
-        if (symbol == "⌖") {
-            val ink = LocalContentColor.current
-            Canvas(Modifier.size(24.dp).clearAndSetSemantics { }) {
-                drawCircle(ink, 6.dp.toPx(), style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()))
-                val distance = 10.dp.toPx(); val inner = 6.dp.toPx()
-                for (axis in listOf(Offset(1f, 0f), Offset(-1f, 0f), Offset(0f, 1f), Offset(0f, -1f))) {
-                    drawLine(ink, center + axis * inner, center + axis * distance, 2.dp.toPx())
-                }
-            }
-        } else Text(symbol, Modifier.clearAndSetSemantics { }, style = MaterialTheme.typography.titleLarge)
+        Icon(when (symbol) { "+" -> Icons.Filled.Add; "−" -> Icons.Filled.Remove; else -> Icons.Filled.MyLocation },
+            contentDescription = null)
     }
 }
 

@@ -1,0 +1,16 @@
+<resources>
+    <string name="stage_prelude">序曲</string>
+    <string name="stage_short_prelude">短序曲</string>
+    <string name="stage_main">主赛道</string>
+    <string name="stage_final_lap">最后一圈</string>
+    <string name="stage_outro">尾奏</string>
+    <string name="stage_bridge">桥段</string>
+    <string name="stage_region">区域 %1$d</string>
+    <string name="stage_pattern">版本 %1$d</string>
+    <string name="stage_join">%1$s · %2$s</string>
+    <string name="stage_fanfare">最后一圈号角</string>
+    <string name="stage_pending">%1$s → %2$s（等待切换）</string>
+    <string name="stage_stopped">已停止</string>
+    <string name="stage_finished">已结束</string>
+    <string name="stage_not_started">尚未开始</string>
+</resources>

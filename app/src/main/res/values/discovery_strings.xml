@@ -44,4 +44,8 @@
     <string name="discovery_home_open">Open course</string>
     <string name="discovery_home_daily_hint">Daily picks refresh at midnight.</string>
     <string name="discovery_home_subtitle">Your music, your world</string>
+    <string name="discovery_previous_recommendation">Previous recommendation</string>
+    <string name="discovery_next_recommendation">Next recommendation</string>
+    <string name="discovery_playing">Playing</string>
+    <string name="discovery_paused">Paused</string>
 </resources>

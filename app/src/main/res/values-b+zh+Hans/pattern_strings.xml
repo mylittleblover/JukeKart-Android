@@ -4,6 +4,6 @@
     <string name="recording_version_hint">保持当前乐句进度，用一秒交叉淡化切换。</string>
     <string name="music_region">音乐区域</string>
     <string name="music_region_number">区域 %1$d</string>
-    <string name="music_region_hint">按 MINF 规定的拍点和偏移量向下一段推进，Pattern 5 之后进入 Fast。</string>
+    <string name="music_region_hint">按曲目的切换点向下一个区域推进，区域 5 之后进入最后一圈。</string>
     <string name="cancel_pending_transition">取消等待中的切换</string>
 </resources>

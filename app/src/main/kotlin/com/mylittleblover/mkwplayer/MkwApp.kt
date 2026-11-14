@@ -1,6 +1,13 @@
 package com.mylittleblover.mkwplayer
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.ui.platform.testTag
@@ -37,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -92,6 +100,8 @@ internal fun MkwApp(
 ) {
     var nav by rememberSaveable(stateSaver = listSaver<NavState, String>(save = { it.snapshot() }, restore = { NavState.restore(it) })) { mutableStateOf(NavState()) }
     val mapState = rememberSaveable(saver = WorldMapState.Saver) { WorldMapState() }
+    var mediaCategory by rememberSaveable { mutableIntStateOf(-1) }
+    var mediaQuery by rememberSaveable { mutableStateOf("") }
 
     // The pack picker. It is the only import path a normal listener needs: one file carries the audio, the
     // stage structures and the timings. Kept here rather than inside a page so the library's empty state and
@@ -157,6 +167,7 @@ internal fun MkwApp(
                 is NavState.Detail.Course -> androidx.compose.ui.res.stringResource(R.string.nav_course)
                 is NavState.Detail.Cup -> androidx.compose.ui.res.stringResource(R.string.discovery_gp)
                 NavState.Detail.Flow -> androidx.compose.ui.res.stringResource(R.string.discovery_interactive)
+                NavState.Detail.Track -> androidx.compose.ui.res.stringResource(R.string.discovery_media)
                 is NavState.Detail.Interactive -> androidx.compose.ui.res.stringResource(R.string.discovery_interactive)
                 is NavState.Detail.Playlist -> androidx.compose.ui.res.stringResource(R.string.discovery_playlists)
                 else -> tabTitle(nav.tab)
@@ -167,21 +178,21 @@ internal fun MkwApp(
         bottomBar = {
             Column {
                 androidx.compose.animation.AnimatedVisibility(
-                    visible = ui.flow != null && ui.canStop && nav.detail != NavState.Detail.Flow &&
+                    visible = ui.canStop && nav.detail != NavState.Detail.Track && nav.detail != NavState.Detail.Flow &&
                         ((nav.detail as? NavState.Detail.Interactive)?.let { !model.isStageOpen(it.code) } ?: true),
                     enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { it / 4 },
                     exit = fadeOut(tween(150))) {
                     val miniTitle = model.currentStageCode?.let { browse?.displayName(it, languageTag) } ?: ui.title
-                    MiniPlayer(miniTitle, model.currentStageCode, ui, onOpen = { nav = nav.open(NavState.Detail.Flow) },
+                    MiniPlayer(miniTitle, model.currentStageCode, ui, onOpen = { nav = nav.open(if (ui.flow == null) NavState.Detail.Track else NavState.Detail.Flow) },
                         onToggle = { if (ui.canPause) model.pause() else if (ui.canResume) model.resume() })
                 }
             if (!sideNavigation) NavigationBar {
                 Tab.ordered().forEach { tab ->
                     NavigationBarItem(
                         selected = nav.tab == tab,
-                        onClick = { nav = nav.select(tab) },
+                        onClick = { if (tab == Tab.MEDIA) { mediaCategory = -1; mediaQuery = "" }; nav = nav.select(tab) },
                         label = { Text(tabTitle(tab)) },
-                        icon = { TabIcon(tab) },
+                        icon = { TabIcon(tab, nav.tab == tab) },
                     )
                 }
             }
@@ -192,7 +203,7 @@ internal fun MkwApp(
             if (sideNavigation) androidx.compose.material3.NavigationRail {
                 Tab.ordered().forEach { tab ->
                     androidx.compose.material3.NavigationRailItem(selected = nav.tab == tab,
-                        onClick = { nav = nav.select(tab) }, icon = { TabIcon(tab) }, label = { Text(tabTitle(tab)) })
+                        onClick = { if (tab == Tab.MEDIA) { mediaCategory = -1; mediaQuery = "" }; nav = nav.select(tab) }, icon = { TabIcon(tab, nav.tab == tab) }, label = { Text(tabTitle(tab)) })
                 }
             }
             AnimatedContent(targetState = nav.snapshot(), modifier = Modifier.weight(1f).fillMaxSize(),
@@ -235,11 +246,13 @@ internal fun MkwApp(
                 detail is NavState.Detail.Cup -> com.mylittleblover.mkwplayer.ui.home.DiscoveryCup(
                     browse?.route(detail.id, unlocked), browse, languageTag) { code -> nav = nav.open(NavState.Detail.Course(code)) }
                 detail == NavState.Detail.Flow -> ConsolePage(model, ui, openPack, openFiles)
+                detail == NavState.Detail.Track -> SingleTrackPlayer(model, ui)
                 else -> when (page.tab) {
                     Tab.HOME -> com.mylittleblover.mkwplayer.ui.home.DiscoveryHome(browse, discoveryState, languageTag, unlocked,
                         onOpen = { nav = nav.open(NavState.Detail.Course(it)) }, onFavorite = discovery::toggleFavorite,
                         onImport = openPack, onPlayer = { nav = nav.open(NavState.Detail.Flow) }, hasPlayer = ui.flow != null && ui.canStop)
                     Tab.MEDIA -> com.mylittleblover.mkwplayer.ui.home.DiscoveryMedia(browse, unlocked, languageTag,
+                        category = mediaCategory, onCategory = { mediaCategory = it }, query = mediaQuery, onQuery = { mediaQuery = it },
                         onCourse = { nav = nav.open(NavState.Detail.Course(it)) }, onCup = { nav = nav.open(NavState.Detail.Cup(it)) })
                     Tab.WORLD_MAP -> MapPage(model, ui, mapState) { code -> nav = nav.open(NavState.Detail.Course(code)) }
                     Tab.PLAYLISTS -> com.mylittleblover.mkwplayer.ui.home.DiscoveryPlaylists(browse, unlocked, languageTag,
@@ -497,7 +510,10 @@ private fun ConsolePage(
                                 }
                                 if (flow.regionNumbers.isNotEmpty()) {
                                     Text(androidx.compose.ui.res.stringResource(R.string.music_region), style = MaterialTheme.typography.titleSmall)
-                                    Text("Full → Pattern 2 → Pattern 3 → Pattern 4 → Pattern 5 → Fast", style = MaterialTheme.typography.bodySmall)
+                                    Text((listOf(com.mylittleblover.mkwplayer.ui.interactive.stageText("Main")) +
+                                        (2..5).map { com.mylittleblover.mkwplayer.ui.interactive.stageText("Region $it") } +
+                                        listOf(com.mylittleblover.mkwplayer.ui.interactive.stageText("Fast"))).joinToString(" → "),
+                                        style = MaterialTheme.typography.bodySmall)
                                     Text(androidx.compose.ui.res.stringResource(R.string.music_region_hint), style = MaterialTheme.typography.bodySmall)
                                 }
                                 if (flow.versionNumbers.isNotEmpty()) {
@@ -561,12 +577,12 @@ private fun PlayerInformation(model: PlayerViewModel, ui: PlayerViewModel.Ui, ti
                 val label = androidx.compose.ui.res.stringResource(if (favorite) R.string.discovery_favorite_remove else R.string.discovery_favorite_add)
                 androidx.compose.material3.IconButton(onClick = { discovery.toggleFavorite(course) },
                     modifier = Modifier.semantics { contentDescription = label }) {
-                    Text(if (favorite) "♥" else "♡", style = MaterialTheme.typography.headlineSmall)
+                    androidx.compose.material3.Icon(if (favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, contentDescription = null)
                 }
             }
         }
         flow?.let {
-            Text(it.performanceStage.ifEmpty { androidx.compose.ui.res.stringResource(R.string.interactive_waiting) },
+            Text(com.mylittleblover.mkwplayer.ui.interactive.performanceStageText(it),
                 style = MaterialTheme.typography.bodyMedium)
             com.mylittleblover.mkwplayer.ui.interactive.InteractivePlaybackTimeline(ui.position, it)
         } ?: Text(androidx.compose.ui.res.stringResource(R.string.interactive_empty))
@@ -582,7 +598,7 @@ private fun PlayerInformation(model: PlayerViewModel, ui: PlayerViewModel.Ui, ti
                 modifier = Modifier.size(68.dp).semantics { contentDescription = actionLabel },
                 colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
                     containerColor = MaterialTheme.colorScheme.onSurface, contentColor = MaterialTheme.colorScheme.surface)) {
-                Text(if (ui.canPause) "Ⅱ" else "▶", style = MaterialTheme.typography.headlineSmall)
+                androidx.compose.material3.Icon(if (ui.canPause) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(30.dp))
             }
         }
     }
@@ -590,7 +606,7 @@ private fun PlayerInformation(model: PlayerViewModel, ui: PlayerViewModel.Ui, ti
 
 @Composable
 private fun MiniPlayer(title: String, courseCode: String?, ui: PlayerViewModel.Ui, onOpen: () -> Unit, onToggle: () -> Unit) {
-    val flow = ui.flow ?: return
+    val flow = ui.flow
     val label = androidx.compose.ui.res.stringResource(if (ui.canPause) R.string.interactive_pause else R.string.interactive_resume)
     androidx.compose.material3.Surface(tonalElevation = 3.dp, shadowElevation = 3.dp) {
         Column {
@@ -601,20 +617,41 @@ private fun MiniPlayer(title: String, courseCode: String?, ui: PlayerViewModel.U
                 androidx.compose.material3.TextButton(onClick = onOpen, modifier = Modifier.weight(1f)) {
                     Column(Modifier.fillMaxWidth()) {
                         Text(title, maxLines = 1, style = MaterialTheme.typography.titleSmall)
-                        Text(flow.performanceStage, maxLines = 1, style = MaterialTheme.typography.labelSmall)
+                        Text(flow?.let { com.mylittleblover.mkwplayer.ui.interactive.performanceStageText(it) } ?: androidx.compose.ui.res.stringResource(
+                            if (ui.canResume) R.string.discovery_paused else R.string.discovery_playing),
+                            maxLines = 1, style = MaterialTheme.typography.labelSmall)
                     }
                 }
                 androidx.compose.material3.IconButton(onClick = onToggle, enabled = ui.canPause || ui.canResume,
                     modifier = Modifier.size(48.dp).semantics { contentDescription = label }) {
-                    Text(if (ui.canPause) "Ⅱ" else "▶", style = MaterialTheme.typography.titleLarge)
+                    androidx.compose.material3.Icon(if (ui.canPause) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = null)
                 }
             }
-            val frame = flow.sourceFrame
-            val length = flow.sourceFrames
-            if (frame != null && frame >= 0 && length != null && length > 0) {
-                androidx.compose.material3.LinearProgressIndicator(
-                    progress = { (frame.toDouble() / length).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
-            }
+            val frame = flow?.sourceFrame
+            val length = flow?.sourceFrames
+            val progress = if (frame != null && frame >= 0 && length != null && length > 0)
+                (frame.toDouble() / length).toFloat().coerceIn(0f, 1f) else ui.progress.coerceIn(0f, 1f)
+            androidx.compose.material3.LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
         }
+    }
+}
+
+@Composable
+private fun SingleTrackPlayer(model: PlayerViewModel, ui: PlayerViewModel.Ui) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally) {
+        androidx.compose.material3.Surface(Modifier.widthIn(max = 440.dp).fillMaxWidth().aspectRatio(1f),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+            com.mylittleblover.mkwplayer.ui.art.CoursePlaceholder(model.currentStageCode, Modifier.fillMaxSize())
+        }
+        Text(ui.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        androidx.compose.material3.LinearProgressIndicator(progress = { ui.progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(ui.position); Text(ui.total) }
+        val label = androidx.compose.ui.res.stringResource(if (ui.canPause) R.string.interactive_pause else R.string.interactive_resume)
+        androidx.compose.material3.FilledIconButton(onClick = { if (ui.canPause) model.pause() else model.resume() },
+            enabled = ui.canPause || ui.canResume, modifier = Modifier.size(68.dp).semantics { contentDescription = label }) {
+            androidx.compose.material3.Icon(if (ui.canPause) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(30.dp))
+        }
+        OutlinedButton(onClick = model::stop, enabled = ui.canStop) { Text(androidx.compose.ui.res.stringResource(R.string.interactive_stop)) }
     }
 }

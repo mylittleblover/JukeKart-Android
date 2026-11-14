@@ -4,6 +4,6 @@
     <string name="recording_version_hint">Switches at the current musical position with a one-second crossfade.</string>
     <string name="music_region">Music region</string>
     <string name="music_region_number">Region %1$d</string>
-    <string name="music_region_hint">Advances at the next authored bar boundary. Continue from Pattern 5 to Fast.</string>
+    <string name="music_region_hint">Advance to the next region at its authored boundary. Region 5 leads to Final Lap.</string>
     <string name="cancel_pending_transition">Cancel queued change</string>
 </resources>
