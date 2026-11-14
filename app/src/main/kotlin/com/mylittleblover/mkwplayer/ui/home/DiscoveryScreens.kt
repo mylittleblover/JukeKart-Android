@@ -2,6 +2,12 @@ package com.mylittleblover.mkwplayer.ui.home
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntOffset
@@ -67,12 +73,53 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
         com.mylittleblover.mkwplayer.library.MapAnchors.parse(context.assets.open("map_anchors.json").bufferedReader().use { it.readText() })
     }.getOrNull() }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { Text(stringResource(R.string.discovery_daily), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
-        if (catalog == null || state.dailyIds.none { it in catalog.courses(unlocked) }) item { Text(stringResource(R.string.discovery_empty)) }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.discovery_home_eyebrow), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.discovery_home_headline), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.discovery_home_subtitle), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (state.favoritesError != null || state.dailyError != null) item {
+            Text(stringResource(R.string.discovery_save_failed), color = MaterialTheme.colorScheme.error)
+        }
+        val visibleDaily = state.dailyIds.filter { it in catalog?.courses(unlocked).orEmpty() }
+        if (catalog == null || visibleDaily.isEmpty()) item { Text(stringResource(R.string.discovery_empty)) }
         else item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(state.dailyIds.filter { it in catalog.courses(unlocked) }, key = { it }) { id ->
-                    CourseTile(id, catalog.displayName(id, language) ?: id, id in state.favorites, map, anchors, { onOpen(id) }, { onFavorite(id) })
+            val pager = rememberPagerState(pageCount = { visibleDaily.size })
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                HorizontalPager(pager, Modifier.fillMaxWidth().height(264.dp)) { index ->
+                    val id = visibleDaily[index]
+                    Box(Modifier.fillMaxSize().clip(RoundedCornerShape(24.dp))) {
+                        val anchor = anchors?.stageTolerant(id)
+                        if (map != null && anchor != null) {
+                            val image = map!!
+                            Canvas(Modifier.fillMaxSize()) {
+                                val cropW = (image.width * .24f).toInt().coerceAtLeast(1)
+                                val cropH = (image.height * .18f).toInt().coerceAtLeast(1)
+                                val left = (anchor.u * image.width - cropW / 2).toInt().coerceIn(0, image.width - cropW)
+                                val top = (anchor.v * image.height - cropH / 2).toInt().coerceIn(0, image.height - cropH)
+                                drawImage(image, srcOffset = IntOffset(left, top), srcSize = IntSize(cropW, cropH),
+                                    dstSize = IntSize(size.width.toInt().coerceAtLeast(1), size.height.toInt().coerceAtLeast(1)))
+                            }
+                        }
+                        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x33000000), Color(0xCC000000)))))
+                        Column(Modifier.fillMaxSize().padding(22.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                            Text("${stringResource(R.string.discovery_daily)} · ${index + 1} / ${visibleDaily.size}", color = Color.White, style = MaterialTheme.typography.labelMedium)
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(stringResource(R.string.discovery_home_today), color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                                Text(catalog.displayName(id, language) ?: id, color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                                Text(stringResource(R.string.discovery_home_daily_hint), color = Color.White, style = MaterialTheme.typography.bodySmall)
+                                androidx.compose.material3.FilledTonalButton(onClick = { onOpen(id) }) { Text(stringResource(R.string.discovery_home_open)) }
+                            }
+                        }
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                    repeat(visibleDaily.size) { index ->
+                        Box(Modifier.padding(horizontal = 2.dp).width(if (index == pager.currentPage) 18.dp else 6.dp).height(5.dp)
+                            .clip(RoundedCornerShape(50)).background(if (index == pager.currentPage) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant))
+                    }
                 }
             }
         }
@@ -92,27 +139,49 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
 internal fun DiscoveryMedia(catalog: BrowseCatalog?, unlocked: Boolean, language: String,
                             onCourse: (String) -> Unit, onCup: (String) -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
-    var category by rememberSaveable { mutableIntStateOf(0) }
+    var category by rememberSaveable { mutableIntStateOf(-1) }
+    androidx.activity.compose.BackHandler(enabled = category >= 0) { category = -1 }
     val categories = listOf(R.string.discovery_gp, R.string.discovery_rally, R.string.discovery_vs,
         R.string.discovery_free, R.string.discovery_other, R.string.discovery_sounds)
     val routes = when (category) {
         0 -> catalog?.routes(OfficialRouteKind.GRAND_PRIX, unlocked, query).orEmpty()
         1 -> catalog?.routes(OfficialRouteKind.RALLY, unlocked, query).orEmpty()
+        -1 -> if (query.isBlank()) emptyList() else catalog?.routes(OfficialRouteKind.GRAND_PRIX, unlocked, query).orEmpty() + catalog?.routes(OfficialRouteKind.RALLY, unlocked, query).orEmpty()
         else -> emptyList()
     }
-    val courses = if (category == 0 && query.isNotBlank()) catalog?.searchCourses(query, unlocked).orEmpty() else emptyList()
+    val courses = if ((category == 0 || category == -1) && query.isNotBlank()) catalog?.searchCourses(query, unlocked).orEmpty() else emptyList()
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.discovery_search)) }, singleLine = true) }
-        item { LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(categories.size) { i -> FilterChip(selected = category == i, onClick = { category = i }, label = { Text(stringResource(categories[i])) }) }
-        } }
+        if (category < 0) {
+            item { Text(stringResource(R.string.discovery_media), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
+            for (row in 0..2) item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    for (column in 0..1) {
+                        val index = row * 2 + column
+                        Card(onClick = { category = index }, modifier = Modifier.weight(1f).height(112.dp),
+                            shape = RoundedCornerShape(20.dp)) {
+                            Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.BottomStart) {
+                                val art = when (index) { 0 -> R.drawable.mode_grand_prix; 1 -> R.drawable.mode_knockout; 2 -> R.drawable.mode_vs; else -> null }
+                                art?.let { Image(painterResource(it), null, Modifier.align(Alignment.TopEnd).size(52.dp)) }
+                                Text(stringResource(categories[index]), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+        } else item {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { category = -1 }) { Text(stringResource(R.string.common_back)) }
+                Text(stringResource(categories[category]), style = MaterialTheme.typography.headlineSmall)
+            }
+        }
         items(routes, key = { it.id }) { route -> RouteRow(route, language) { onCup(route.id) } }
         items(courses, key = { "course:$it" }) { code ->
             Card(onClick = { onCourse(code) }, modifier = Modifier.fillMaxWidth()) {
                 Text(catalog?.displayName(code, language) ?: code, Modifier.padding(16.dp), style = MaterialTheme.typography.titleMedium)
             }
         }
-        if (routes.isEmpty() && courses.isEmpty()) item { Text(stringResource(R.string.discovery_empty)) }
+        if (category >= 0 && routes.isEmpty() && courses.isEmpty()) item { Text(stringResource(R.string.discovery_empty)) }
     }
 }
 

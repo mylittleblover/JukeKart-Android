@@ -38,4 +38,10 @@
     <string name="discovery_rename">Rename</string>
     <string name="discovery_move_up">Move up</string>
     <string name="discovery_move_down">Move down</string>
+    <string name="discovery_home_headline">Let the music keep moving</string>
+    <string name="discovery_home_eyebrow">Your music, your world</string>
+    <string name="discovery_home_today">Today&#8217;s picks</string>
+    <string name="discovery_home_open">Open course</string>
+    <string name="discovery_home_daily_hint">Daily picks refresh at midnight.</string>
+    <string name="discovery_home_subtitle">Your music, your world</string>
 </resources>

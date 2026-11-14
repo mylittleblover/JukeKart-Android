@@ -38,4 +38,10 @@
     <string name="discovery_rename">重新命名</string>
     <string name="discovery_move_up">上移</string>
     <string name="discovery_move_down">下移</string>
+    <string name="discovery_home_headline">讓賽道音樂繼續流動</string>
+    <string name="discovery_home_eyebrow">YOUR MUSIC, YOUR WORLD</string>
+    <string name="discovery_home_today">今日聽聽</string>
+    <string name="discovery_home_open">查看曲目詳情</string>
+    <string name="discovery_home_daily_hint">每日推薦在本地午夜更新。</string>
+    <string name="discovery_home_subtitle">你的音樂，你的世界</string>
 </resources>

@@ -21,19 +21,20 @@ import java.util.Locale
 @Composable
 internal fun InteractivePlaybackTimeline(position: String, flow: PlayerViewModel.FlowUi) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(position, style = MaterialTheme.typography.headlineSmall)
         val frame = flow.sourceFrame
         val length = flow.sourceFrames
         if (frame != null && frame >= 0 && length != null && length > 0) {
             LinearProgressIndicator(progress = { (frame.toDouble() / length).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
-            Text(stringResource(R.string.interactive_source_position, EngineSnapshot.formatPosition(frame, flow.transportRate)), style = MaterialTheme.typography.labelMedium)
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(if (frame != null && frame >= 0) EngineSnapshot.formatPosition(frame, flow.transportRate) else position, style = MaterialTheme.typography.labelMedium)
+            if (length != null && length > 0) Text(EngineSnapshot.formatPosition(length, flow.transportRate), style = MaterialTheme.typography.labelMedium)
         }
         if (flow.voiceCount > 0 && flow.loopStart != null && flow.loopEnd != null && !flow.fading) {
             Text(stringResource(R.string.interactive_loop_range,
                 EngineSnapshot.formatPosition(flow.loopStart, flow.transportRate),
                 EngineSnapshot.formatPosition(flow.loopEnd, flow.transportRate)), style = MaterialTheme.typography.labelMedium)
         }
-        Text(stringResource(R.string.interactive_voice_count, flow.voiceCount), style = MaterialTheme.typography.labelMedium)
         if (flow.fading) {
             val remaining = flow.fadeRemainingFrames
             Text(if (remaining == null) stringResource(R.string.interactive_fading)

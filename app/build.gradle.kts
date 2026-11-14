@@ -13,8 +13,8 @@ android {
         minSdk = 26
         targetSdk = 35
         // MINF sample timelines, actual Native state, and Rainbow's complete regional graph.
-        versionCode = 13
-        versionName = "0.1.0-alpha13"
+        versionCode = 15
+        versionName = "0.1.0-alpha15"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

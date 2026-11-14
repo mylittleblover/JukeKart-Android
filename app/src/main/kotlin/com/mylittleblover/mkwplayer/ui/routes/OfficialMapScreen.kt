@@ -3,7 +3,6 @@ package com.mylittleblover.mkwplayer.ui.routes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
@@ -18,6 +17,13 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.FilterQuality
@@ -259,16 +265,34 @@ private fun MapCanvas(
             val iconSize = with(density) { iconPixels.toDp() }
             val visits = occurrences[code].orEmpty()
             val selected = state.selectedCourseCode == code
+            val selectionScale by animateFloatAsState(if (selected) 1.24f else 1f,
+                animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing), label = "course-selection")
             val description = if (visits.isEmpty()) name(code) else stringResource(R.string.map_pin_occurrences, name(code), visits.joinToString(stringResource(R.string.map_stop_separator)) { it.ordinal.toString() })
             Box(
                 Modifier.offset { IntOffset((point.x - iconPixels / 2f).roundToInt(), (point.y - iconPixels / 2f).roundToInt()) }
                     .size(iconSize)
-                    .then(if(selected || visits.isNotEmpty()) Modifier.border(iconSize * .045f, accent, CircleShape) else Modifier)
+                    .zIndex(if (selected) 1f else 0f)
                     .clickable(role = Role.Button) { state.selectCourse(code) }
                     .semantics { contentDescription = description; this.selected = selected },
                 contentAlignment = Alignment.Center,
             ) {
-                StageArt.resolve(code)?.let { art -> Image(painterResource(art), contentDescription = null, modifier = Modifier.fillMaxSize()) }
+                StageArt.resolve(code)?.let { art ->
+                    val painter = painterResource(art)
+                    Image(painter, contentDescription = null, modifier = Modifier.fillMaxSize()
+                        .graphicsLayer { scaleX = selectionScale; scaleY = selectionScale }
+                        .drawWithContent {
+                            if (selected) {
+                                // Draw the source alpha silhouette, rather than a circular marker.
+                                val edge = size.minDimension * .035f
+                                for (dx in -1..1) for (dy in -1..1) if (dx != 0 || dy != 0) {
+                                    withTransform({ translate(dx * edge, dy * edge) }) {
+                                        with(painter) { draw(size = size, colorFilter = ColorFilter.tint(Color.White)) }
+                                    }
+                                }
+                            }
+                            drawContent()
+                        })
+                }
                 if (visits.isNotEmpty()) {
                     Surface(Modifier.align(Alignment.TopEnd).offset(x = iconSize * .1f, y = -iconSize * .1f), shape = CircleShape, color = accent, contentColor = MaterialTheme.colorScheme.onPrimary) {
                         Text(visits.joinToString("·") { it.ordinal.toString() }, Modifier.padding(horizontal = iconSize * .08f, vertical = iconSize * .025f),
