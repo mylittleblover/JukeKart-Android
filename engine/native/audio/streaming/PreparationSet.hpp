@@ -16,6 +16,14 @@ private:
         bool operator==(const Key& b)const noexcept{return cache==b.cache && asset==b.asset && first==b.first && next==b.next;}};
     struct LeaseSlot {Key key;Requirement requirement;StreamCursor cursor;};
     std::array<LeaseSlot,capacity> slots_{};std::bitset<capacity> occupied_,wanted_;
+    std::array<Requirement,capacity> configuredInput_{};
+    std::array<std::size_t,capacity> wantedSlots_{};
+    std::size_t configuredCount_{},wantedCount_{};
+    bool configurationCached_{};
+    static bool same(const Requirement& a,const Requirement& b)noexcept {
+        return a.cache==b.cache && a.asset==b.asset && a.sample.value==b.sample.value && a.fraction==b.fraction &&
+            a.nextSample.has_value()==b.nextSample.has_value() && (!a.nextSample || a.nextSample->value==b.nextSample->value);
+    }
     static Key key(const Requirement& r)noexcept {
         const auto first=r.sample.value/static_cast<std::int64_t>(SourcePageCache::FramesPerPage);
         const auto last=r.cache->duration(r.asset).value-1;
@@ -26,6 +34,13 @@ public:
     struct FrameEnd {PreparationSet* set{};~FrameEnd(){if(set)set->trim();}};
     bool configure(const Requirement* input,std::size_t count)noexcept {
         if(count>capacity || (count && !input))return false;
+        // Stable queued transitions reserve the same source pages for thousands of frames.
+        // Reuse that exact configuration; changed positions/rates/selection still take the full path.
+        if(configurationCached_ && count==configuredCount_) {
+            bool unchanged=true;
+            for(std::size_t n=0;n<count && unchanged;++n)unchanged=same(input[n],configuredInput_[n]);
+            if(unchanged)return true;
+        }
         std::array<Key,capacity> unique{};std::array<std::size_t,capacity> indexes{};std::size_t size=0,needed=0;
         for(std::size_t n=0;n<count;++n) {
             const auto& r=input[n];
@@ -44,19 +59,21 @@ public:
                 for(slot=0;slot<capacity && occupied_[slot];++slot){}
                 auto& s=slots_[slot];s.key=unique[n];s.requirement=input[indexes[n]];s.cursor.bind(s.key.cache,s.key.asset);occupied_.set(slot);
             }
-            wanted.set(slot);
+            wanted.set(slot);wantedSlots_[n]=slot;
         }
-        wanted_=wanted;return true;
+        wanted_=wanted;wantedCount_=size;
+        for(std::size_t n=0;n<count;++n)configuredInput_[n]=input[n];
+        configuredCount_=count;configurationCached_=true;return true;
     }
     std::size_t size()const noexcept{return wanted_.count();}
     bool ready()noexcept {
         bool ready=true;
-        for(std::size_t n=0;n<capacity;++n)if(wanted_[n]) {
-            auto& s=slots_[n];if(!s.cursor.prepare(static_cast<double>(s.requirement.sample.value)+s.requirement.fraction,s.requirement.nextSample))ready=false;
+        for(std::size_t index=0;index<wantedCount_;++index) {
+            auto& s=slots_[wantedSlots_[index]];if(!s.cursor.prepare(static_cast<double>(s.requirement.sample.value)+s.requirement.fraction,s.requirement.nextSample))ready=false;
         }
         return ready;
     }
-    void retire()noexcept{wanted_.reset();}
-    void trim()noexcept{for(std::size_t n=0;n<capacity;++n)if(occupied_[n] && !wanted_[n]){slots_[n].cursor.reset();occupied_.reset(n);}}
+    void retire()noexcept{wanted_.reset();wantedCount_=0;configurationCached_=false;}
+    void trim()noexcept{if(occupied_==wanted_)return;for(std::size_t n=0;n<capacity;++n)if(occupied_[n] && !wanted_[n]){slots_[n].cursor.reset();occupied_.reset(n);}}
 };
 }

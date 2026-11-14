@@ -1,0 +1,12 @@
+<resources>
+    <string name="settings_unlock_test_title">隱藏內容測試</string>
+    <string name="settings_unlock_test_hint">暫時顯示或隱藏彩虹之路與特別盃。聆聽進度和解鎖演出記錄會保留。</string>
+    <string name="settings_unlock_test_normal">模式：正常聆聽進度</string>
+    <string name="settings_unlock_test_unlocked">模式：強制解鎖</string>
+    <string name="settings_unlock_test_locked">模式：強制鎖定</string>
+    <string name="settings_unlock_test_visible">隱藏內容已顯示</string>
+    <string name="settings_unlock_test_hidden">隱藏內容已隱藏</string>
+    <string name="settings_unlock_test_unlock">直接解鎖（測試）</string>
+    <string name="settings_unlock_test_lock">取消解鎖（測試）</string>
+    <string name="settings_unlock_test_restore">恢復正常進度</string>
+</resources>

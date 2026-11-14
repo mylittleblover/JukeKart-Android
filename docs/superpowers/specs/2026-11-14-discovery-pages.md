@@ -24,3 +24,7 @@
 ## 本子项目之外但必须继续的工作
 
 预设编排与完整组曲、普通线性播放器及冻结队列、完整会话恢复、后台原子解码导入/检查点恢复、真实 Jukebox 候选池、官方路线音频编排。其可用性不能仅靠静态页面或这里的目录模型宣布完成；分成后续独立执行计划，继续执行，不在页面完成后自动停工。
+
+## Latest user delivery priority
+
+Finish and validate the interactive screen, then deliver the APK and compatible mkwpack before resuming other pages. Complete suites and all other preset contents are deferred until supplied by the user. DonkeyKong progresses only Full (region 1) → Pattern 2 → Pattern 3 → Pattern 4 → Pattern 5 → Fast. No reverse or skipped region transitions; preserve MINF bar grids and destination offsets.

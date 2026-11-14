@@ -127,6 +127,7 @@ class EngineRuntime {
     void advanceAlbumFlow() noexcept;
     void completeAlbumFlow() noexcept;
     long double automaticBeats_{};Frame automaticFrame_{-1},automaticClockFrame_{-1};Tempo automaticTempo_;double automaticSpeed_{1};
+    Frame globalFadeEnd_{-1};
     int rate_{48000},current_{-1}; std::uint32_t instance_{};
     std::uint64_t rejected_{},voiceNumericalCorrections_{};
     api::EngineStatus last_{api::EngineStatus::Ok};

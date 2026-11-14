@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.withTransform
@@ -37,6 +38,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mylittleblover.mkwplayer.R
 import com.mylittleblover.mkwplayer.library.MapAnchors
 import com.mylittleblover.mkwplayer.routes.LocalizedNames
@@ -75,7 +77,7 @@ internal fun OfficialMapScreen(
         val paneWidth = if (maxWidth >= 840.dp) 320.dp else 248.dp
         Row(Modifier.fillMaxSize()) {
             BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
-                MapCanvas(image, pins, route, state, name, Modifier.fillMaxSize())
+                MapCanvas(image, anchors.canvasWidth.toFloat(), pins, route, state, name, Modifier.fillMaxSize())
                 val horizontalControls = maxHeight < 240.dp || (!wide && maxHeight < 400.dp)
                 Surface(
                     modifier = Modifier.align(Alignment.TopStart).padding(12.dp).widthIn(max = (maxWidth - if (horizontalControls) 184.dp else 88.dp).coerceIn(0.dp, 320.dp)),
@@ -207,15 +209,14 @@ private fun MapControl(symbol: String, label: String, enabled: Boolean = true, o
 
 @Composable
 private fun MapCanvas(
-    image: ImageBitmap, pins: List<MapAnchors.Anchor>, route: OfficialRoute?, state: WorldMapState,
+    image: ImageBitmap, sourceCanvasWidth: Float, pins: List<MapAnchors.Anchor>, route: OfficialRoute?, state: WorldMapState,
     name: (String) -> String, modifier: Modifier,
 ) {
     val density = LocalDensity.current
     val padding = with(density) { 24.dp.toPx() }
-    val halfTarget = with(density) { 24.dp.toPx() }
     val accent = MaterialTheme.colorScheme.primary
     val occurrences = route?.stops?.groupBy { it.stageCode }.orEmpty()
-    BoxWithConstraints(modifier.clipToBounds().pointerInput(state) {
+    BoxWithConstraints(modifier.background(Color(0xFF24516F)).clipToBounds().pointerInput(state) {
         detectTransformGestures { centroid, pan, zoom, _ -> state.gesture(centroid, pan, zoom) }
     }) {
         val transform = state.configure(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat(), image.width.toFloat() / image.height, padding)
@@ -233,16 +234,19 @@ private fun MapCanvas(
                 val end = transform.project(b.u, b.v)
                 val difference = end - start
                 val length = difference.getDistance()
-                val radius = 28.dp.toPx()
-                if (length <= radius * 2f) continue
+                val startRadius = transform.sourcePixelsToScreen(a.artSize / 2f + 6f, sourceCanvasWidth)
+                val endRadius = transform.sourcePixelsToScreen(b.artSize / 2f + 6f, sourceCanvasWidth)
+                if (length <= startRadius + endRadius) continue
                 val unit = difference / length
-                drawLine(accent, start + unit * radius, end - unit * radius, strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
+                drawLine(accent, start + unit * startRadius, end - unit * endRadius,
+                    strokeWidth = transform.sourcePixelsToScreen(8f, sourceCanvasWidth), cap = StrokeCap.Round)
                 val middle = start + difference * .6f
                 val perpendicular = Offset(-unit.y, unit.x)
                 val arrow = Path().apply {
-                    val tip = middle + unit * 7.dp.toPx()
-                    val left = middle - unit * 5.dp.toPx() + perpendicular * 5.dp.toPx()
-                    val right = middle - unit * 5.dp.toPx() - perpendicular * 5.dp.toPx()
+                    val arrowSize = transform.sourcePixelsToScreen(28f, sourceCanvasWidth)
+                    val tip = middle + unit * arrowSize
+                    val left = middle - unit * arrowSize * .7f + perpendicular * arrowSize * .7f
+                    val right = middle - unit * arrowSize * .7f - perpendicular * arrowSize * .7f
                     moveTo(tip.x, tip.y); lineTo(left.x, left.y); lineTo(right.x, right.y); close()
                 }
                 drawPath(arrow, accent)
@@ -251,21 +255,24 @@ private fun MapCanvas(
         for (pin in pins) {
             val code = pin.code.removeSuffix("_00")
             val point = transform.project(pin.u, pin.v)
+            val iconPixels = transform.sourcePixelsToScreen(pin.artSize, sourceCanvasWidth)
+            val iconSize = with(density) { iconPixels.toDp() }
             val visits = occurrences[code].orEmpty()
             val selected = state.selectedCourseCode == code
             val description = if (visits.isEmpty()) name(code) else stringResource(R.string.map_pin_occurrences, name(code), visits.joinToString(stringResource(R.string.map_stop_separator)) { it.ordinal.toString() })
             Box(
-                Modifier.offset { IntOffset((point.x - halfTarget).roundToInt(), (point.y - halfTarget).roundToInt()) }
-                    .size(48.dp).background(MaterialTheme.colorScheme.surface, CircleShape)
-                    .border(if (selected) 3.dp else if (visits.isNotEmpty()) 2.dp else 0.dp, if (selected || visits.isNotEmpty()) accent else MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                Modifier.offset { IntOffset((point.x - iconPixels / 2f).roundToInt(), (point.y - iconPixels / 2f).roundToInt()) }
+                    .size(iconSize)
+                    .then(if(selected || visits.isNotEmpty()) Modifier.border(iconSize * .045f, accent, CircleShape) else Modifier)
                     .clickable(role = Role.Button) { state.selectCourse(code) }
                     .semantics { contentDescription = description; this.selected = selected },
                 contentAlignment = Alignment.Center,
             ) {
-                StageArt.resolve(code)?.let { art -> Image(painterResource(art), contentDescription = null, modifier = Modifier.size(40.dp)) }
+                StageArt.resolve(code)?.let { art -> Image(painterResource(art), contentDescription = null, modifier = Modifier.fillMaxSize()) }
                 if (visits.isNotEmpty()) {
-                    Surface(Modifier.align(Alignment.TopEnd).offset(x = 6.dp, y = (-6).dp), shape = CircleShape, color = accent, contentColor = MaterialTheme.colorScheme.onPrimary) {
-                        Text(visits.joinToString("·") { it.ordinal.toString() }, Modifier.padding(horizontal = 5.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    Surface(Modifier.align(Alignment.TopEnd).offset(x = iconSize * .1f, y = -iconSize * .1f), shape = CircleShape, color = accent, contentColor = MaterialTheme.colorScheme.onPrimary) {
+                        Text(visits.joinToString("·") { it.ordinal.toString() }, Modifier.padding(horizontal = iconSize * .08f, vertical = iconSize * .025f),
+                            fontSize = (iconSize.value * .22f).sp, lineHeight = (iconSize.value * .25f).sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }

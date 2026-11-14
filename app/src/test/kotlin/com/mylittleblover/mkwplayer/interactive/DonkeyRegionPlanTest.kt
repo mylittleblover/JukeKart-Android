@@ -16,13 +16,17 @@ class DonkeyRegionPlanTest {
         val groups=StageFlowDiscovery.group(bytes.map { (n,b)->StageFlowReader.readPart(n,b).getOrThrow() })
         val plan=InteractivePlaybackPlan.normal(StageFlowDiscovery.flowFor(StageFlowDiscovery.dominant(groups)!!).getOrThrow(),bytes,catalog)
         assertEquals(5,plan.regions.size)
+        assertTrue(plan.standard!!.segmentByRole.getValue(com.mylittleblover.mkwplayer.library.StageFlow.Role.PreShort) in plan.initialSegments)
+        assertTrue(plan.regions.getValue(1) in plan.initialSegments)
+        assertFalse(plan.fast in plan.initialSegments, "Donkey Fast must follow Pattern 5")
+        plan.standard.segmentByRole[com.mylittleblover.mkwplayer.library.StageFlow.Role.Bridge]?.let { assertFalse(it in plan.initialSegments) }
         assertTrue(plan.streamed)
         for((number,source) in plan.regions) {
             val part=catalog.part(if(number==1) "DonkeyKong" else "DonkeyKong_Pattern$number","Full")!!
             val segment=plan.spec.segments.single { it.index==source }
             assertEquals(segment.cues.map { it.frame }.sorted(),segment.cues.map { it.frame },"Native requires chronological cues")
             assertEquals(part.beats.filter { it.label==1 }.map { it.frame },segment.cues.filter { it.name=="region.exit" }.map { it.frame })
-            for((targetNumber,target) in plan.regions.filterKeys { it!=number }) {
+            for((targetNumber,target) in plan.regions.filterKeys { it==number+1 }) {
                 val targetPart=catalog.part(if(targetNumber==1) "DonkeyKong" else "DonkeyKong_Pattern$targetNumber","Full")!!
                 val rule=plan.spec.transitions.single { it.sources==listOf(source) && it.destinations==listOf(target) }
                 assertEquals(G.SyncPoint.NextCustomCue,rule.sync)
@@ -31,9 +35,12 @@ class DonkeyRegionPlanTest {
                 assertEquals(0,rule.timeline.destinationCommit)
                 assertEquals(0,rule.timeline.destinationSource)
             }
-            if(number!=1) assertTrue(plan.spec.transitions.filter { source in it.sources }.all { it.destinations.single() in plan.regions.values },"No unverified Pattern Outro or Fast edges")
+            val progression=plan.spec.transitions.filter { source in it.sources && (it.destinations.single() in plan.regions.values || it.destinations.single()==plan.fast) }
+            val expected=if(number==5) plan.fast else plan.regions[number+1]
+            assertEquals(listOf(expected),progression.map { it.destinations.single() })
+            assertEquals(expected,plan.next[source])
         }
-        assertEquals(20,plan.spec.transitions.count { it.sourceCue=="region.exit" })
+        assertEquals(5,plan.spec.transitions.count { it.sourceCue=="region.exit" })
         assertContentEquals(plan.packet,plan.standard!!.packet)
     }
 }

@@ -33,7 +33,8 @@ internal class InstalledUi {
         if (contains) it.text?.toString()?.contains(text) == true else it.text?.toString() == text
     }
     fun tapDescription(description: String) = tapMatching { it.contentDescription?.toString() == description }
-    private fun tapMatching(predicate: (AccessibilityNodeInfo) -> Boolean) {
+    fun longPressText(text: String) = tapMatching(holdMillis = 800) { it.text?.toString() == text }
+    private fun tapMatching(holdMillis: Long = 0, predicate: (AccessibilityNodeInfo) -> Boolean) {
         val deadline = SystemClock.uptimeMillis() + 180_000
         var bounds: Rect? = null
         while (bounds == null && SystemClock.uptimeMillis() < deadline) {
@@ -66,6 +67,7 @@ internal class InstalledUi {
             event.source = InputDevice.SOURCE_TOUCHSCREEN
             assertTrue("Touch rejected", instrumentation.uiAutomation.injectInputEvent(event, true))
             event.recycle()
+            if (action == MotionEvent.ACTION_DOWN && holdMillis > 0) SystemClock.sleep(holdMillis)
         }
     }
     fun awaitOrientation(landscape: Boolean) {

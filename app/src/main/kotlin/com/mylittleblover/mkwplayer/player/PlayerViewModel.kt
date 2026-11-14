@@ -28,6 +28,8 @@ import com.mylittleblover.mkwplayer.unlock.ListeningProgress
 import com.mylittleblover.mkwplayer.unlock.SpecialCupUnlock
 import com.mylittleblover.mkwplayer.unlock.SpecialCupRules
 import com.mylittleblover.mkwplayer.unlock.UnlockStore
+import com.mylittleblover.mkwplayer.unlock.UnlockTestMode
+import com.mylittleblover.mkwplayer.unlock.UnlockTestStore
 import com.mylittleblover.mkwplayer.library.Playability
 import com.mylittleblover.mkwplayer.library.PackPicker
 import com.mylittleblover.mkwplayer.pack.PackCoverage
@@ -94,6 +96,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val flow: FlowUi? = null,
         /** Special Cup progress and the offer, or null before a library exists. */
         val unlock: UnlockUi? = null,
+        val unlockTestMode: UnlockTestMode = UnlockTestMode.NORMAL,
         /** What the last pack import did, or null when none has run. */
         val pack: PackUi? = null,
     )
@@ -162,6 +165,14 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val availableVersions: Set<Int> = emptySet(),
         val canFast: Boolean = false,
         val canCancelPending: Boolean = false,
+        val sourceFrame: Long? = null,
+        val sourceFrames: Long? = null,
+        val loopStart: Long? = null,
+        val loopEnd: Long? = null,
+        val voiceCount: Int = 0,
+        val transportRate: Int = 48000,
+        val fading: Boolean = false,
+        val fadeRemainingFrames: Long? = null,
         /**
          * The next-stage event is available.
          *
@@ -212,6 +223,8 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      * and getting nothing is indistinguishable from a broken app.
      */
     fun selectStage(code: String) {
+        if(isSpecialStageLocked(code)) return
+        if(nativePerformance?.isFading==true) return
         packPlaybackRequest++
         pack?.let { installed ->
             val stage=installed.manifest.stages.firstOrNull { it.code.removeSuffix("_00").equals(code.removeSuffix("_00"),true) }
@@ -232,10 +245,14 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         select(match.key)
     }
 
+    internal val currentStageCode: String?
+        get() = interactivePlan?.name?.removePrefix("BGM_Stage_")?.removeSuffix("_00")
+
     internal fun isStageOpen(code: String): Boolean =
         interactivePlan?.name?.removePrefix("BGM_Stage_")?.removeSuffix("_00")?.equals(code.removeSuffix("_00"), true) == true
 
     fun canStartStage(code: String): Boolean {
+        if(isSpecialStageLocked(code)) return false
         val logical=code.removeSuffix("_00")
         if(interactivePlan?.name?.removePrefix("BGM_Stage_")?.equals(logical,true)==true) return true
         val installed=pack ?: return false
@@ -244,6 +261,8 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
     /** Resolve the selected course by its stable code before starting any playback. */
     fun startStagePerformance(code: String) {
+        if(isSpecialStageLocked(code)) return
+        if(nativePerformance?.isFading==true) return
         val logical=code.removeSuffix("_00")
         if(interactivePlan?.name?.removePrefix("BGM_Stage_")?.equals(logical,true)==true) { packPlaybackRequest++;startPerformance();return }
         val installed=pack
@@ -310,6 +329,28 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     /** Special Cup progress, persisted separately from the library so a corrupt one cannot lose both. */
     private val unlockStore = UnlockStore(java.io.File(application.filesDir, SPECIAL_CUP_FILE))
 
+    private val unlockTestStore = UnlockTestStore(java.io.File(application.filesDir, "unlock-test-mode.json"))
+    private var naturalUnlockUi: UnlockUi? = null
+
+    private fun projectUnlock(natural: UnlockUi?): UnlockUi? {
+        naturalUnlockUi = natural
+        // A research pack with an unfinished scope must never earn the formal gate by accident.
+        val formal = if(pack?.manifest?.unlock?.frozen == false) natural?.copy(visible=false, canEnter=false) else natural
+        return _ui.value.unlockTestMode.apply(formal)
+    }
+
+    fun setUnlockTestMode(mode: UnlockTestMode) {
+        unlockTestStore.write(mode).fold(onSuccess = {
+            _ui.value = _ui.value.copy(unlockTestMode=mode, unlock=mode.apply(
+                if(pack?.manifest?.unlock?.frozen == false) naturalUnlockUi?.copy(visible=false,canEnter=false) else naturalUnlockUi))
+            if(isSpecialStageLocked(currentStageCode.orEmpty())) releaseTransport()
+        }, onFailure = { _ui.value = _ui.value.copy(detail=it.message) })
+    }
+
+    private fun isSpecialStageLocked(code: String): Boolean =
+        code.removePrefix("BGM_Stage_").removeSuffix("_00").equals("Rainbow",true) &&
+            !com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(_ui.value.unlock)
+
     /** The cup's rules and progress, or null until there is a library to derive eligibility from. */
     private var cup: SpecialCupUnlock? = null
 
@@ -325,8 +366,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      */
     private fun creditListening(state: PlaybackSession.State) {
         val bridge = listening ?: return
-        val stage = state.title.takeIf { it.isNotEmpty() } ?: return
-        val prefix = StageFlowDiscovery.prefixOf(stage)
+        val prefix = currentStageCode ?: state.title.takeIf { it.isNotEmpty() }?.let(StageFlowDiscovery::prefixOf) ?: return
 
         if (bridge.snapshot.currentStage != prefix) {
             bridge.begin(prefix, state.totalFrames, state.sampleRate.coerceAtLeast(48_000))
@@ -337,12 +377,14 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val offered = outcome.offeredNow || _ui.value.unlock?.offered == true
 
         if (outcome.ignoredReason == null) {
-            _ui.value = _ui.value.copy(unlock = UnlockUi.from(bridge, offered))
+            _ui.value = _ui.value.copy(unlock = projectUnlock(UnlockUi.from(bridge, offered)))
             unlockStore.save(outcome.state)?.let { _ui.value = _ui.value.copy(detail = it) }
         }
     }
 
     init {
+        unlockTestStore.read().fold(onSuccess = { _ui.value = _ui.value.copy(unlockTestMode=it) },
+            onFailure = { _ui.value = _ui.value.copy(detail=it.message) })
         // The catalog is bundled data, so it is read once rather than re-parsed on every
         // recomposition. A missing or broken asset leaves it null and the UI omits the
         // section instead of showing an empty one.
@@ -377,6 +419,36 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         }
         loaded.problem?.let { _ui.value = _ui.value.copy(detail = it) }
 
+        // Restore the installed source without opening audio. Browsing after a process restart
+        // must offer the same courses as immediately after import.
+        val packRoot = java.io.File(getApplication<Application>().filesDir, PACK_ROOT)
+        val restored = PackRegistry(packRoot).load()
+            .sortedWith(compareByDescending<PackRegistry.Entry> { it.packVersion }.thenBy { it.packId })
+            .firstNotNullOfOrNull { entry ->
+                runCatching {
+                    val expected = java.io.File(java.io.File(java.io.File(packRoot, "packs"), entry.packId), entry.packVersion.toString()).canonicalFile
+                    val directory = java.io.File(entry.directory).canonicalFile
+                    if (directory != expected || !directory.toPath().startsWith(packRoot.canonicalFile.toPath())) return@runCatching null
+                    val manifest = PackManifest.parse(java.io.File(directory, PackManifest.MEMBER_NAME).readText()).manifestOrNull()
+                        ?: return@runCatching null
+                    if (manifest.packId != entry.packId || manifest.packVersion != entry.packVersion ||
+                        com.mylittleblover.mkwplayer.pack.PackValidation.validate(manifest).failures.isNotEmpty()) return@runCatching null
+                    if (!manifest.assets.all { asset ->
+                        val file = java.io.File(directory, "audio/${asset.digest.sha256}")
+                        file.isFile && file.length() == asset.byteSize
+                    }) return@runCatching null
+                    InstalledPack(manifest, directory)
+                }.getOrNull()
+            }
+        if (restored != null) {
+            pack = restored
+            _ui.value = _ui.value.copy(pack = PackUi(
+                name = restored.manifest.name,
+                trackCount = restored.manifest.tracks.size,
+                playableCount = PackPlayback.playableTracks(restored.manifest).size,
+            ))
+        }
+
         // The cup's eligibility depends on what the user actually has, so it is derived after the
         // library is restored. Reading the stored progress first means the offer survives a restart.
         establishCup(loaded.tracks)
@@ -391,11 +463,13 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      */
     private fun establishCup(tracks: List<LibraryStore.TrackRow> = emptyList()) {
         val names = _ui.value.tracks.map { it.name }.ifEmpty { tracks.map { it.title } }
-        val eligible = SpecialCupRules.eligibleStages(names)
+        val eligible = pack?.manifest?.let { manifest ->
+            manifest.unlock.stages.toSet().ifEmpty { manifest.stages.map { it.code }.toSet() }
+        } ?: SpecialCupRules.eligibleStages(names)
         if (eligible.isEmpty()) {
             cup = null
             listening = null
-            _ui.value = _ui.value.copy(unlock = null)
+            _ui.value = _ui.value.copy(unlock = projectUnlock(null))
             return
         }
 
@@ -414,7 +488,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val offered = restored.state?.ceremony == SpecialCupUnlock.CeremonyPhase.PENDING ||
             restored.state?.ceremony == SpecialCupUnlock.CeremonyPhase.PLAYING ||
             restored.state?.ceremony == SpecialCupUnlock.CeremonyPhase.COMPLETED
-        _ui.value = _ui.value.copy(unlock = UnlockUi.from(bridge, offered))
+        _ui.value = _ui.value.copy(unlock = projectUnlock(UnlockUi.from(bridge, offered)))
     }
 
     /** Enters the ceremony. Fails loudly rather than pretending when the cup is not open. */
@@ -425,7 +499,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val next = rules.withState(bridge.snapshot).beginCeremony()
         bridge.seed(next)
         unlockStore.save(next)?.let { _ui.value = _ui.value.copy(detail = it) }
-        _ui.value = _ui.value.copy(unlock = UnlockUi.from(bridge, offered = true))
+        _ui.value = _ui.value.copy(unlock = projectUnlock(UnlockUi.from(bridge, offered = true)))
         return true
     }
 
@@ -437,7 +511,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val next = rules.withState(bridge.snapshot).leaveCeremonyEarly()
         bridge.seed(next)
         unlockStore.save(next)?.let { _ui.value = _ui.value.copy(detail = it) }
-        _ui.value = _ui.value.copy(unlock = UnlockUi.from(bridge, offered = true))
+        _ui.value = _ui.value.copy(unlock = projectUnlock(UnlockUi.from(bridge, offered = true)))
     }
 
     /**
@@ -453,7 +527,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val next = rules.withState(bridge.snapshot).finishCeremony(reachedEnd = true)
         bridge.seed(next)
         unlockStore.save(next)?.let { _ui.value = _ui.value.copy(detail = it) }
-        _ui.value = _ui.value.copy(unlock = UnlockUi.from(bridge, offered = true))
+        _ui.value = _ui.value.copy(unlock = projectUnlock(UnlockUi.from(bridge, offered = true)))
     }
 
     /** Consumes the first-time congratulations, if it is owed. */
@@ -464,7 +538,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val next = rules.withState(bridge.snapshot).markCongratulated()
         bridge.seed(next)
         unlockStore.save(next)?.let { _ui.value = _ui.value.copy(detail = it) }
-        _ui.value = _ui.value.copy(unlock = UnlockUi.from(bridge, offered = true))
+        _ui.value = _ui.value.copy(unlock = projectUnlock(UnlockUi.from(bridge, offered = true)))
     }
 
     /**
@@ -638,6 +712,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      * than giving the flow code a special case it would then have to keep working.
      */
     fun openFlow(uris: List<Uri>) {
+        if(nativePerformance?.isFading==true) return
         packPlaybackRequest++
         if (uris.isEmpty()) return
         _ui.value = _ui.value.copy(busy = true, status = "Reading files...", detail = null)
@@ -708,8 +783,16 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
-    private fun startFlow(flow: StageFlow, bytes: Map<String, ByteArray>, rejected: List<String>,displayTitle: String=flow.name): Boolean {
+    private fun startFlow(flow: StageFlow, sourceBytes: Map<String, ByteArray>, rejected: List<String>,displayTitle: String=flow.name): Boolean {
+        if(nativePerformance?.isFading==true) return false
         packPlaybackRequest++
+        val bytes = try {
+            sourceBytes + (com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.ASSET to
+                getApplication<Application>().assets.open("audio/BGM_Seq_FinalLapFF.bwav").use { it.readBytes() })
+        } catch(e: Exception) {
+            _ui.value=_ui.value.copy(status="Cannot load FinalLapFF",detail=e.message)
+            return false
+        }
         val plan = try {
             if(minfCatalog.part(flow.name.removePrefix("BGM_Stage_"),"Full")!=null)
                 InteractivePlaybackPlan.normal(flow,bytes,minfCatalog) else null
@@ -786,6 +869,8 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     }
 
     private fun startRainbow(bytes: Map<String,ByteArray>,notes: List<String>,displayTitle: String="Rainbow"): Boolean {
+        if(isSpecialStageLocked("Rainbow")) return false
+        if(nativePerformance?.isFading==true) return false
         packPlaybackRequest++
         val plan=try { InteractivePlaybackPlan.rainbow(bytes,minfCatalog) } catch(e: Exception) {
             _ui.value=_ui.value.copy(status="Cannot prepare Rainbow",detail=e.message);return false
@@ -811,6 +896,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      * app cannot read.
      */
     fun openFlowFromFolder() {
+        if(nativePerformance?.isFading==true) return
         packPlaybackRequest++
         val folder = java.io.File(getApplication<Application>().filesDir, FLOW_FOLDER)
         _ui.value = _ui.value.copy(busy = true, status = "Scanning folder...", detail = null)
@@ -866,6 +952,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      * that failed, and "could not import" tells a user nothing they can act on.
      */
     fun importPack(uri: Uri) {
+        if(nativePerformance?.isFading==true) return
         _ui.value = _ui.value.copy(
             busy = true,
             status = "Copying the pack...",
@@ -928,6 +1015,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         displayName: String,
     ) {
         this.pack = InstalledPack(manifest, directory)
+        establishCup()
 
         val playable = PackPlayback.playableTracks(manifest)
         val notes = buildList {
@@ -965,15 +1053,17 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
     /** Newest selection waits without blocking the service's foreground promotion. */
     fun openPackTrack(track: PackManifest.Track,perform: Boolean=false) {
+        if(nativePerformance?.isFading==true) return
         val request=++packPlaybackRequest
         viewModelScope.launch {
             PlaybackService.awaitForegroundPromotion()
-            if(request!=packPlaybackRequest) return@launch
+            if(request!=packPlaybackRequest || nativePerformance?.isFading==true) return@launch
             if(openPackTrackNow(track) && perform) startPerformance()
         }
     }
 
     private fun openPackTrackNow(track: PackManifest.Track): Boolean {
+        if(nativePerformance?.isFading==true) return false
         val installed = pack ?: return false
         return when (val prepared = PackPlayback.prepare(installed.manifest, track, installed.directory)) {
             is PackPlayback.Result.Refused -> {
@@ -1053,6 +1143,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      * indistinguishable from a broken app.
      */
     fun startPerformance() {
+        if(isSpecialStageLocked(currentStageCode.orEmpty())) return
         interactivePlan?.let { plan ->
             if(!session.state.value.loaded) {
                 val request=++packPlaybackRequest
@@ -1116,6 +1207,34 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         apply(driver.takeOutro(), driver)
     }
 
+    internal val initialEntryChoices: Map<Int,String>
+        get() = interactivePlan?.let { plan -> plan.initialSegments.associateWith { plan.labels[it].orEmpty() } }.orEmpty()
+    internal val selectedEntrySegment: Int? get() = interactivePlan?.entry
+
+    fun selectInitialEntry(segment: Int) {
+        val plan = interactivePlan ?: return
+        if (_ui.value.canStop || nativePerformance?.isFading == true || segment !in plan.initialSegments) return
+        packPlaybackRequest++
+        publish(session.stop())
+        nativePerformance = null
+        interactivePlan = plan.copy(entry = segment)
+        _ui.value = _ui.value.copy(flow = _ui.value.flow?.copy(activeSegment=null, performanceStage="", performing=false))
+    }
+
+    internal val canFadeStop: Boolean
+        get() = interactivePlan != null && session.state.value.loaded && _ui.value.canStop && nativePerformance?.isFading != true
+
+    fun fadeStopPerformance(seconds: Int) {
+        if(seconds !in listOf(1,3,5,10) || !canFadeStop) return
+        startPerformance()
+        val driver=nativePerformance ?: return
+        if(driver.isFading) return
+        val plan=interactivePlan ?: return
+        val error=session.fadeStop(seconds*plan.spec.bpm/60.0)
+        if(error==null) { packPlaybackRequest++;driver.markFadeRequested() }
+        publishNativePerformance(error,true)
+    }
+
     /** Stops a performance without ending the stage. */
     fun stopPerformance() {
         packPlaybackRequest++
@@ -1123,7 +1242,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             nativePerformance=null
             publish(session.stop())
             _ui.value=_ui.value.copy(flow=_ui.value.flow?.copy(performing=false,performanceStage="Stopped",canAdvance=false,canEnd=false,fastPlaying=false,
-                canFast=false,canCancelPending=false,availableRegions=emptySet(),availableVersions=emptySet(),selectedRegion=null,selectedVersion=null))
+                canFast=false,canCancelPending=false,fading=false,fadeRemainingFrames=null,voiceCount=0,sourceFrame=null,availableRegions=emptySet(),availableVersions=emptySet(),selectedRegion=null,selectedVersion=null))
             return
         }
         val driver = performance ?: return
@@ -1195,6 +1314,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
     /** Starts the track with the given key, or reports why it cannot start. */
     fun select(key: String) {
+        if(nativePerformance?.isFading==true) return
         packPlaybackRequest++
         val track = _ui.value.tracks.firstOrNull { it.key == key } ?: return
         if (!track.playable) {
@@ -1310,6 +1430,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     private fun followPerformance() {
         if(nativePerformance!=null) {
             session.interactiveObservation()?.let { nativePerformance!!.observe(it) }
+            if(nativePerformance?.isFading==true && nativePerformance?.finished==true) { stop();return }
             publishNativePerformance()
             return
         }
@@ -1347,6 +1468,8 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val driver=nativePerformance ?: return
         val plan=interactivePlan ?: return
         val current=_ui.value.flow ?: return
+        val observation=driver.observationState
+        val segment=plan.spec.segments.singleOrNull { it.index==driver.current }
         val label=plan.labels[driver.current] ?: "Waiting"
         val pending=driver.pending?.let { " → ${plan.labels[it]} (queued)" }.orEmpty()
         _ui.value=_ui.value.copy(detail=if(fromAction) error else driver.diagnostic ?: _ui.value.detail,flow=current.copy(
@@ -1354,7 +1477,10 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             performanceStage=if(driver.finished) "Finished" else label+pending,
             canAdvance=driver.canAdvance,canEnd=driver.canEnd,fastPlaying=driver.isFast,canFast=driver.canFast,
             selectedVersion=driver.currentVersion,availableVersions=driver.availableVersions,
-            selectedRegion=driver.currentRegion,availableRegions=driver.availableRegions,canCancelPending=driver.canCancelPending))
+            selectedRegion=driver.currentRegion,availableRegions=driver.availableRegions,canCancelPending=driver.canCancelPending,
+            sourceFrame=observation?.sourceFrame,sourceFrames=segment?.exit,loopStart=segment?.loop?.start,loopEnd=segment?.loop?.end,
+            voiceCount=observation?.voices ?: 0,transportRate=plan.spec.transportSampleRate,fading=driver.isFading,
+            fadeRemainingFrames=observation?.fadeEndFrame?.let { end -> observation.transportFrame?.let { (end-it).coerceAtLeast(0) } }))
     }
     private fun publish(state: PlaybackSession.State) {
         creditListening(state)
@@ -1412,7 +1538,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         publish(session.stop())
         _ui.value = _ui.value.copy(progress = 0f, position = EngineSnapshot.formatPosition(0, rate),
             flow=_ui.value.flow?.copy(performing=false,performanceStage="Stopped",canAdvance=false,canEnd=false,fastPlaying=false,
-                canFast=false,canCancelPending=false,availableRegions=emptySet(),availableVersions=emptySet(),selectedRegion=null,selectedVersion=null))
+                canFast=false,canCancelPending=false,fading=false,fadeRemainingFrames=null,voiceCount=0,sourceFrame=null,availableRegions=emptySet(),availableVersions=emptySet(),selectedRegion=null,selectedVersion=null))
         PlaybackService.stop(getApplication())
     }
 

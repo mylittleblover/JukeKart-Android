@@ -177,6 +177,7 @@ EngineSnapshot engineSnapshot(const EngineHandle* engine) noexcept {
     EngineSnapshot s;
     for(;;) {
         const auto before=engine->sequence.load(std::memory_order_acquire); if(before&1) continue;
+        s.globalFadeEnd=engine->globalFadeEnd.load(std::memory_order_relaxed);
         s.position.value=engine->frame.load(std::memory_order_relaxed); s.status=engine->status.load(std::memory_order_relaxed);
         s.transportEpoch=PlaylistMonitorSlot::loadBits(engine->transportEpoch.data());
         s.activeVoices=engine->voices.load(std::memory_order_relaxed); s.currentObject=engine->current.load(std::memory_order_relaxed);

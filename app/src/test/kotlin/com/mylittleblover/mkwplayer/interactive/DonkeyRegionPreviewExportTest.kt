@@ -9,7 +9,7 @@ import kotlin.test.*
 import org.junit.Assume.assumeTrue
 
 class DonkeyRegionPreviewExportTest {
-    @Test fun exportsAllTwentyDirectedRegionChangesAndTheirLoopBoundaryCases() {
+    @Test fun exportsForwardProgressionAndItsLoopBoundaryCases() {
         val output=System.getenv("MKW_DONKEY_PREVIEW_ROOT")
         assumeTrue(output!=null)
         val root=File(output!!).apply { mkdirs() }
@@ -23,7 +23,7 @@ class DonkeyRegionPreviewExportTest {
         val jobs=JSONArray()
         for((number,from) in p.regions) {
             val segment=p.spec.segments.single { it.index==from }
-            for((targetNumber,to) in p.regions.filterKeys { it!=number }) {
+            for((targetNumber,to) in (if(number==5) mapOf(6 to p.fast!!) else p.regions.filterKeys { it==number+1 })) {
                 for((edge,at) in listOf("early" to 100000L,"loop-end" to segment.loop!!.end-1024)) {
                     val g=segment.cues.filter { it.name=="region.exit" && it.frame>at }.minOf { it.frame }
                     val id="Region$number-Region$targetNumber-$edge"
@@ -38,6 +38,6 @@ class DonkeyRegionPreviewExportTest {
             }
         }
         File(root,"jobs.json").writeText(JSONObject().put("cases",jobs).toString(2))
-        assertEquals(40,jobs.length())
+        assertEquals(10,jobs.length())
     }
 }

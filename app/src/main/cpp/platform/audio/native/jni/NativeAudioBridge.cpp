@@ -147,7 +147,7 @@ extern "C" JNIEXPORT jlongArray JNICALL
 Java_com_mylittleblover_player2_platform_audio_NativeAudioLibrary_snapshot(JNIEnv* env,jobject,jlong engine) {
     const auto s=player2::api::engineSnapshot(handle(engine));
     std::uint32_t left{},right{}; std::memcpy(&left,&s.peakLeft,sizeof(left)); std::memcpy(&right,&s.peakRight,sizeof(right));
-    jlong values[65]={8,s.position.value,s.status,s.activeVoices,s.currentObject,static_cast<jlong>(s.droppedVoices),static_cast<jlong>(s.rejectedCommands),static_cast<int>(s.lastResult),left,right,
+    jlong values[66]={8,s.position.value,s.status,s.activeVoices,s.currentObject,static_cast<jlong>(s.droppedVoices),static_cast<jlong>(s.rejectedCommands),static_cast<int>(s.lastResult),left,right,
         s.playlist,s.playingSegment,s.playlistGroup,s.playlistItem,s.playlistCursor,s.playlistHistorySize,static_cast<jlong>(s.playlistRandomState),
         s.switchContainer,s.switchTarget,s.switchPath,s.switchSpecificity,s.switchPriority,s.switchCandidates,s.switchReason};
     for(std::size_t i=0;i<s.transition.size();++i) values[24+i]=s.transition[i];
@@ -158,7 +158,8 @@ Java_com_mylittleblover_player2_platform_audio_NativeAudioLibrary_snapshot(JNIEn
     for(std::size_t i=0;i<s.stinger.size();++i) values[38+i]=s.stinger[i];
     for(std::size_t i=0;i<s.event.size();++i) values[52+i]=s.event[i];
     values[63]=static_cast<jlong>(s.voiceNumericalCorrections);values[64]=static_cast<jlong>(s.mixerNumericalCorrections);
-    auto result=env->NewLongArray(65); if(result) env->SetLongArrayRegion(result,0,65,values); return result;
+    values[65]=s.globalFadeEnd;
+    auto result=env->NewLongArray(66); if(result) env->SetLongArrayRegion(result,0,66,values); return result;
 }
 extern "C" JNIEXPORT jlongArray JNICALL
 Java_com_mylittleblover_player2_platform_audio_NativeAudioLibrary_playlistDecisionSnapshot(JNIEnv* env,jobject,jlong engine,jint index) {

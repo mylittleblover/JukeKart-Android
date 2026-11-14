@@ -1,0 +1,12 @@
+<resources>
+    <string name="settings_unlock_test_title">Hidden cup testing</string>
+    <string name="settings_unlock_test_hint">Temporarily show or hide Rainbow Road and the Special Cup. Your listening progress and reveal ceremony history are preserved.</string>
+    <string name="settings_unlock_test_normal">Mode: normal listening progress</string>
+    <string name="settings_unlock_test_unlocked">Mode: forced unlocked</string>
+    <string name="settings_unlock_test_locked">Mode: forced locked</string>
+    <string name="settings_unlock_test_visible">Hidden content is visible</string>
+    <string name="settings_unlock_test_hidden">Hidden content is hidden</string>
+    <string name="settings_unlock_test_unlock">Unlock for testing</string>
+    <string name="settings_unlock_test_lock">Cancel unlock for testing</string>
+    <string name="settings_unlock_test_restore">Restore normal progress</string>
+</resources>

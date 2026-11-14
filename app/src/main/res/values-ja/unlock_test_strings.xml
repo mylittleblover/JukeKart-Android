@@ -1,0 +1,12 @@
+<resources>
+    <string name="settings_unlock_test_title">隠しコンテンツのテスト</string>
+    <string name="settings_unlock_test_hint">レインボーロードとスペシャルカップの表示を一時的に切り替えます。再生の進捗と解放演出の履歴は保持されます。</string>
+    <string name="settings_unlock_test_normal">モード：通常の再生進捗</string>
+    <string name="settings_unlock_test_unlocked">モード：強制解放</string>
+    <string name="settings_unlock_test_locked">モード：強制ロック</string>
+    <string name="settings_unlock_test_visible">隠しコンテンツは表示中です</string>
+    <string name="settings_unlock_test_hidden">隠しコンテンツは非表示です</string>
+    <string name="settings_unlock_test_unlock">解放する（テスト）</string>
+    <string name="settings_unlock_test_lock">解放を取り消す（テスト）</string>
+    <string name="settings_unlock_test_restore">通常の進捗に戻す</string>
+</resources>

@@ -66,6 +66,10 @@ internal class AudioEngine private constructor(private val handle: Long) : Sessi
     override fun play(target: Int): Int =
         if (closed) CLOSED else NativeAudioLibrary.command(handle, COMMAND_PLAY, target, -1, 0.0, -1L)
 
+    override fun fadeStop(beats: Double): Int =
+        if (closed || !beats.isFinite() || beats <= 0) CLOSED
+        else NativeAudioLibrary.command(handle, COMMAND_STOP, -1, -1, beats, -1L)
+
     override fun stop(): Int =
         if (closed) CLOSED else NativeAudioLibrary.command(handle, COMMAND_STOP, -1, -1, 0.0, -1L)
 

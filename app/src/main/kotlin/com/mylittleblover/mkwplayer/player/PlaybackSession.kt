@@ -84,7 +84,7 @@ internal class PlaybackSession(
         if(raw.size<65 || raw[0]!=8L) return null
         val segment=raw[11].toInt()
         var sourceFrame: Long?=null
-        for(slot in 0 until 128) {
+        if(segment>=0) for(slot in 0 until 128) {
             val source=current.sourceSnapshot(slot) ?: continue
             if(source.size==207 && source[0] in 3L..11L && source[1]==1L && source[4]==segment.toLong()) {
                 sourceFrame=source[10]
@@ -95,7 +95,7 @@ internal class PlaybackSession(
             it.first==segment && it.third==raw[6]
         }?.second
         return NativeInteractiveDriver.Observation(segment,sourceFrame,raw[24]!=0L,raw[2]==2L,raw[3].toInt(),
-            if(raw[7]!=0L) "Native playback: ${AudioStatusText.engine(raw[7].toInt())}" else null,raw[6],destination,canCancel=raw[24]!=0L && raw[37]==0L,stopped=raw[2]==0L)
+            if(raw[7]!=0L) "Native playback: ${AudioStatusText.engine(raw[7].toInt())}" else null,raw[6],destination,canCancel=raw[24]!=0L && raw[37]==0L,stopped=raw[2]==0L,transportFrame=raw[1],fadeEndFrame=raw.getOrNull(65)?.takeIf { it>=0 })
     }
 
     /**
@@ -219,6 +219,12 @@ internal class PlaybackSession(
     fun resume(): State {
         val active = controller ?: return _state.value
         return publishState(active.resume())
+    }
+
+    fun fadeStop(beats: Double): String? {
+        val current = engine ?: return "No audio source is open"
+        val status = current.fadeStop(beats)
+        return if (status == 0) null else AudioStatusText.engine(status)
     }
 
     fun stop(): State {

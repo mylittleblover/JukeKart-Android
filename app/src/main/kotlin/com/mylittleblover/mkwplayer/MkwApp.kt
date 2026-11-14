@@ -142,6 +142,9 @@ internal fun MkwApp(
                 detail == NavState.Detail.Settings -> AppSettingsScreen(
                     language = language, onLanguage = { AppLanguageSettings.select(context, it) },
                     busy = ui.busy, sourceName = ui.pack?.name, onOpenPack = openPack, onOpenFiles = openFiles,
+                    testMode = ui.unlockTestMode,
+                    testUnlockVisible = com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(ui.unlock),
+                    onTestUnlock = model::setUnlockTestMode,
                 )
                 detail is NavState.Detail.Course -> CoursePage(model, ui, detail.code) {
                     model.startStagePerformance(detail.code)
@@ -316,6 +319,7 @@ private fun RoutesPage() {
  * Three events and one switch, each enabled only when it means something. A control that is always available
  * is a control that is sometimes a no-op, and the listener cannot tell which.
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun ConsolePage(
     model: PlayerViewModel,
@@ -324,62 +328,82 @@ private fun ConsolePage(
     onOpenFiles: () -> Unit,
 ) {
     val flow = ui.flow
+    val context = LocalContext.current
+    val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
+    val names = remember(context.assets) {
+        runCatching { context.assets.open("localized_names.json").bufferedReader().use { LocalizedNames.parse(it.readText()) } }.getOrNull()
+    }
+    val displayTitle = model.currentStageCode
+        ?.let { names?.name(it, languageTag) } ?: ui.title
 
+    Column(Modifier.fillMaxSize()) {
     LazyColumn(
         Modifier
-            .fillMaxSize()
+            .weight(1f)
             .testTag("interactive-page")
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item(key = "performance-console") {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Console", style = MaterialTheme.typography.headlineSmall)
+                Text(androidx.compose.ui.res.stringResource(R.string.interactive_title), style = MaterialTheme.typography.headlineSmall)
+                com.mylittleblover.mkwplayer.ui.interactive.InteractiveCoursePicker(
+                    names = names,
+                    specialUnlocked = com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(ui.unlock),
+                    busy = ui.busy || flow?.fading == true,
+                    available = model::canStartStage,
+                    onPlay = model::startStagePerformance,
+                )
 
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (flow == null) {
                             Text(
-                                "No stage is open. Open one from the library first.",
+                                androidx.compose.ui.res.stringResource(R.string.interactive_empty),
                                 style = MaterialTheme.typography.bodyMedium,
                             )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(onClick = onOpenPack) { Text("Import a pack") }
-                                OutlinedButton(onClick = onOpenFiles) { Text("Add .bwav files") }
+                            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = onOpenPack) { Text(androidx.compose.ui.res.stringResource(R.string.interactive_import)) }
+                                OutlinedButton(onClick = onOpenFiles) { Text(androidx.compose.ui.res.stringResource(R.string.interactive_files)) }
                                 OutlinedButton(onClick = { model.openFlowFromFolder() }) {
-                                    Text("Scan stages folder")
+                                    Text(androidx.compose.ui.res.stringResource(R.string.interactive_scan))
                                 }
                             }
                         } else {
-                            Text(flow.title, style = MaterialTheme.typography.titleMedium)
+                            Text(displayTitle, style = MaterialTheme.typography.titleMedium)
                             Text(flow.summary, style = MaterialTheme.typography.bodySmall)
                             Text(
-                                flow.performanceStage.ifEmpty { "Not started" },
+                                flow.performanceStage.ifEmpty { androidx.compose.ui.res.stringResource(R.string.interactive_waiting) },
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
+                            )
+
+                            com.mylittleblover.mkwplayer.ui.interactive.InteractivePlaybackTimeline(ui.position, flow)
+
+                            com.mylittleblover.mkwplayer.ui.interactive.InteractiveEntryChooser(
+                                choices = model.initialEntryChoices,
+                                selected = model.selectedEntrySegment,
+                                enabled = !ui.canStop && !ui.busy,
+                                onSelect = model::selectInitialEntry,
                             )
 
                             if (flow.performanceBlocker != null) {
                                 // A disabled button with no explanation reads as a broken app.
                                 Text(flow.performanceBlocker, style = MaterialTheme.typography.bodySmall)
                             } else {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Button(
                                         onClick = { model.startPerformance() },
                                         enabled = !flow.performing,
-                                    ) { Text("Start") }
+                                    ) { Text(androidx.compose.ui.res.stringResource(R.string.interactive_start)) }
 
                                     // The next-stage event. The prelude loops until this is pressed, which is what
                                     // the game does: the race start is an event, not a timer.
                                     OutlinedButton(
                                         onClick = { model.advancePerformance() },
                                         enabled = flow.canAdvance,
-                                    ) { Text("Next stage") }
+                                    ) { Text(androidx.compose.ui.res.stringResource(R.string.interactive_next)) }
 
-                                    OutlinedButton(
-                                        onClick = { model.stopPerformance() },
-                                        enabled = flow.performing,
-                                    ) { Text("Stop") }
                                 }
 
                                 if (flow.hasFast) {
@@ -387,9 +411,9 @@ private fun ConsolePage(
                                     // line, so the switch is not a cut.
                                     OutlinedButton(
                                         onClick = { model.toggleFast() },
-                                        enabled = flow.canFast || (flow.versionNumbers.isEmpty() && flow.canEnd && !flow.fastPlaying),
+                                        enabled = flow.canFast || (flow.versionNumbers.isEmpty() && flow.regionNumbers.isEmpty() && flow.canEnd && !flow.fastPlaying),
                                     ) {
-                                        Text(if (flow.fastPlaying) "Fast playing" else "Fast version")
+                                        Text(if (flow.fastPlaying) androidx.compose.ui.res.stringResource(R.string.interactive_fast_playing) else androidx.compose.ui.res.stringResource(R.string.interactive_fast))
                                     }
                                 }
 
@@ -401,24 +425,16 @@ private fun ConsolePage(
 
                                 if (flow.regionNumbers.isNotEmpty()) {
                                     Text(androidx.compose.ui.res.stringResource(R.string.music_region))
-                                    flow.regionNumbers.chunked(3).forEach { row ->
-                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            row.forEach { number ->
-                                                FilterChip(
-                                                    selected = flow.selectedRegion == number,
-                                                    onClick = { if(flow.selectedRegion != number) model.selectMusicRegion(number) },
-                                                    enabled = number in flow.availableRegions || number == flow.selectedRegion,
-                                                    label = { Text(androidx.compose.ui.res.stringResource(R.string.music_region_number,number)) },
-                                                )
-                                            }
-                                        }
-                                    }
+                                    Text(
+                                        "Full → Pattern 2 → Pattern 3 → Pattern 4 → Pattern 5 → Fast",
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
                                     Text(androidx.compose.ui.res.stringResource(R.string.music_region_hint),style = MaterialTheme.typography.bodySmall)
                                 }
 
                                 if (flow.versionNumbers.isNotEmpty()) {
                                     Text(androidx.compose.ui.res.stringResource(R.string.recording_version))
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                         flow.versionNumbers.forEach { number ->
                                             FilterChip(
                                                 selected = flow.selectedVersion == number,
@@ -434,9 +450,9 @@ private fun ConsolePage(
                                 if (flow.canEnd) {
                                     // The ending is chosen by how far into the loop playback has got; the console
                                     // offers the event, not a menu of files.
-                                    Button(onClick = { model.takeOutro() }) { Text("End the stage") }
+                                    Button(onClick = { model.takeOutro() }) { Text(androidx.compose.ui.res.stringResource(R.string.interactive_end)) }
                                     Text(
-                                        "The ending nearest to the current position is chosen.",
+                                        androidx.compose.ui.res.stringResource(R.string.interactive_ending_hint),
                                         style = MaterialTheme.typography.bodySmall,
                                     )
                                 }
@@ -447,19 +463,19 @@ private fun ConsolePage(
                     }
                 }
 
-                PlayScreen(
-                    transport = UiMapping.transport(ui),
-                    sections = UiMapping.sections(flow),
-                    title = ui.title,
-                    provenance = UiMapping.provenanceLine(flow),
-                    onPlay = { model.startPerformance() },
-                    onPause = { model.pause() },
-                    onResume = { model.resume() },
-                    onStop = { model.stopPerformance() },
-                    onSection = { model.playSection(it) },
-                    modifier = Modifier.fillMaxWidth(),
-                    scrollable = false,
-                )
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedButton(onClick = { model.pause() }, enabled = ui.canPause) {
+                        Text(androidx.compose.ui.res.stringResource(R.string.interactive_pause))
+                    }
+                    OutlinedButton(onClick = { model.resume() }, enabled = ui.canResume) {
+                        Text(androidx.compose.ui.res.stringResource(R.string.interactive_resume))
+                    }
+                }
+                ui.detail?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+
             }
         }
 
@@ -472,5 +488,13 @@ private fun ConsolePage(
             summary = UiMapping.importSummary(ui),
             onScan = { model.openFlowFromFolder() },
         )
+    }
+    com.mylittleblover.mkwplayer.ui.interactive.InteractiveStopBar(
+        canStop = ui.canStop,
+        canFade = !ui.busy && model.canFadeStop,
+        fading = flow?.fading == true,
+        onStop = model::stop,
+        onFade = model::fadeStopPerformance,
+    )
     }
 }

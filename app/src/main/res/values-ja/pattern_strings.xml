@@ -4,6 +4,6 @@
     <string name="recording_version_hint">現在の再生位置を保ち、1秒のクロスフェードで切り替えます。</string>
     <string name="music_region">楽曲エリア</string>
     <string name="music_region_number">エリア %1$d</string>
-    <string name="music_region_hint">次の小節頭で切り替えます。終了や Fast への切り替えは、エリア1に戻ってから行えます。</string>
+    <string name="music_region_hint">MINF の拍位置とオフセットに従って次へ進みます。Pattern 5 の次は Fast です。</string>
     <string name="cancel_pending_transition">待機中の切り替えをキャンセル</string>
 </resources>

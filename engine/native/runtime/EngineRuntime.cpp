@@ -57,6 +57,7 @@ bool EngineRuntime::submit(const api::EngineCommand& command) noexcept {
     return queue_.push(command);
 }
 void EngineRuntime::resetStopped() noexcept {
+    globalFadeEnd_=-1;
     albumActive_=albumEnding_=albumWaitingTail_=false;albumCurrent_=albumOwner_=-1;albumProbeInstance_=-1;
     if(albumState_.phase!=api::AlbumFlowPhase::None)albumState_.phase=api::AlbumFlowPhase::Stopped;
     musicalLoopActive_=false;if(musicalLoopState_.phase!=api::MusicalLoopPhase::None)musicalLoopState_.phase=api::MusicalLoopPhase::Stopped;
@@ -220,8 +221,15 @@ void EngineRuntime::execute(const api::EngineCommand& command,int depth) noexcep
             }
             break;
         case EngineCommandKind::Stop:
-            if(command.target==-1) resetStopped();
-            else last_=stopObject(command.target,command.number,command.value==1);
+            if(command.target==-1 && command.number==0) resetStopped();
+            else {
+                last_=stopObject(command.target,command.number,command.value==1);
+                if(command.target==-1 && command.number>0 && last_==EngineStatus::Ok) {
+                    globalFadeEnd_=clock_.frame();
+                    for(const auto& voice:voices_.slots()) if(voice.active && voice.exitFade)
+                        globalFadeEnd_=std::max(globalFadeEnd_,voice.fadeEnd);
+                }
+            }
             break;
         case EngineCommandKind::Pause: clock_.pause(); break;
         case EngineCommandKind::Resume: if(clock_.status()==TransportStatus::Paused) clock_.play(); break;
@@ -517,6 +525,7 @@ void EngineRuntime::render(float* output,std::size_t frames) noexcept {
 }
 api::EngineSnapshot EngineRuntime::snapshot() const noexcept {
     api::EngineSnapshot result{{clock_.frame()},static_cast<int>(clock_.status()),static_cast<int>(voices_.count()),current_,voices_.dropped(),rejected_,last_,peakLeft_,peakRight_};
+    result.globalFadeEnd=globalFadeEnd_;
     result.transportEpoch=journal_->epoch;result.voiceNumericalCorrections=voiceNumericalCorrections_;result.mixerNumericalCorrections=mixer_ ? mixer_->numericalCorrections() : 0;
     result.event=eventDecision_;
     result.stinger=stingerDecision_; result.stinger[0]=stinger_.active;

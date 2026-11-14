@@ -12,6 +12,18 @@ class NativeInteractiveDriverTest {
         G.Transition(202,listOf(101),listOf(103),sourceCue="outro.1"),G.Transition(203,listOf(101),listOf(104))))
     private fun driver(request: (Int)->String?={null})=NativeInteractiveDriver(spec,100,mapOf(100 to 101),
         mapOf(0 to 102,1 to 103),104,request)
+    @Test fun fadeStopCannotBeCancelledOrReplacedByASectionRequest() {
+        var requests=0
+        val d=driver { requests++; null }
+        d.observe(NativeInteractiveDriver.Observation(100,100,transportFrame=4800))
+        d.markFadeRequested()
+        assertFalse(d.canAdvance)
+        assertFalse(d.canCancelPending)
+        assertNotNull(d.advance())
+        assertEquals(0,requests)
+        d.observe(NativeInteractiveDriver.Observation(-1,null,voices=0,transportFrame=52800,fadeEndFrame=52800))
+        assertTrue(d.finished)
+    }
     @Test fun acceptedRequestStaysPendingUntilNativeCommitsDestination() {
         val d=driver();d.observe(NativeInteractiveDriver.Observation(100,100))
         assertNull(d.advance());assertEquals(100,d.current);assertEquals(101,d.pending)

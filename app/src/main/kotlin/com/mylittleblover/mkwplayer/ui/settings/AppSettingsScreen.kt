@@ -14,12 +14,16 @@ import androidx.compose.ui.unit.dp
 import com.mylittleblover.mkwplayer.BuildConfig
 import com.mylittleblover.mkwplayer.R
 import com.mylittleblover.mkwplayer.i18n.AppLanguage
+import com.mylittleblover.mkwplayer.unlock.UnlockTestMode
 
 @Composable
 internal fun AppSettingsScreen(
     language: AppLanguage, onLanguage: (AppLanguage) -> Unit,
     busy: Boolean, sourceName: String?, onOpenPack: () -> Unit, onOpenFiles: () -> Unit,
     modifier: Modifier = Modifier,
+    testMode: UnlockTestMode = UnlockTestMode.NORMAL,
+    testUnlockVisible: Boolean = false,
+    onTestUnlock: (UnlockTestMode) -> Unit = {},
 ) {
     LazyColumn(modifier.fillMaxSize().selectableGroup(), contentPadding = PaddingValues(vertical = 16.dp)) {
         item("language-heading") {
@@ -35,6 +39,28 @@ internal fun AppSettingsScreen(
                 trailingContent = { RadioButton(selected = language == choice, onClick = null) },
                 modifier = Modifier.selectable(selected = language == choice, role = Role.RadioButton, onClick = { onLanguage(choice) }),
             )
+        }
+        item("unlock-test") {
+            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                HorizontalDivider()
+                Text(stringResource(R.string.settings_unlock_test_title), style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.settings_unlock_test_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(when (testMode) {
+                    UnlockTestMode.NORMAL -> R.string.settings_unlock_test_normal
+                    UnlockTestMode.FORCE_UNLOCKED -> R.string.settings_unlock_test_unlocked
+                    UnlockTestMode.FORCE_LOCKED -> R.string.settings_unlock_test_locked
+                }), style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(if (testUnlockVisible) R.string.settings_unlock_test_visible else R.string.settings_unlock_test_hidden), style = MaterialTheme.typography.bodyMedium)
+                Button(onClick = { onTestUnlock(UnlockTestMode.FORCE_UNLOCKED) }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.settings_unlock_test_unlock))
+                }
+                OutlinedButton(onClick = { onTestUnlock(UnlockTestMode.FORCE_LOCKED) }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.settings_unlock_test_lock))
+                }
+                OutlinedButton(onClick = { onTestUnlock(UnlockTestMode.NORMAL) }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.settings_unlock_test_restore))
+                }
+            }
         }
         item("library") {
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

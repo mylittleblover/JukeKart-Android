@@ -21,8 +21,9 @@ internal object MapAnchors {
     }
 
     /** A point on the map, as fractions of the drawn width and height. */
-    data class Anchor(val code: String, val u: Float, val v: Float) {
+    data class Anchor(val code: String, val u: Float, val v: Float, val artSize: Float = 176f) {
         init {
+            require(artSize.isFinite() && artSize > 0f) { "art size must be positive and finite" }
             require(code.isNotBlank()) { "anchor code must not be blank" }
             // A fraction outside 0..1 would place the pin off the bitmap, which looks like a broken
             // map rather than bad data.
@@ -94,7 +95,8 @@ internal object MapAnchors {
                 val v = item.optDouble("v", Double.NaN)
                 if (u.isNaN() || v.isNaN()) continue
                 if (u < 0.0 || u > 1.0 || v < 0.0 || v > 1.0) continue
-                list += Anchor(code, u.toFloat(), v.toFloat())
+                val artSize = item.optDouble("artSize", 176.0).toFloat()
+                list += Anchor(code, u.toFloat(), v.toFloat(), artSize)
             }
             return list
         }

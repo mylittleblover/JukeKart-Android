@@ -44,12 +44,16 @@ class DonkeyRegionControlsDeviceTest {
             assertEquals(1,model.ui.value.flow!!.selectedRegion)
             instrumentation.runOnMainSync { model.cancelPendingPerformance() }
             await("Cancellation not acknowledged by Native") { model.ui.value.flow?.selectedRegion==1 && 2 in model.ui.value.flow!!.availableRegions }
-            for(region in listOf(2,3,4,5,1)) {
+            for(region in listOf(2,3,4,5)) {
                 instrumentation.runOnMainSync { model.selectMusicRegion(region) }
-                await("Region $region did not start") { model.ui.value.flow?.selectedRegion==region && model.ui.value.flow!!.availableRegions.isNotEmpty() }
-                if(region!=1) { assertFalse(model.ui.value.flow!!.canFast);assertFalse(model.ui.value.flow!!.canEnd) }
+                await("Region $region did not start") { model.ui.value.flow?.selectedRegion==region && model.ui.value.flow!!.canAdvance }
+                assertEquals(if(region==5) emptySet<Int>() else setOf(region+1),model.ui.value.flow!!.availableRegions)
+                assertEquals(region==5,model.ui.value.flow!!.canFast)
+                assertFalse(model.ui.value.flow!!.canEnd)
             }
-            assertTrue(model.ui.value.flow!!.canEnd)
+            instrumentation.runOnMainSync { model.advancePerformance() }
+            await("Pattern 5 did not advance to Fast") { model.ui.value.flow?.fastPlaying==true && !model.ui.value.flow!!.canAdvance }
+            assertTrue(model.ui.value.flow!!.availableRegions.isEmpty())
             instrumentation.runOnMainSync { model.stop() }
             assertTrue(model.ui.value.flow!!.availableRegions.isEmpty())
             assertFalse(model.ui.value.flow!!.canCancelPending)
@@ -58,7 +62,7 @@ class DonkeyRegionControlsDeviceTest {
             await("Stopped course did not restart") { model.ui.value.flow?.canAdvance==true && model.ui.value.outputActive }
             Thread.sleep(2000) // Cross the old delayed service-stop window.
             assertTrue(context.getSystemService(NotificationManager::class.java).activeNotifications.any { it.id==PlaybackService.NOTIFICATION_ID })
-            File(context.filesDir,"donkey-region-controls-results.json").writeText(JSONObject().put("regions",5).put("cancelBeforeTarget",true).put("returnedToBase",true).put("restartKeepsForeground",true).put("outputActive",model.ui.value.outputActive).toString(2))
+            File(context.filesDir,"donkey-region-controls-results.json").writeText(JSONObject().put("regions",5).put("cancelBeforeTarget",true).put("advancedToFast",true).put("restartKeepsForeground",true).put("outputActive",model.ui.value.outputActive).toString(2))
             instrumentation.runOnMainSync { model.stop() }
         }
     }

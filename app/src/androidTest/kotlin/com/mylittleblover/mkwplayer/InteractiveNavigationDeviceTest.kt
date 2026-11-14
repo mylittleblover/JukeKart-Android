@@ -59,9 +59,15 @@ class InteractiveNavigationDeviceTest {
     }
     @Test fun interactiveTabOpensAndScrollsThroughPlayerSettingsAndImport() {
         val context = instrumentation.targetContext
-        context.startActivity(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        context.startActivity(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
+        InstalledUi().awaitOrientation(landscape = false)
         click("Interactive")
-        awaitText("Console")
+        awaitText("Interactive playback")
+        click("Choose and play a course")
+        awaitText("Search course names")
+        awaitText("Mario Bros. Circuit")
+        click("Close")
+        awaitText("Interactive playback")
         val scrollDeadline = SystemClock.uptimeMillis() + 180_000
         var reachedImport = false
         while (!reachedImport && SystemClock.uptimeMillis() < scrollDeadline) {
@@ -77,8 +83,9 @@ class InteractiveNavigationDeviceTest {
         awaitText("Scan the stages folder")
         click("Library")
         awaitText("Open your soundtrack")
+        InstalledUi().awaitOrientation(landscape = false)
         click("Interactive")
-        awaitText("Console")
+        awaitText("Interactive playback")
         instrumentation.uiAutomation.takeScreenshot()?.let { bitmap ->
             File(context.filesDir, "interactive-navigation-pass.png").outputStream().use {
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)

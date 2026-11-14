@@ -32,6 +32,13 @@ class MapAnchorsTest {
         }
     """.trimIndent()
 
+    @Test fun explicitArtworkSizeUsesCanvasPixelsAndLegacyAnchorsKeepTheirDefault() {
+        assertEquals(176f, catalog().stage("Coaster")!!.artSize)
+        val measured = sample.replace("\"code\": \"Coaster\"", "\"code\": \"Coaster\", \"artSize\": 185.25")
+        assertEquals(185.25f, assertNotNull(MapAnchors.parse(measured)).stage("Coaster")!!.artSize)
+        assertNull(MapAnchors.parse(measured.replace("185.25", "0")))
+    }
+
     private fun catalog() = assertNotNull(MapAnchors.parse(sample))
 
     // ---------------------------------------------------------------- parsing

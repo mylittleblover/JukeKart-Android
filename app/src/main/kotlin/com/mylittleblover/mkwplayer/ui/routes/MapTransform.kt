@@ -18,6 +18,11 @@ internal class MapTransform private constructor(
     val top: Float,
     private val fitPadding: Float,
 ) {
+    /** Artwork is measured in the anchor canvas, so camera zoom and density affect it exactly like the map. */
+    fun sourcePixelsToScreen(pixels: Float, sourceCanvasWidth: Float): Float =
+        if(pixels.isFinite() && pixels > 0f && sourceCanvasWidth.isFinite() && sourceCanvasWidth > 0f)
+            pixels * drawnWidth / sourceCanvasWidth else 0f
+
     fun project(u: Float, v: Float): Offset = Offset(left + u * drawnWidth, top + v * drawnHeight)
     fun inverse(screen: Offset): Offset = if (drawnWidth > 0f && drawnHeight > 0f) {
         Offset((screen.x - left) / drawnWidth, (screen.y - top) / drawnHeight)

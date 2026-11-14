@@ -92,5 +92,7 @@ struct EngineSnapshot {
     std::array<std::int64_t,14> transition{0,-1,-1,-1,-1,0,0,0,0,0,-1,0,-1,0};
     std::uint64_t voiceNumericalCorrections{},mixerNumericalCorrections{};
     std::uint64_t transportEpoch{};
+    // Optional global fade deadline in the same pausable transport clock.
+    std::int64_t globalFadeEnd{-1};
 };
 }

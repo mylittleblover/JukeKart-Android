@@ -4,6 +4,20 @@ import androidx.compose.ui.geometry.Offset
 import kotlin.test.*
 
 class MapTransformTest {
+    @Test fun sourceArtScalesExactlyWithMapZoomWithoutAVisualSizeClamp() {
+        val fit = MapTransform.create(392f, 780f, 2500f/2400f, MapCamera(1f), 24f)
+        val close = MapTransform.create(392f, 780f, 2500f/2400f, MapCamera(6f), 24f)
+        val fitIcon = fit.sourcePixelsToScreen(176f, 2500f)
+        assertEquals(176f * fit.drawnWidth / 2500f, fitIcon, .00001f)
+        assertTrue(fitIcon < 48f)
+        assertEquals(fitIcon * 6f, close.sourcePixelsToScreen(176f, 2500f), .0001f)
+        assertTrue(close.sourcePixelsToScreen(176f, 2500f) > 100f)
+    }
+    @Test fun iconAndBitmapGeometryShareDensityAndViewportScaling() {
+        val first = MapTransform.create(392f, 780f, 2500f/2400f, MapCamera(2f))
+        val second = MapTransform.create(1176f, 2340f, 2500f/2400f, MapCamera(2f))
+        assertEquals(first.sourcePixelsToScreen(176f,2500f)*3f, second.sourcePixelsToScreen(176f,2500f), .0001f)
+    }
     @Test fun projectionAndInverseAgreeAcrossOrientationZoomAndImageAspects() {
         for ((width, height) in listOf(360f to 720f, 840f to 600f, 1280f to 800f)) {
             for (aspect in listOf(2500f / 2400f, 2f, .5f)) {

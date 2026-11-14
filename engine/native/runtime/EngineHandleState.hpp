@@ -27,6 +27,7 @@ public:
     // Atomic payload as well as sequence avoids C++ data races in the monitor reader.
     std::atomic<std::uint32_t> sequence{0};
     std::atomic<Frame> frame{0};
+    std::atomic<Frame> globalFadeEnd{-1};
     std::array<std::atomic<std::uint32_t>,2> transportEpoch{};
     std::atomic<int> status{0},voices{0},current{-1},result{0};
     std::atomic<std::uint64_t> dropped{0},rejected{0};
@@ -130,6 +131,7 @@ public:
         auto s=runtime ? runtime->snapshot() : EngineSnapshot{};
         if(peakLeft>=0) { s.peakLeft=peakLeft; s.peakRight=peakRight; }
         sequence.fetch_add(1,std::memory_order_acq_rel);
+        globalFadeEnd.store(s.globalFadeEnd,std::memory_order_relaxed);
         frame.store(s.position.value,std::memory_order_relaxed); status.store(s.status,std::memory_order_relaxed);
         PlaylistMonitorSlot::storeBits(transportEpoch.data(),s.transportEpoch);
         voices.store(s.activeVoices,std::memory_order_relaxed); current.store(s.currentObject,std::memory_order_relaxed);

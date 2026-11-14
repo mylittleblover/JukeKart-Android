@@ -1,0 +1,33 @@
+<resources>
+    <string name="interactive_choose_course">コースを選んで再生</string>
+    <string name="interactive_search_course">コース名を検索</string>
+    <string name="interactive_audio_missing">音源が未インポートです</string>
+    <string name="interactive_no_results">該当するコースはありません</string>
+    <string name="interactive_close">閉じる</string>
+    <string name="interactive_title">インタラクティブ再生</string>
+    <string name="interactive_empty">コースを選択するか、音源をインポートしてください。</string>
+    <string name="interactive_import">パックをインポート</string>
+    <string name="interactive_files">.bwav ファイルを追加</string>
+    <string name="interactive_scan">コースフォルダーをスキャン</string>
+    <string name="interactive_waiting">未開始</string>
+    <string name="interactive_start">開始</string>
+    <string name="interactive_next">次のパートへ</string>
+    <string name="interactive_stop">停止</string>
+    <string name="interactive_fast">Fast へ</string>
+    <string name="interactive_fast_playing">Fast 再生中</string>
+    <string name="interactive_end">コースを終了</string>
+    <string name="interactive_ending_hint">現在位置に最も近い有効な Outro の終了点を選びます。</string>
+    <string name="interactive_pause">一時停止</string>
+    <string name="interactive_resume">再開</string>
+    <string name="interactive_source_position">音源位置：%1$s</string>
+    <string name="interactive_loop_range">ループ：%1$s – %2$s</string>
+    <string name="interactive_voice_count">再生中の音声：%1$d</string>
+    <string name="interactive_fading">フェードアウト中…</string>
+    <string name="interactive_fade_remaining">フェードアウト中 · 残り %1$s 秒</string>
+    <string name="interactive_fade_choose">フェードアウトして停止</string>
+    <string name="interactive_fade_hint">開始後は取り消せません。一時停止するとフェードも停止します。</string>
+    <string name="interactive_fade_seconds">%1$d秒でフェードアウト</string>
+    <string name="interactive_entry_hint">開始パート · 停止中に選択できます</string>
+    <string name="interactive_entry_pre">イントロ</string>
+    <string name="interactive_entry_short">ショートイントロ</string>
+</resources>

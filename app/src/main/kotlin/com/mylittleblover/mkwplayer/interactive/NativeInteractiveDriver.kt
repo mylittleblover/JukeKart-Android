@@ -17,18 +17,22 @@ internal class NativeInteractiveDriver(
 ) {
     data class Observation(val segment: Int,val sourceFrame: Long?,val transitioning: Boolean=false,
                            val paused: Boolean=false,val voices: Int=1,val error: String?=null,val failureCount: Long=0,
-                           val destination: Int?=null,val canCancel: Boolean=false,val stopped: Boolean=false)
+                           val destination: Int?=null,val canCancel: Boolean=false,val stopped: Boolean=false,
+                           val transportFrame: Long?=null,val fadeEndFrame: Long?=null)
     var current: Int=entry; private set
     var pending: Int?=null; private set
     var diagnostic: String?=null; private set
     private var observation: Observation?=null
+    val observationState: Observation? get()=observation
+    var isFading: Boolean=false; private set
+    fun markFadeRequested() { isFading=true;pending=null;cancellationRequested=false }
     private var cancellationRequested=false
     private var heardVoices=false
     private var previousError: String?=null
     private var previousFailures=0L
-    private val available: Boolean get()=pending==null && observation?.transitioning==false && observation?.paused==false && !finished &&
+    private val available: Boolean get()=!isFading && pending==null && observation?.transitioning==false && observation?.paused==false && !finished &&
         !(currentVersion!=null && (observation?.voices ?: 0)>1)
-    val canCancelPending: Boolean get()=pending!=null && observation?.canCancel==true && !cancellationRequested
+    val canCancelPending: Boolean get()=!isFading && pending!=null && observation?.canCancel==true && !cancellationRequested
     fun cancelPending(): String? {
         if(!canCancelPending) return "The next section has already started or is not cancellable"
         val error=cancelRequest()
@@ -52,13 +56,13 @@ internal class NativeInteractiveDriver(
         target!=null && target!=current && rule(target)!=null
     }.map { it.number }.toSet()
     val canFast: Boolean get()=available && fastTarget?.let { rule(it)!=null }==true
-    val finished: Boolean get()=heardVoices && observation?.let { it.voices==0 && it.stopped && !it.paused && !it.transitioning && pending==null }==true
+    val finished: Boolean get()=heardVoices && observation?.let { it.voices==0 && (it.stopped || isFading && it.fadeEndFrame!=null) && !it.paused && !it.transitioning && pending==null }==true
 
     fun observe(value: Observation) {
         observation=value
         if(value.voices>0) heardVoices=true
         if(spec.segments.any { it.index==value.segment }) current=value.segment
-        if(value.destination!=null && value.destination!=current) pending=value.destination
+        if(!isFading && value.destination!=null && value.destination!=current) pending=value.destination
         val newFailure=value.error!=null && (value.error!=previousError || value.failureCount!=previousFailures)
         if(newFailure) { diagnostic=value.error;cancellationRequested=false }
         if(cancellationRequested && !value.transitioning && value.destination==null) {
