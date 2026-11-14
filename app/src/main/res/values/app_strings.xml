@@ -21,4 +21,6 @@
     <string name="language_zh_hant_native" translatable="false">繁體中文</string>
     <string name="language_en_native" translatable="false">English</string>
     <string name="language_ja_native" translatable="false">日本語</string>
+    <string name="settings_library_counts">%1$d tracks imported · %2$d playable</string>
+    <string name="settings_import_details">Import details</string>
 </resources>

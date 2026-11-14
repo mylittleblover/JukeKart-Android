@@ -19,6 +19,7 @@ internal class WorldMapState(
         private set
     var selectedCourseCode by mutableStateOf(courseCode?.removeSuffix("_00"))
         private set
+    private var pendingFit: List<Offset>? = null
     private var width = 0f
     private var height = 0f
     private var aspect = 1f
@@ -26,6 +27,10 @@ internal class WorldMapState(
 
     fun configure(width: Float, height: Float, imageAspect: Float, padding: Float): MapTransform {
         this.width = width; this.height = height; this.aspect = imageAspect; this.padding = padding
+        if (width > 0f && height > 0f) pendingFit?.let { points ->
+            pendingFit = null
+            camera = transform().fitTo(points, padding * 2f)
+        }
         return transform()
     }
     private fun transform() = MapTransform.create(width, height, aspect, camera, padding)
@@ -38,7 +43,8 @@ internal class WorldMapState(
     fun selectRoute(id: String, points: List<Offset> = emptyList()) {
         selectedRouteId = id
         selectedCourseCode = null
-        camera = transform().fitTo(points, padding * 2f)
+        if (width > 0f && height > 0f) camera = transform().fitTo(points, padding * 2f)
+        else pendingFit = points
     }
 
     companion object {

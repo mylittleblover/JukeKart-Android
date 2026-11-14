@@ -16,20 +16,35 @@ internal data class InteractivePlaybackPlan(
     val outroVariants: Map<Int,List<Int>> = emptyMap(),
     val regions: Map<Int,Int> = emptyMap(),
     val preparedAssets: Set<String> = emptySet(),
+    val directBridge: Int? = null,
+    val originalEntry: Int? = null,
+    val entryPreparedAssets: Map<Int,Set<String>> = emptyMap(),
+    val entryAutomaticNext: Map<Int,Int> = emptyMap(),
+    val advanceViaOutro: Set<Int> = emptySet(),
 ) {
     data class Version(val number: Int,val main: Int,val fast: Int?)
 
     /** Start choices are real independent sources; Bridge is an authored overlap, not an entry shortcut. */
     val initialSegments: List<Int> get() {
-        val roles=standard?.segmentByRole ?: return listOf(entry)
-        val allowed=listOf(StageFlow.Role.Pre,StageFlow.Role.PreShort,StageFlow.Role.Main)+
+        val roles=standard?.segmentByRole
+        if (roles == null) return (listOf(originalEntry ?: entry) + listOfNotNull(directBridge) +
+            listOf("Area1", "Area2", "Area3_Pre", "Area3", "Final_Pre", "Final").mapNotNull { label -> labels.entries.singleOrNull { it.value == label }?.key }).distinct()
+        val allowed=listOf(StageFlow.Role.Pre,StageFlow.Role.PreShort)+
+            listOfNotNull(directBridge?.let { StageFlow.Role.Bridge })+listOf(StageFlow.Role.Main)+
             if(regions.isEmpty()) listOf(StageFlow.Role.Fast) else emptyList()
-        return allowed.mapNotNull { roles[it] }.distinct()
+        return (allowed.mapNotNull { if (it == StageFlow.Role.Bridge) directBridge else roles[it] } + regions.toSortedMap().values + versions.flatMap { listOfNotNull(it.main, it.fast) }).distinct()
     }
 
 
+    fun startingAt(label: String?): InteractivePlaybackPlan {
+        if (label == null) return this
+        val match = initialSegments.singleOrNull { labels[it] == label }
+            ?: error("The requested starting stage is not available: $label")
+        return copy(entry = match)
+    }
+
     /** Authored Outro markers lead into the next looping prelude without another user event. */
-    val automaticNext: Map<Int,Int> get()=outros.values.mapNotNull { from -> next[from]?.let { from to it } }.toMap()
+    val automaticNext: Map<Int,Int> get()=outros.values.mapNotNull { from -> next[from]?.let { from to it } }.toMap()+entryAutomaticNext
     companion object {
         fun normal(flow: StageFlow,bytes: Map<String,ByteArray>,catalog: MinfCatalog): InteractivePlaybackPlan {
             val prepared=MinfInteractiveCompiler.prepare(flow,flow.parts.associate { part ->
@@ -44,8 +59,9 @@ internal data class InteractivePlaybackPlan(
                 compiled.segmentByOutro.entries.associate { it.value to "Outro%02d".format(it.key) }
             val base=InteractivePlaybackPlan(flow.name,prepared.spec,compiled.packet,compiled.assetPaths,entry,next,
                 compiled.segmentByOutro,roles[StageFlow.Role.Fast],labels,compiled)
-            return FinalLapFanfareCompiler.extend(
+            val enriched = FinalLapFanfareCompiler.extend(
                 DonkeyRegionCompiler.extend(FullVersionCompiler.extend(base,flow,bytes,catalog),flow,bytes,catalog),bytes)
+            return DirectBridgeCompiler.normal(enriched, flow, catalog)
         }
         fun rainbow(bytes: Map<String,ByteArray>,catalog: MinfCatalog): InteractivePlaybackPlan {
             val sources=RainbowInteractiveCompiler.roles.map { role ->
@@ -58,10 +74,12 @@ internal data class InteractivePlaybackPlan(
             val pairs=listOf("Area1_Pre" to "Area1","Area1" to "Area2","Area3_Pre" to "Area3",
                 "Area3" to "Final_Pre","Final_Pre" to "Final","FinalLapFanfare" to "Final")+
                 (0..4).map { "Area2_Outro%02d".format(it) to "Area3_Pre" }
-            return InteractivePlaybackPlan("Rainbow",p.spec,p.packet,p.assets.map { it.fileName },p.segments.getValue("Area1_Pre"),
+            val base = InteractivePlaybackPlan("Rainbow",p.spec,p.packet,p.assets.map { it.fileName },p.segments.getValue("Area1_Pre"),
                 pairs.associate { p.segments.getValue(it.first) to p.segments.getValue(it.second) },
                 (0..4).associateWith { p.segments.getValue("Area2_Outro%02d".format(it)) },null,
-                p.segments.entries.associate { it.value to it.key },streamed=true)
+                p.segments.entries.associate { it.value to it.key },streamed=true,
+                advanceViaOutro=setOf(p.segments.getValue("Area2")))
+            return DirectBridgeCompiler.rainbow(base, catalog)
         }
     }
 }

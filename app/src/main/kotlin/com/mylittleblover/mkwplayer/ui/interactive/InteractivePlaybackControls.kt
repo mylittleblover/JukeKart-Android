@@ -1,7 +1,16 @@
 package com.mylittleblover.mkwplayer.ui.interactive
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.combinedClickable
@@ -13,6 +22,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.unit.dp
 import com.mylittleblover.mkwplayer.R
 import com.mylittleblover.mkwplayer.audio.EngineSnapshot
@@ -83,16 +94,84 @@ internal fun InteractiveStopBar(canStop: Boolean, canFade: Boolean, fading: Bool
     )
 }
 
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun InteractiveEntryChooser(choices: Map<Int, String>, selected: Int?, enabled: Boolean, onSelect: (Int) -> Unit) {
-    if (choices.size < 2) return
-    Column {
-        Text(stringResource(R.string.interactive_entry_hint), style = MaterialTheme.typography.labelMedium)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for ((id, label) in choices) {
-                val name = stageText(label)
-                FilterChip(selected = id == selected, onClick = { if(id != selected) onSelect(id) }, enabled = enabled, label = { Text(name) })
+    if (choices.isEmpty()) return
+    var showSheet by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(enabled) { if (!enabled) showSheet = false }
+    val selectedName = stageText(choices[selected] ?: choices.values.first())
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(stringResource(R.string.stage_start_label), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = { showSheet = true }, enabled = enabled) {
+                Text(selectedName, maxLines = 1)
+                Spacer(Modifier.width(6.dp))
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+            }
+        }
+    }
+    if (showSheet && enabled) ModalBottomSheet(onDismissRequest = { showSheet = false }) {
+        Column(Modifier.fillMaxWidth().heightIn(max = 480.dp).verticalScroll(rememberScrollState())
+            .selectableGroup().padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(R.string.stage_start_choose), Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                style = MaterialTheme.typography.headlineSmall)
+            choices.forEach { (id, label) ->
+                ListItem(headlineContent = { Text(stageText(label)) },
+                    trailingContent = { RadioButton(selected = id == selected, onClick = null) },
+                    modifier = Modifier.selectable(selected = id == selected, role = Role.RadioButton,
+                        onClick = { if (id != selected) onSelect(id); showSheet = false }).heightIn(min = 56.dp))
+            }
+        }
+    }
+}
+
+/** A read-only inventory of this graph's actual stages, without implying an invented sequence. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+internal fun InteractiveStructure(flow: PlayerViewModel.FlowUi) {
+    if (flow.availableStageKeys.isEmpty()) return
+    val names = flow.availableStageKeys.map { stageText(it) }.distinct()
+    val current = if (flow.sourceFrame != null && flow.voiceCount > 0) flow.stageKey?.let { stageText(it) } else null
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(R.string.stage_available), style = MaterialTheme.typography.titleSmall)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            names.forEach { name ->
+                val active = current == name
+                val background by animateColorAsState(
+                    if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                    animationSpec = tween(180), label = "stage-background")
+                val foreground by animateColorAsState(
+                    if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                    animationSpec = tween(180), label = "stage-text")
+                Surface(modifier = Modifier.semantics { selected = active }, shape = MaterialTheme.shapes.extraLarge,
+                    color = background, contentColor = foreground) {
+                    Text(name, Modifier.padding(horizontal = 12.dp, vertical = 7.dp), style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+    }
+}
+
+/** Only currently available events occupy space; a single row remains stable during playback. */
+@Composable
+internal fun InteractiveActionBar(flow: PlayerViewModel.FlowUi, onAdvance: () -> Unit,
+    onFast: () -> Unit, onCancel: () -> Unit, onEnd: () -> Unit) {
+    val actions = buildList {
+        if (flow.canAdvance) add(Triple(Icons.Filled.SkipNext, R.string.interactive_action_next, onAdvance))
+        if (flow.canFast) add(Triple(Icons.Filled.Speed, R.string.interactive_action_fast, onFast))
+        if (flow.canEnd) add(Triple(Icons.Filled.Flag, R.string.interactive_action_end, onEnd))
+        if (flow.canCancelPending) add(Triple(Icons.AutoMirrored.Filled.Undo, R.string.interactive_action_cancel, onCancel))
+    }
+    if (actions.isEmpty()) return
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        actions.forEach { (icon, label, action) ->
+            OutlinedButton(onClick = action, modifier = Modifier.weight(1f).fillMaxHeight().heightIn(min = 56.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)) {
+                Icon(icon, null, Modifier.size(if (actions.size > 2) 18.dp else 22.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(label), style = MaterialTheme.typography.labelLarge, maxLines = 2)
             }
         }
     }

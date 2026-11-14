@@ -30,4 +30,8 @@
     <string name="interactive_entry_hint">Starting section · choose while stopped</string>
     <string name="interactive_entry_pre">Prelude</string>
     <string name="interactive_entry_short">Short Prelude</string>
+    <string name="interactive_action_next">Next</string>
+    <string name="interactive_action_fast">Final Lap</string>
+    <string name="interactive_action_end">Finish</string>
+    <string name="interactive_action_cancel">Cancel</string>
 </resources>

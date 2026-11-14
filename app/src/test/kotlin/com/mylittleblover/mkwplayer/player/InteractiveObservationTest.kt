@@ -72,4 +72,16 @@ class InteractiveObservationTest {
         assertFalse(s.interactiveObservation()!!.canCancel)
     }
 
+    @Test fun directBridgeQueuesItsAutomaticTargetBeforeTheOutputOpens() {
+        val device = Device()
+        var requestsAtOpen: List<Int>? = null
+        val session = PlaybackSession({ device }, { _, _ -> requestsAtOpen = device.requests.toList(); null })
+        val packet = G.build(G.Spec(listOf(G.Asset("a", 48000, 2, 20000, ByteArray(32))),
+            listOf(G.Segment(100, exit = 20000)), listOf(G.Track(200, 100, listOf(G.Clip(300, 0, sourceLength = 20000))))))
+        val state = session.loadFlow("stage", packet, listOf("a" to byteArrayOf(1)), 20000, 100,
+            autoAdvance = mapOf(100 to 101), prequeueInitial = true)
+        assertNull(state.detail)
+        assertEquals(listOf(100, 101), requestsAtOpen)
+    }
+
 }

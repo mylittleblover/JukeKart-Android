@@ -13,4 +13,12 @@
     <string name="stage_stopped">已停止</string>
     <string name="stage_finished">已結束</string>
     <string name="stage_not_started">尚未開始</string>
+    <string name="stage_available">可用階段</string>
+    <string name="stage_transitioning">過渡中</string>
+    <string name="stage_actions">音樂階段與操作</string>
+    <string name="stage_structure">音樂結構</string>
+    <string name="stage_structure_open_hint">開啟互動播放器後可查看此賽道的可用階段。</string>
+    <string name="stage_start_label">起始階段</string>
+    <string name="stage_start_choose">選擇起始階段</string>
+    <string name="stage_start_stop_hint">停止播放後可更改起始階段。</string>
 </resources>

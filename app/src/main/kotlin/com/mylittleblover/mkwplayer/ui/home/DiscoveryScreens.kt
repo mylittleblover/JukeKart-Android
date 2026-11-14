@@ -17,6 +17,10 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -58,23 +62,22 @@ import com.mylittleblover.mkwplayer.ui.art.StageArt
 @Composable
 private fun CourseTile(code: String, name: String, favorite: Boolean, map: ImageBitmap?,
     anchors: com.mylittleblover.mkwplayer.library.MapAnchors.Catalog?, onOpen: () -> Unit, onFavorite: () -> Unit) {
-    Card(onClick = onOpen, modifier = Modifier.width(310.dp)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                val anchor = anchors?.stageTolerant(code)
-                if (map != null && anchor != null) Canvas(Modifier.fillMaxSize()) {
-                    val cropW = (map.width * .24f).toInt().coerceAtLeast(1)
-                    val cropH = (map.height * .18f).toInt().coerceAtLeast(1)
-                    val left = (anchor.u * map.width - cropW / 2).toInt().coerceIn(0, map.width - cropW)
-                    val top = (anchor.v * map.height - cropH / 2).toInt().coerceIn(0, map.height - cropH)
-                    drawImage(map, srcOffset = IntOffset(left, top), srcSize = IntSize(cropW, cropH),
-                        dstSize = IntSize(size.width.toInt().coerceAtLeast(1), size.height.toInt().coerceAtLeast(1)))
-                }
-                StageArt.resolve(code)?.let { Image(painterResource(it), null, Modifier.size(92.dp)) }
+    Column(Modifier.width(165.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow).clickable(onClick = onOpen)) {
+            com.mylittleblover.mkwplayer.ui.art.CoursePlaceholder(code, Modifier.fillMaxSize())
+            FilledIconButton(onClick = onFavorite, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(48.dp),
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = .94f),
+                    contentColor = MaterialTheme.colorScheme.primary)) {
+                Icon(if (favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                    stringResource(if (favorite) R.string.discovery_favorite_remove else R.string.discovery_favorite_add), Modifier.size(20.dp))
             }
-            Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 2)
-            Text(stringResource(R.string.discovery_placeholder), style = MaterialTheme.typography.labelSmall)
-            TextButton(onClick = onFavorite) { Text(stringResource(if (favorite) R.string.discovery_favorite_remove else R.string.discovery_favorite_add)) }
+        }
+        Column(Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = 2.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
+                maxLines = 2, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
+            Text(stringResource(R.string.discovery_course_music), style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -85,15 +88,13 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
                            onImport: () -> Unit, onPlayer: () -> Unit, onToggle: () -> Unit, onMedia: () -> Unit,
                            session: com.mylittleblover.mkwplayer.player.PlayerViewModel.Ui, currentCode: String?) {
     val context = LocalContext.current
-    val map by produceState<ImageBitmap?>(null, context) {
-        value = withContext(Dispatchers.IO) {
-            android.graphics.BitmapFactory.decodeResource(context.resources, R.drawable.world_map)?.asImageBitmap()
-        }
+    val map by produceState(com.mylittleblover.mkwplayer.ui.art.MapArtworkCache.cached(), context) {
+        value = com.mylittleblover.mkwplayer.ui.art.MapArtworkCache.load(context)
     }
     val anchors = remember(context) { runCatching {
         com.mylittleblover.mkwplayer.library.MapAnchors.parse(context.assets.open("map_anchors.json").bufferedReader().use { it.readText() })
     }.getOrNull() }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.discovery_home_eyebrow), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
@@ -110,7 +111,7 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
             val pager = rememberPagerState(pageCount = { visibleDaily.size })
             val scope = rememberCoroutineScope()
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                HorizontalPager(pager, Modifier.fillMaxWidth().height(264.dp)) { index ->
+                HorizontalPager(pager, Modifier.fillMaxWidth().height(280.dp * androidx.compose.ui.platform.LocalDensity.current.fontScale.coerceAtLeast(1f))) { index ->
                     val id = visibleDaily[index]
                     Box(Modifier.fillMaxSize().clip(RoundedCornerShape(24.dp))) {
                         val anchor = anchors?.stageTolerant(id)
@@ -126,12 +127,14 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
                             }
                         }
                         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x33000000), Color(0xCC000000)))))
+                        StageArt.resolve(id)?.let { Image(painterResource(it), null,
+                            Modifier.align(Alignment.TopEnd).padding(top = 34.dp, end = 12.dp).size(100.dp)) }
                         Column(Modifier.fillMaxSize().padding(22.dp), verticalArrangement = Arrangement.SpaceBetween) {
                             Text("${stringResource(R.string.discovery_daily)} · ${index + 1} / ${visibleDaily.size}", color = Color.White, style = MaterialTheme.typography.labelMedium)
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(stringResource(R.string.discovery_home_today), color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                                 Text(catalog.displayName(id, language) ?: id, color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                                Text(stringResource(R.string.discovery_home_daily_hint), color = Color.White, style = MaterialTheme.typography.bodySmall)
+                                Text(stringResource(R.string.discovery_home_daily_hint), color = Color.White.copy(alpha = .8f), style = MaterialTheme.typography.bodySmall, modifier = Modifier.widthIn(max = 230.dp))
                                 androidx.compose.material3.FilledTonalButton(onClick = { onOpen(id) }) { Text(stringResource(R.string.discovery_home_open)) }
                             }
                         }
@@ -153,13 +156,14 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
                 }
             }
         }
-        item { OutlinedButton(onClick = onImport, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.discovery_import)) } }
+        if (visibleDaily.isEmpty()) item { OutlinedButton(onClick = onImport, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.discovery_import)) } }
         if (session.canStop) {
             item { Text(stringResource(R.string.discovery_continue), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
             item {
-                Card(onClick = onPlayer, modifier = Modifier.fillMaxWidth()) {
+                Card(onClick = onPlayer, modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                     Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        currentCode?.let { StageArt.resolve(it) }?.let { Image(painterResource(it), null, Modifier.size(64.dp)) }
+                        com.mylittleblover.mkwplayer.ui.art.CoursePlaceholder(currentCode, Modifier.size(72.dp).clip(RoundedCornerShape(16.dp)), showIcon = false)
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(currentCode?.let { catalog?.displayName(it, language) } ?: session.title, style = MaterialTheme.typography.titleMedium, maxLines = 1)
                             val flow = session.flow
@@ -216,7 +220,7 @@ internal fun DiscoveryMedia(catalog: BrowseCatalog?, unlocked: Boolean, language
         -1 -> if (query.isBlank()) emptyList() else catalog?.routes(OfficialRouteKind.GRAND_PRIX, unlocked, query).orEmpty() + catalog?.routes(OfficialRouteKind.RALLY, unlocked, query).orEmpty()
         else -> emptyList()
     }
-    val courses = if ((category == 0 || category == -1) && query.isNotBlank()) catalog?.searchCourses(query, unlocked).orEmpty() else emptyList()
+    val courses = if (category == 2 || ((category == 0 || category == -1) && query.isNotBlank())) catalog?.searchCourses(query, unlocked).orEmpty() else emptyList()
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { OutlinedTextField(query, onQuery, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.discovery_search)) },
             leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) }, singleLine = true) }
@@ -226,13 +230,13 @@ internal fun DiscoveryMedia(catalog: BrowseCatalog?, unlocked: Boolean, language
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     for (column in 0..1) {
                         val index = row * 2 + column
-                        Card(onClick = { onCategory(index) }, modifier = Modifier.weight(1f).height(112.dp),
+                        Card(onClick = { onCategory(index) }, modifier = Modifier.weight(1f).heightIn(min = 112.dp),
                             shape = RoundedCornerShape(20.dp)) {
-                            Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.BottomStart) {
+                            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 val art = when (index) { 0 -> R.drawable.mode_grand_prix; 1 -> R.drawable.mode_knockout; 2 -> R.drawable.mode_vs; else -> null }
-                                if (art != null) Image(painterResource(art), null, Modifier.align(Alignment.TopEnd).size(52.dp))
+                                if (art != null) Image(painterResource(art), null, Modifier.align(Alignment.End).size(52.dp))
                                 else Icon(when (index) { 3 -> Icons.Outlined.MusicNote; 4 -> Icons.Outlined.Album; else -> Icons.Outlined.GraphicEq },
-                                    contentDescription = null, modifier = Modifier.align(Alignment.TopEnd).size(32.dp),
+                                    contentDescription = null, modifier = Modifier.align(Alignment.End).size(32.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text(stringResource(categories[index]), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             }
@@ -253,6 +257,15 @@ internal fun DiscoveryMedia(catalog: BrowseCatalog?, unlocked: Boolean, language
             }
         }
         if (category >= 0 && routes.isEmpty() && courses.isEmpty()) item { Text(stringResource(R.string.discovery_empty)) }
+        if (category < 0 && query.isBlank()) {
+            item { Text(stringResource(R.string.discovery_course_music), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+            items(catalog?.courses(unlocked).orEmpty(), key = { "browse:$it" }) { code ->
+                RecentCourseRow(code, catalog?.displayName(code, language) ?: code) { onCourse(code) }
+            }
+        }
+        if (query.isNotBlank() && routes.isEmpty() && courses.isEmpty()) item {
+            Text(stringResource(R.string.discovery_search_empty), Modifier.padding(vertical = 16.dp))
+        }
         val recent = if (category < 0 && query.isBlank()) recentIds.filter { it in catalog?.courses(unlocked).orEmpty() }.take(6) else emptyList()
         if (recent.isNotEmpty()) {
             item { Text(stringResource(R.string.discovery_recent), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
@@ -263,10 +276,19 @@ internal fun DiscoveryMedia(catalog: BrowseCatalog?, unlocked: Boolean, language
 
 @Composable
 private fun RecentCourseRow(code: String, title: String, onClick: () -> Unit) {
-    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StageArt.resolve(code)?.let { Image(painterResource(it), null, Modifier.size(48.dp)) }
-            Text(title, style = MaterialTheme.typography.bodyLarge)
+    Surface(onClick = onClick, color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp, horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            com.mylittleblover.mkwplayer.ui.art.CoursePlaceholder(code,
+                Modifier.size(56.dp).clip(RoundedCornerShape(12.dp)), showIcon = false)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(stringResource(R.string.discovery_course_music), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -288,14 +310,33 @@ private fun RouteRow(route: OfficialRoute, language: String, onClick: () -> Unit
 }
 
 @Composable
-internal fun DiscoveryCup(route: OfficialRoute?, catalog: BrowseCatalog?, language: String, onCourse: (String) -> Unit) {
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+internal fun DiscoveryCup(route: OfficialRoute?, catalog: BrowseCatalog?, language: String,
+    onMap: (String) -> Unit, onCourse: (String) -> Unit) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (route == null) item { Text(stringResource(R.string.discovery_empty)) }
         else {
-            item { Text(route.displayName(language), style = MaterialTheme.typography.headlineSmall) }
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        val cup = com.mylittleblover.mkwplayer.ui.art.CupArt.all().firstOrNull { "${it.id}_cup" == route.id }
+                        if (cup != null) Image(painterResource(cup.drawable), null, Modifier.size(104.dp))
+                        else Icon(Icons.Outlined.GraphicEq, null, Modifier.size(64.dp))
+                        Text(route.displayName(language), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.map_route_stops, route.stops.size), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        OutlinedButton(onClick = { onMap(route.id) }) { Text(stringResource(R.string.discovery_view_map)) }
+                    }
+                }
+            }
+            item { Text(stringResource(R.string.discovery_course_order), style = MaterialTheme.typography.titleLarge) }
             items(route.stops, key = { it.id }) { stop ->
                 Card(onClick = { onCourse(stop.stageCode) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("${stop.ordinal}. ${catalog?.displayName(stop.stageCode, language) ?: stop.stageCode}", Modifier.padding(18.dp))
+                    Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Text(stop.ordinal.toString(), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                        StageArt.resolve(stop.stageCode)?.let { Image(painterResource(it), null, Modifier.size(56.dp)) }
+                        Text(catalog?.displayName(stop.stageCode, language) ?: stop.stageCode, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                    }
                 }
             }
         }
@@ -368,6 +409,7 @@ private fun OfficialRouteStrip(routes: List<OfficialRoute>, language: String, on
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun DiscoveryPlaylist(playlist: com.mylittleblover.mkwplayer.library.UserPlaylist?, catalog: BrowseCatalog?,
     unlocked: Boolean, language: String, error: Boolean, onAdd: (String) -> Unit, onRemove: (Int) -> Unit,
@@ -377,14 +419,25 @@ internal fun DiscoveryPlaylist(playlist: com.mylittleblover.mkwplayer.library.Us
     var renaming by rememberSaveable { mutableStateOf(false) }
     var newName by rememberSaveable { mutableStateOf("") }
     val visible = catalog?.courses(unlocked).orEmpty()
-    if (choosing) AlertDialog(onDismissRequest = { choosing = false },
-        title = { Text(stringResource(R.string.discovery_choose_course)) },
-        text = { LazyColumn(Modifier.heightIn(max = 400.dp)) {
-            items(visible, key = { it }) { code -> TextButton(onClick = { onAdd(code); choosing = false }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                Text(catalog?.displayName(code, language) ?: code)
-            } }
-        } },
-        confirmButton = { TextButton(onClick = { choosing = false }) { Text(stringResource(R.string.discovery_cancel)) } })
+    var courseQuery by rememberSaveable { mutableStateOf("") }
+    if (choosing) ModalBottomSheet(onDismissRequest = { choosing = false; courseQuery = "" }) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(stringResource(R.string.discovery_choose_course), style = MaterialTheme.typography.headlineSmall)
+            OutlinedTextField(courseQuery, { courseQuery = it }, modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.discovery_search)) }, singleLine = true,
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) })
+            val matches = catalog?.searchCourses(courseQuery, unlocked).orEmpty()
+            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 400.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
+                if (matches.isEmpty()) item { Text(stringResource(R.string.discovery_empty), Modifier.padding(vertical = 16.dp)) }
+                items(matches, key = { it }) { code ->
+                    ListItem(headlineContent = { Text(catalog?.displayName(code, language) ?: code) },
+                        trailingContent = { IconButton(onClick = { onAdd(code); choosing = false; courseQuery = "" }) {
+                            Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.discovery_add_course))
+                        } })
+                }
+            }
+        }
+    }
     if (renaming) AlertDialog(onDismissRequest = { renaming = false },
         title = { Text(stringResource(R.string.discovery_rename)) },
         text = { OutlinedTextField(newName, { newName = it.take(120) }, label = { Text(stringResource(R.string.discovery_playlist_name)) }, singleLine = true) },
@@ -409,14 +462,15 @@ internal fun DiscoveryPlaylist(playlist: com.mylittleblover.mkwplayer.library.Us
             if (playlist.courseIds.isEmpty()) item { Text(stringResource(R.string.discovery_playlist_empty)) }
             items(playlist.courseIds.size) { index ->
                 val code = playlist.courseIds[index]
-                Card(Modifier.fillMaxWidth()) { Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { onCourse(code) }, enabled = code in visible, modifier = Modifier.weight(1f)) {
-                        Text(if (code in visible) catalog?.displayName(code, language) ?: code else stringResource(R.string.discovery_empty))
+                val title = if (code in visible) catalog?.displayName(code, language) ?: code else stringResource(R.string.discovery_empty)
+                Card(Modifier.fillMaxWidth()) { Column(Modifier.fillMaxWidth().padding(8.dp)) {
+                    TextButton(onClick = { onCourse(code) }, enabled = code in visible, modifier = Modifier.fillMaxWidth()) {
+                        Text(title)
                     }
-                    Row {
-                        IconButton(onClick = { onMove(index, index - 1) }, enabled = index > 0) { Icon(Icons.Filled.KeyboardArrowUp, contentDescription = stringResource(R.string.discovery_move_up)) }
-                        IconButton(onClick = { onMove(index, index + 1) }, enabled = index + 1 < playlist.courseIds.size) { Icon(Icons.Filled.KeyboardArrowDown, contentDescription = stringResource(R.string.discovery_move_down)) }
-                        IconButton(onClick = { onRemove(index) }) { Icon(Icons.Filled.RemoveCircleOutline, contentDescription = stringResource(R.string.discovery_remove)) }
+                    Row(Modifier.align(Alignment.End)) {
+                        IconButton(onClick = { onMove(index, index - 1) }, enabled = index > 0) { Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "${stringResource(R.string.discovery_move_up)}: $title, ${index + 1}" ) }
+                        IconButton(onClick = { onMove(index, index + 1) }, enabled = index + 1 < playlist.courseIds.size) { Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "${stringResource(R.string.discovery_move_down)}: $title, ${index + 1}" ) }
+                        IconButton(onClick = { onRemove(index) }) { Icon(Icons.Filled.RemoveCircleOutline, contentDescription = "${stringResource(R.string.discovery_remove)}: $title, ${index + 1}" ) }
                     }
                 } }
             }

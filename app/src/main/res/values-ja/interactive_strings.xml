@@ -30,4 +30,8 @@
     <string name="interactive_entry_hint">開始パート · 停止中に選択できます</string>
     <string name="interactive_entry_pre">序曲</string>
     <string name="interactive_entry_short">短い序曲</string>
+    <string name="interactive_action_next">次へ</string>
+    <string name="interactive_action_fast">最終ラップ</string>
+    <string name="interactive_action_end">終了</string>
+    <string name="interactive_action_cancel">キャンセル</string>
 </resources>

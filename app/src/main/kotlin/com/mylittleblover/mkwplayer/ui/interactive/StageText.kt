@@ -5,16 +5,20 @@ import androidx.compose.ui.res.stringResource
 import com.mylittleblover.mkwplayer.R
 import com.mylittleblover.mkwplayer.player.PlayerViewModel
 
+private val patternLabel = Regex("^(Main|Full|Fast|Outro[0-9]*) Pattern([0-9]+)$")
+private val regionLabel = Regex("^Region ([0-9]+)$")
+private val areaLabel = Regex("^Area([0-9]+)(?:_(Pre|Bridge|Outro[0-9]*))?$")
+
 /** Source labels stay stable in the engine; only their presentation is translated. */
 @Composable
 internal fun stageText(raw: String): String {
     val value = raw.trim()
-    val pattern = Regex("^(Main|Full|Fast|Outro[0-9]*) Pattern([0-9]+)$").matchEntire(value)
+    val pattern = patternLabel.matchEntire(value)
     if (pattern != null) return stringResource(R.string.stage_join,
         stageText(pattern.groupValues[1]), stringResource(R.string.stage_pattern, pattern.groupValues[2].toInt()))
-    val region = Regex("^Region ([0-9]+)$").matchEntire(value)
+    val region = regionLabel.matchEntire(value)
     if (region != null) return stringResource(R.string.stage_region, region.groupValues[1].toInt())
-    val area = Regex("^Area([0-9]+)(?:_(Pre|Bridge|Outro[0-9]*))?$").matchEntire(value)
+    val area = areaLabel.matchEntire(value)
     if (area != null) {
         val location = stringResource(R.string.stage_region, area.groupValues[1].toInt())
         val phase = area.groupValues[2]
@@ -25,7 +29,7 @@ internal fun stageText(raw: String): String {
     if (value.startsWith("Outro")) return stringResource(R.string.stage_outro)
     return when (value.lowercase()) {
         "pre", "prelude", "prelude, looping" -> stringResource(R.string.stage_prelude)
-        "preshort", "short prelude", "short prelude, looping" -> stringResource(R.string.stage_short_prelude)
+        "preshort", "pre (short)", "short prelude", "short prelude, looping" -> stringResource(R.string.stage_short_prelude)
         "full", "main", "main loop" -> stringResource(R.string.stage_main)
         "fast", "final", "final lap" -> stringResource(R.string.stage_final_lap)
         "bridge" -> stringResource(R.string.stage_bridge)
@@ -40,6 +44,9 @@ internal fun stageText(raw: String): String {
 
 @Composable
 internal fun performanceStageText(flow: PlayerViewModel.FlowUi): String {
+    // During a bridge the foreground source may already have ended; do not claim it is still playing.
+    if (flow.performing && flow.voiceCount > 0 && flow.sourceFrame == null)
+        return stringResource(R.string.stage_transitioning)
     val current = stageText(flow.stageKey ?: flow.performanceStage)
     val pending = flow.pendingStageKey ?: return current
     return stringResource(R.string.stage_pending, current, stageText(pending))

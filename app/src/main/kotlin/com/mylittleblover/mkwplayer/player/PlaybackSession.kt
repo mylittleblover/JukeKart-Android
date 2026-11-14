@@ -116,6 +116,7 @@ internal class PlaybackSession(
         streamed: Boolean = false,
         autoAdvance: Map<Int,Int> = emptyMap(),
         preparedAssets: Set<String> = emptySet(),
+        prequeueInitial: Boolean = false,
     ): State {
         var current = engine
         if (current == null) {
@@ -141,6 +142,15 @@ internal class PlaybackSession(
         val started = active.playSegment(startSegment)
         if (started is PlaybackController.State.Failed) return fail(started.reason)
         automaticTransitions=autoAdvance.toMap()
+        automaticSource = null
+        automaticPending = null
+        // Queue an initial automatic edge before opening output. This lets even a zero-frame
+        // Bridge exit begin its overlapping destination on the first rendered sample.
+        (if (prequeueInitial) automaticTransitions[startSegment] else null)?.let { target ->
+            val queued = active.playSegment(target)
+            if (queued is PlaybackController.State.Failed) return fail(queued.reason)
+            automaticSource = startSegment
+        }
 
         active.setDuration(frames)
         if (output == null) {

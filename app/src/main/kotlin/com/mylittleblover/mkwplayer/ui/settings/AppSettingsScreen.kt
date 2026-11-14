@@ -6,7 +6,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -16,6 +20,7 @@ import com.mylittleblover.mkwplayer.R
 import com.mylittleblover.mkwplayer.i18n.AppLanguage
 import com.mylittleblover.mkwplayer.unlock.UnlockTestMode
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AppSettingsScreen(
     language: AppLanguage, onLanguage: (AppLanguage) -> Unit,
@@ -24,24 +29,38 @@ internal fun AppSettingsScreen(
     testMode: UnlockTestMode = UnlockTestMode.NORMAL,
     testUnlockVisible: Boolean = false,
     onTestUnlock: (UnlockTestMode) -> Unit = {},
+    sourceCount: Int? = null, playableCount: Int? = null, importProgress: String = "", importDetail: String? = null,
 ) {
-    LazyColumn(modifier.fillMaxSize().selectableGroup(), contentPadding = PaddingValues(vertical = 16.dp)) {
-        item("language-heading") {
-            Column(Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.app_language_title), style = MaterialTheme.typography.headlineSmall)
-                Text(stringResource(R.string.settings_language_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(8.dp))
+    var choosingLanguage by rememberSaveable { mutableStateOf(false) }
+    if (choosingLanguage) ModalBottomSheet(onDismissRequest = { choosingLanguage = false }) {
+        Column(Modifier.fillMaxWidth().selectableGroup().padding(bottom = 24.dp)) {
+            Text(stringResource(R.string.app_language_title), Modifier.padding(24.dp), style = MaterialTheme.typography.headlineSmall)
+            AppLanguage.entries.forEach { choice ->
+                ListItem(headlineContent = { Text(stringResource(choice.labelResource)) },
+                    trailingContent = { RadioButton(selected = language == choice, onClick = null) },
+                    modifier = Modifier.selectable(selected = language == choice, role = Role.RadioButton,
+                        onClick = { choosingLanguage = false; if (language != choice) onLanguage(choice) }).heightIn(min = 56.dp))
             }
         }
-        items(AppLanguage.entries, key = { it.tag }) { choice ->
-            ListItem(
-                headlineContent = { Text(stringResource(choice.labelResource)) },
-                trailingContent = { RadioButton(selected = language == choice, onClick = null) },
-                modifier = Modifier.selectable(selected = language == choice, role = Role.RadioButton, onClick = { onLanguage(choice) }),
-            )
+    }
+    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+        item("language-heading") {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(stringResource(R.string.app_language_title), style = MaterialTheme.typography.titleLarge)
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+                    Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.settings_language_hint), Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        TextButton(onClick = { choosingLanguage = true }) {
+                            Text(stringResource(language.labelResource))
+                            Icon(Icons.Filled.ArrowDropDown, null)
+                        }
+                    }
+                }
+            }
         }
         item("unlock-test") {
-            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 HorizontalDivider()
                 Text(stringResource(R.string.settings_unlock_test_title), style = MaterialTheme.typography.titleLarge)
                 Text(stringResource(R.string.settings_unlock_test_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -51,30 +70,41 @@ internal fun AppSettingsScreen(
                     UnlockTestMode.FORCE_LOCKED -> R.string.settings_unlock_test_locked
                 }), style = MaterialTheme.typography.bodyMedium)
                 Text(stringResource(if (testUnlockVisible) R.string.settings_unlock_test_visible else R.string.settings_unlock_test_hidden), style = MaterialTheme.typography.bodyMedium)
-                Button(onClick = { onTestUnlock(UnlockTestMode.FORCE_UNLOCKED) }, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.settings_unlock_test_unlock))
-                }
-                OutlinedButton(onClick = { onTestUnlock(UnlockTestMode.FORCE_LOCKED) }, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.settings_unlock_test_lock))
-                }
-                OutlinedButton(onClick = { onTestUnlock(UnlockTestMode.NORMAL) }, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.settings_unlock_test_restore))
+                Column(Modifier.fillMaxWidth().selectableGroup()) {
+                    listOf(UnlockTestMode.NORMAL to R.string.settings_unlock_test_restore,
+                        UnlockTestMode.FORCE_UNLOCKED to R.string.settings_unlock_test_unlock,
+                        UnlockTestMode.FORCE_LOCKED to R.string.settings_unlock_test_lock).forEach { (mode, label) ->
+                        ListItem(headlineContent = { Text(stringResource(label)) },
+                            trailingContent = { RadioButton(selected = mode == testMode, onClick = null) },
+                            modifier = Modifier.selectable(selected = mode == testMode, role = Role.RadioButton,
+                                onClick = { if (mode != testMode) onTestUnlock(mode) }).heightIn(min = 56.dp))
+                    }
                 }
             }
         }
         item("library") {
-            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 HorizontalDivider()
                 Text(stringResource(R.string.settings_library), style = MaterialTheme.typography.titleLarge)
                 Text(stringResource(R.string.settings_library_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                sourceName?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                sourceName?.let { Text(it, style = MaterialTheme.typography.titleSmall) }
+                if (sourceCount != null && playableCount != null) Text(stringResource(R.string.settings_library_counts, sourceCount, playableCount),
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (busy && importProgress.isNotBlank()) Text(importProgress, style = MaterialTheme.typography.bodySmall)
+                importDetail?.let { detail ->
+                    var expanded by rememberSaveable(detail) { mutableStateOf(false) }
+                    TextButton(onClick = { expanded = !expanded }) { Text(stringResource(R.string.settings_import_details)) }
+                    androidx.compose.animation.AnimatedVisibility(expanded) {
+                        Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
                 if (busy) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text(stringResource(R.string.settings_importing)) }
                 Button(onClick = onOpenPack, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.settings_import_pack)) }
                 OutlinedButton(onClick = onOpenFiles, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.settings_open_files)) }
             }
         }
         item("about") {
-            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 HorizontalDivider()
                 Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.titleLarge)
                 Text(stringResource(R.string.app_name))

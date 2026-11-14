@@ -14,6 +14,8 @@ internal class NativeInteractiveDriver(
     private val outroVariants: Map<Int,List<Int>> = emptyMap(),
     private val regions: Map<Int,Int> = emptyMap(),
     private val cancelRequest: ()->String? = { "Cancellation is unavailable" },
+    private val mandatoryAutomaticSources: Set<Int> = emptySet(),
+    private val advanceViaOutro: Set<Int> = emptySet(),
 ) {
     data class Observation(val segment: Int,val sourceFrame: Long?,val transitioning: Boolean=false,
                            val paused: Boolean=false,val voices: Int=1,val error: String?=null,val failureCount: Long=0,
@@ -32,7 +34,7 @@ internal class NativeInteractiveDriver(
     private var previousFailures=0L
     private val available: Boolean get()=!isFading && pending==null && observation?.transitioning==false && observation?.paused==false && !finished &&
         !(currentVersion!=null && (observation?.voices ?: 0)>1)
-    val canCancelPending: Boolean get()=!isFading && pending!=null && observation?.canCancel==true && !cancellationRequested
+    val canCancelPending: Boolean get()=current !in mandatoryAutomaticSources && !isFading && pending!=null && observation?.canCancel==true && !cancellationRequested
     fun cancelPending(): String? {
         if(!canCancelPending) return "The next section has already started or is not cancellable"
         val error=cancelRequest()
@@ -40,8 +42,8 @@ internal class NativeInteractiveDriver(
         if(error==null) cancellationRequested=true
         return error
     }
-    val canAdvance: Boolean get()=available && next[current]!=null
-    val canEnd: Boolean get()=available && outroRules().isNotEmpty()
+    val canAdvance: Boolean get()=available && (next[current]!=null || current in advanceViaOutro && outroRules().isNotEmpty())
+    val canEnd: Boolean get()=available && current !in advanceViaOutro && outroRules().isNotEmpty()
     val currentRegion: Int? get()=regions.entries.singleOrNull { it.value==current }?.key
     val availableRegions: Set<Int> get()=if(!available) emptySet() else regions.filter { (_,target) -> target!=current && rule(target)!=null }.keys
     fun selectRegion(number: Int): String? {
@@ -83,6 +85,7 @@ internal class NativeInteractiveDriver(
         return error
     }
     fun advance(): String? {
+        if (current in advanceViaOutro) return takeOutro()
         val target=next[current] ?: return "No next section here"
         return submit(target)
     }

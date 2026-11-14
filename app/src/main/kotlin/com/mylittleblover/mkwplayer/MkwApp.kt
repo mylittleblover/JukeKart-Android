@@ -21,11 +21,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
@@ -57,6 +59,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -170,6 +173,8 @@ internal fun MkwApp(
     val configuration = LocalConfiguration.current
     val sideNavigation = configuration.screenWidthDp >= 600 ||
         (configuration.screenWidthDp > configuration.screenHeightDp && configuration.screenHeightDp < 500)
+    val playerDetail = nav.detail == NavState.Detail.Flow || nav.detail == NavState.Detail.Track ||
+        ((nav.detail as? NavState.Detail.Interactive)?.let { model.isStageOpen(it.code) } == true)
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
@@ -188,14 +193,25 @@ internal fun MkwApp(
         },
         bottomBar = {
             Column {
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = ui.canStop && nav.detail != NavState.Detail.Track && nav.detail != NavState.Detail.Flow &&
-                        ((nav.detail as? NavState.Detail.Interactive)?.let { !model.isStageOpen(it.code) } ?: true),
-                    enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { it / 4 },
-                    exit = fadeOut(tween(150))) {
-                    val miniTitle = model.currentStageCode?.let { browse?.displayName(it, languageTag) } ?: ui.title
-                    MiniPlayer(miniTitle, model.currentStageCode, ui, onOpen = { nav = nav.open(if (ui.flow == null) NavState.Detail.Track else NavState.Detail.Flow) },
-                        onToggle = { if (ui.canPause) model.pause() else if (ui.canResume) model.resume() })
+                if (playerDetail && ui.flow != null) {
+                    com.mylittleblover.mkwplayer.ui.interactive.InteractiveStopBar(
+                        canStop = ui.canStop, canFade = !ui.busy && model.canFadeStop, fading = ui.flow?.fading == true,
+                        onStop = model::stop, onFade = model::fadeStopPerformance)
+                } else if (playerDetail && nav.detail == NavState.Detail.Track) {
+                    androidx.compose.material3.Surface {
+                        OutlinedButton(onClick = model::stop, enabled = ui.canStop,
+                            modifier = Modifier.fillMaxWidth().padding(12.dp).height(48.dp)) {
+                            Text(androidx.compose.ui.res.stringResource(R.string.interactive_stop))
+                        }
+                    }
+                } else {
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = ui.canStop, enter = fadeIn(tween(180)), exit = fadeOut(tween(150))) {
+                        val miniTitle = model.currentStageCode?.let { browse?.displayName(it, languageTag) } ?: ui.title
+                        MiniPlayer(miniTitle, model.currentStageCode, ui,
+                            onOpen = { nav = nav.open(if (ui.flow == null) NavState.Detail.Track else NavState.Detail.Flow) },
+                            onToggle = { if (ui.canPause) model.pause() else if (ui.canResume) model.resume() })
+                    }
                 }
             if (!sideNavigation) NavigationBar {
                 Tab.ordered().forEach { tab ->
@@ -211,14 +227,14 @@ internal fun MkwApp(
         },
     ) { inner ->
         Row(Modifier.padding(inner).fillMaxSize()) {
-            if (sideNavigation) androidx.compose.material3.NavigationRail {
+            if (sideNavigation) androidx.compose.material3.NavigationRail(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Tab.ordered().forEach { tab ->
                     androidx.compose.material3.NavigationRailItem(selected = nav.tab == tab,
                         onClick = { if (tab == Tab.MEDIA) { mediaCategory = -1; mediaQuery = "" }; nav = nav.select(tab) }, icon = { TabIcon(tab, nav.tab == tab) }, label = { Text(tabTitle(tab)) })
                 }
             }
             AnimatedContent(targetState = nav.snapshot(), modifier = Modifier.weight(1f).fillMaxSize(),
-                transitionSpec = { (fadeIn(tween(180)) + slideInVertically(tween(180)) { it / 32 }) togetherWith fadeOut(tween(150)) },
+                transitionSpec = { (fadeIn(tween(180)) + slideInVertically(tween(180)) { it / 32 }) togetherWith ExitTransition.None },
                 label = "page-transition") { snapshot ->
             val page = NavState.restore(snapshot)
             val detail = page.detail
@@ -229,6 +245,8 @@ internal fun MkwApp(
                     testMode = ui.unlockTestMode,
                     testUnlockVisible = com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(ui.unlock),
                     onTestUnlock = model::setUnlockTestMode,
+                    sourceCount = ui.pack?.trackCount, playableCount = ui.pack?.playableCount,
+                    importProgress = ui.pack?.progress.orEmpty(), importDetail = ui.detail,
                 )
                 detail is NavState.Detail.Course -> {
                     if (browse == null || detail.code.removeSuffix("_00") !in browse.courses(unlocked)) {
@@ -241,10 +259,20 @@ internal fun MkwApp(
                     if (browse == null || detail.code.removeSuffix("_00") !in browse.courses(unlocked)) {
                         Text(androidx.compose.ui.res.stringResource(R.string.discovery_empty), Modifier.padding(24.dp))
                     } else if (model.isStageOpen(detail.code)) ConsolePage(model, ui, openPack, openFiles)
-                    else Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Text(browse?.displayName(detail.code, languageTag) ?: detail.code, style = MaterialTheme.typography.headlineSmall)
+                    else Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        com.mylittleblover.mkwplayer.ui.art.CoursePlaceholder(detail.code,
+                            Modifier.fillMaxWidth().aspectRatio(1.7f).clip(MaterialTheme.shapes.large))
+                        Text(browse?.displayName(detail.code, languageTag) ?: detail.code, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                        Text(androidx.compose.ui.res.stringResource(R.string.discovery_interactive_note), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (model.canStartStage(detail.code)) {
-                            Button(onClick = { model.startStagePerformance(detail.code) }, enabled = !ui.busy) {
+                            val entryNames = remember(detail.code, ui.pack) { model.initialStageLabels(detail.code) }
+                            var selectedEntry by rememberSaveable(detail.code) { mutableStateOf(entryNames.firstOrNull()) }
+                            val choices = entryNames.mapIndexed { index, name -> index to name }.toMap()
+                            val effectiveEntry = selectedEntry?.takeIf { it in entryNames } ?: entryNames.firstOrNull()
+                            com.mylittleblover.mkwplayer.ui.interactive.InteractiveEntryChooser(
+                                choices = choices, selected = entryNames.indexOf(effectiveEntry).takeIf { it >= 0 }, enabled = !ui.busy && ui.flow?.fading != true,
+                                onSelect = { index -> selectedEntry = entryNames.getOrNull(index) })
+                            Button(onClick = { model.startStagePerformance(detail.code, effectiveEntry) }, enabled = !ui.busy && ui.flow?.fading != true) {
                                 Text(androidx.compose.ui.res.stringResource(R.string.discovery_start))
                             }
                         } else {
@@ -261,7 +289,13 @@ internal fun MkwApp(
                     onDelete = { discovery.deletePlaylist(detail.id); nav = nav.back() ?: nav },
                     onCourse = { nav = nav.open(NavState.Detail.Course(it)) })
                 detail is NavState.Detail.Cup -> com.mylittleblover.mkwplayer.ui.home.DiscoveryCup(
-                    browse?.route(detail.id, unlocked), browse, languageTag) { code -> nav = nav.open(NavState.Detail.Course(code)) }
+                    browse?.route(detail.id, unlocked), browse, languageTag,
+                    onMap = { id ->
+                        val route = browse?.route(id, unlocked)
+                        val points = route?.stops.orEmpty().mapNotNull { stop -> model.mapAnchors?.stageTolerant(stop.stageCode)?.let { androidx.compose.ui.geometry.Offset(it.u, it.v) } }
+                        mapState.selectRoute(id, points)
+                        nav = nav.select(Tab.WORLD_MAP)
+                    }) { code -> nav = nav.open(NavState.Detail.Course(code)) }
                 detail == NavState.Detail.Flow -> ConsolePage(model, ui, openPack, openFiles)
                 detail == NavState.Detail.Track -> SingleTrackPlayer(model, ui)
                 else -> when (page.tab) {
@@ -406,6 +440,14 @@ private fun CoursePage(model: PlayerViewModel, ui: PlayerViewModel.Ui, code: Str
                 }
             }
         }
+        item {
+            Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(androidx.compose.ui.res.stringResource(R.string.stage_structure), style = MaterialTheme.typography.titleLarge)
+                val current = ui.flow.takeIf { model.isStageOpen(code) }
+                if (current != null) com.mylittleblover.mkwplayer.ui.interactive.InteractiveStructure(current)
+                else Text(androidx.compose.ui.res.stringResource(R.string.stage_structure_open_hint), style = MaterialTheme.typography.bodyMedium)
+            }
+        }
     }
 }
 
@@ -429,7 +471,7 @@ private fun MapPage(model: PlayerViewModel, ui: PlayerViewModel.Ui, state: World
                     anchors.stages.map { it.code }.toSet(),
                 ))
                 val names = requireNotNull(LocalizedNames.parse(context.assets.open("localized_names.json").bufferedReader().use { it.readText() }))
-                val image = requireNotNull(android.graphics.BitmapFactory.decodeResource(context.resources, R.drawable.world_map)).asImageBitmap()
+                val image = requireNotNull(com.mylittleblover.mkwplayer.ui.art.MapArtworkCache.load(context))
                 MapResources(image, anchors, routes, names)
             }
         }
@@ -517,7 +559,7 @@ private fun ConsolePage(
             }
             if (flow != null) {
                 item {
-                    Text(androidx.compose.ui.res.stringResource(R.string.interactive_title), style = MaterialTheme.typography.titleLarge)
+                    Text(androidx.compose.ui.res.stringResource(R.string.stage_actions), style = MaterialTheme.typography.titleLarge)
                 }
                 item {
                     Card(Modifier.fillMaxWidth()) {
@@ -527,32 +569,9 @@ private fun ConsolePage(
                                 enabled = !ui.canStop && !ui.busy, onSelect = model::selectInitialEntry)
                             if (flow.performanceBlocker != null) Text(flow.performanceBlocker, style = MaterialTheme.typography.bodySmall)
                             else {
-                                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    if (flow.canAdvance) OutlinedButton(onClick = model::advancePerformance) {
-                                        Text(androidx.compose.ui.res.stringResource(R.string.interactive_next))
-                                    }
-                                    if (flow.hasFast && (flow.canFast || flow.fastPlaying ||
-                                            (flow.versionNumbers.isEmpty() && flow.regionNumbers.isEmpty() && flow.canEnd))) {
-                                        OutlinedButton(onClick = model::toggleFast, enabled = !flow.fastPlaying) {
-                                            Text(androidx.compose.ui.res.stringResource(if (flow.fastPlaying) R.string.interactive_fast_playing else R.string.interactive_fast))
-                                        }
-                                    }
-                                    if (flow.canCancelPending) OutlinedButton(onClick = model::cancelPendingPerformance) {
-                                        Text(androidx.compose.ui.res.stringResource(R.string.cancel_pending_transition))
-                                    }
-                                    if (flow.canEnd) OutlinedButton(onClick = model::takeOutro) {
-                                        Text(androidx.compose.ui.res.stringResource(R.string.interactive_end))
-                                    }
-                                }
-                                if (flow.regionNumbers.isNotEmpty()) {
-                                    Text(androidx.compose.ui.res.stringResource(R.string.music_region), style = MaterialTheme.typography.titleSmall)
-                                    Text((listOf(com.mylittleblover.mkwplayer.ui.interactive.stageText("Main")) +
-                                        (2..5).map { com.mylittleblover.mkwplayer.ui.interactive.stageText("Region $it") } +
-                                        listOf(com.mylittleblover.mkwplayer.ui.interactive.stageText("Fast"))).joinToString(" → "),
-                                        style = MaterialTheme.typography.bodySmall)
-                                    Text(androidx.compose.ui.res.stringResource(R.string.music_region_hint), style = MaterialTheme.typography.bodySmall)
-                                }
+                                com.mylittleblover.mkwplayer.ui.interactive.InteractiveActionBar(flow,
+                                    onAdvance = model::advancePerformance, onFast = model::toggleFast,
+                                    onCancel = model::cancelPendingPerformance, onEnd = model::takeOutro)
                                 if (flow.versionNumbers.isNotEmpty()) {
                                     Text(androidx.compose.ui.res.stringResource(R.string.recording_version), style = MaterialTheme.typography.titleSmall)
                                     androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -572,7 +591,7 @@ private fun ConsolePage(
             item {
                 com.mylittleblover.mkwplayer.ui.interactive.InteractiveCoursePicker(names,
                     com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(ui.unlock), ui.busy || flow?.fading == true,
-                    model::canStartStage, model::startStagePerformance)
+                    model::canStartStage, { model.startStagePerformance(it) })
                 if (flow == null) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onOpenPack) { Text(androidx.compose.ui.res.stringResource(R.string.interactive_import)) }
                     OutlinedButton(onClick = onOpenFiles) { Text(androidx.compose.ui.res.stringResource(R.string.interactive_files)) }
@@ -580,9 +599,6 @@ private fun ConsolePage(
                 ui.detail?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             }
         }
-        com.mylittleblover.mkwplayer.ui.interactive.InteractiveStopBar(
-            canStop = ui.canStop, canFade = !ui.busy && model.canFadeStop, fading = flow?.fading == true,
-            onStop = model::stop, onFade = model::fadeStopPerformance)
     }
 }
 
@@ -645,19 +661,17 @@ private fun PlayerInformation(model: PlayerViewModel, ui: PlayerViewModel.Ui, ti
 private fun MiniPlayer(title: String, courseCode: String?, ui: PlayerViewModel.Ui, onOpen: () -> Unit, onToggle: () -> Unit) {
     val flow = ui.flow
     val label = androidx.compose.ui.res.stringResource(if (ui.canPause) R.string.interactive_pause else R.string.interactive_resume)
-    androidx.compose.material3.Surface(modifier = Modifier.testTag("mini-player"), tonalElevation = 3.dp, shadowElevation = 3.dp) {
+    androidx.compose.material3.Surface(modifier = Modifier.testTag("mini-player").height(72.dp), color = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp, shadowElevation = 2.dp) {
         Column {
-            Row(Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.weight(1f).fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 courseCode?.let { com.mylittleblover.mkwplayer.ui.art.StageArt.resolve(it) }?.let { art ->
                     androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(art), contentDescription = null, modifier = Modifier.size(44.dp))
                 }
-                androidx.compose.material3.TextButton(onClick = onOpen, modifier = Modifier.weight(1f)) {
-                    Column(Modifier.fillMaxWidth()) {
-                        Text(title, maxLines = 1, style = MaterialTheme.typography.titleSmall)
+                Column(Modifier.weight(1f).padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(title, maxLines = 1, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                         Text(flow?.let { com.mylittleblover.mkwplayer.ui.interactive.performanceStageText(it) } ?: androidx.compose.ui.res.stringResource(
                             if (ui.canResume) R.string.discovery_paused else R.string.discovery_playing),
-                            maxLines = 1, style = MaterialTheme.typography.labelSmall)
-                    }
+                            maxLines = 1, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 androidx.compose.material3.IconButton(onClick = onToggle, enabled = ui.canPause || ui.canResume,
                     modifier = Modifier.size(48.dp).semantics { contentDescription = label }) {
@@ -689,6 +703,5 @@ private fun SingleTrackPlayer(model: PlayerViewModel, ui: PlayerViewModel.Ui) {
             enabled = ui.canPause || ui.canResume, modifier = Modifier.size(68.dp).semantics { contentDescription = label }) {
             androidx.compose.material3.Icon(if (ui.canPause) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(30.dp))
         }
-        OutlinedButton(onClick = model::stop, enabled = ui.canStop) { Text(androidx.compose.ui.res.stringResource(R.string.interactive_stop)) }
     }
 }

@@ -13,4 +13,12 @@
     <string name="stage_stopped">Stopped</string>
     <string name="stage_finished">Finished</string>
     <string name="stage_not_started">Not started</string>
+    <string name="stage_available">Available stages</string>
+    <string name="stage_transitioning">Transitioning</string>
+    <string name="stage_actions">Music stages and actions</string>
+    <string name="stage_structure">Music structure</string>
+    <string name="stage_structure_open_hint">Open the interactive player to see the stages available for this course.</string>
+    <string name="stage_start_label">Starting stage</string>
+    <string name="stage_start_choose">Choose starting stage</string>
+    <string name="stage_start_stop_hint">Stop playback to change the starting stage.</string>
 </resources>

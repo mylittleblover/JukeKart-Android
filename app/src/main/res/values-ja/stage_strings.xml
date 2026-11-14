@@ -13,4 +13,12 @@
     <string name="stage_stopped">停止中</string>
     <string name="stage_finished">終了</string>
     <string name="stage_not_started">未開始</string>
+    <string name="stage_available">利用可能なパート</string>
+    <string name="stage_transitioning">切り替え中</string>
+    <string name="stage_actions">音楽パートと操作</string>
+    <string name="stage_structure">音楽の構成</string>
+    <string name="stage_structure_open_hint">インタラクティブプレイヤーを開くと、このコースのパートを確認できます。</string>
+    <string name="stage_start_label">開始パート</string>
+    <string name="stage_start_choose">開始パートを選択</string>
+    <string name="stage_start_stop_hint">開始パートを変更するには再生を停止してください。</string>
 </resources>

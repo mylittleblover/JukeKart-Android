@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <sstream>
 using namespace player2;
 std::vector<std::uint8_t> read(const std::string& path) {
     std::ifstream f(path,std::ios::binary);
@@ -27,12 +28,17 @@ int main(int argc,char** argv) try {
         assets.push_back(read(argv[5+i]));auto& b=assets.back();api::SourceOpenRequest req;
         req.providerId="native.bwav";req.bytes={b.data(),b.size()};
         const bool streamed=std::getenv("MKW_SOURCE_PREPARATION") && std::string(std::getenv("MKW_SOURCE_PREPARATION"))=="streamed";
-        const auto bound=api::bindEngineSource(engine,i,req,streamed ? api::SourcePreparation::Streamed : api::SourcePreparation::Prepared);
+        bool preparedOverride=false;
+        if (const auto* values=std::getenv("MKW_PREPARED_INDICES")) {
+            std::istringstream input(values); std::string item;
+            while (std::getline(input,item,',')) if (!item.empty() && std::stoi(item)==i) preparedOverride=true;
+        }
+        const auto bound=api::bindEngineSource(engine,i,req,streamed && !preparedOverride ? api::SourcePreparation::Streamed : api::SourcePreparation::Prepared);
         if(bound!=api::EngineStatus::Ok) {auto probe=api::openAudioSource(req);if(probe.handle)api::closeAudioSource(probe.handle);throw std::runtime_error("Binding failed "+std::string(argv[5+i])+" engine="+std::to_string(static_cast<int>(bound))+" source="+std::to_string(static_cast<int>(probe.status)));}
     }
     std::vector<std::pair<std::int64_t,int>> actions;
     for(int i=5+count;i<argc;++i){std::string a=argv[i];auto c=a.find(',');actions.emplace_back(std::stoll(a.substr(0,c)),std::stoi(a.substr(c+1)));}
-    std::stable_sort(actions.begin(),actions.end());std::size_t action=0;
+    std::stable_sort(actions.begin(),actions.end(),[](const auto& a,const auto& b){return a.first<b.first;});std::size_t action=0;
     const auto recordStart=std::getenv("MKW_RECORD_START") ? std::stoll(std::getenv("MKW_RECORD_START")) : 0;
     if(recordStart<0 || recordStart>=duration)throw std::runtime_error("Invalid recording range");
     const auto recordingFrames=duration-recordStart;

@@ -32,10 +32,8 @@ internal fun CoursePlaceholder(code: String?, modifier: Modifier = Modifier, sho
             MapAnchors.parse(context.assets.open("map_anchors.json").bufferedReader().use { it.readText() })?.stageTolerant(code.orEmpty())
         }.getOrNull()
     }
-    val map by produceState<ImageBitmap?>(null, context) {
-        value = withContext(Dispatchers.IO) {
-            android.graphics.BitmapFactory.decodeResource(context.resources, R.drawable.world_map)?.asImageBitmap()
-        }
+    val map by produceState(MapArtworkCache.cached(), context) {
+        value = MapArtworkCache.load(context)
     }
     Box(modifier, contentAlignment = Alignment.Center) {
         if (map != null && anchor != null) {

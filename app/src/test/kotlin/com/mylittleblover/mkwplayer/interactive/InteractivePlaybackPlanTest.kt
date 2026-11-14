@@ -24,12 +24,24 @@ class InteractivePlaybackPlanTest {
             assertTrue(p.entry in p.labels,dir.name)
             if(dir.name=="Rainbow") {
                 assertTrue(p.streamed);assertEquals(15,p.assetPaths.size)
-                assertEquals(5,p.automaticNext.size)
+                listOf("Area1", "Area2", "Area3_Pre", "Area3", "Final_Pre", "Final").forEach { label ->
+                    assertEquals(label, p.labels[p.startingAt(label).entry])
+                }
+                assertEquals(setOf(p.labels.entries.single { it.value == "Area2" }.key), p.advanceViaOutro)
+                assertEquals(6,p.automaticNext.size)
+                assertNotNull(p.directBridge)
+                assertTrue(p.directBridge in p.initialSegments)
+                val bridgeEntry = p.startingAt("Area1_Bridge")
+                assertEquals(p.directBridge, bridgeEntry.entry)
+                assertTrue(p.entry in bridgeEntry.initialSegments)
                 assertTrue(p.next.values.all { it in p.labels })
             } else {
                 assertNotNull(p.fast,"${dir.name}: importer lost Fast arrangement")
                 assertNotNull(p.standard)
-                assertTrue(p.automaticNext.isEmpty())
+                assertEquals(p.entryAutomaticNext, p.automaticNext)
+                p.directBridge?.let { assertTrue(it in p.initialSegments) }
+                p.regions.values.forEach { assertTrue(it in p.initialSegments) }
+                p.versions.forEach { version -> assertTrue(version.main in p.initialSegments) }
             }
             count++
         }

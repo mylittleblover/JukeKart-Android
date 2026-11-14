@@ -12,6 +12,28 @@ class NativeInteractiveDriverTest {
         G.Transition(202,listOf(101),listOf(103),sourceCue="outro.1"),G.Transition(203,listOf(101),listOf(104))))
     private fun driver(request: (Int)->String?={null})=NativeInteractiveDriver(spec,100,mapOf(100 to 101),
         mapOf(0 to 102,1 to 103),104,request)
+    @Test fun rainbowSecondLapAdvanceSelectsTheNextRealOutroCue() {
+        val requested = mutableListOf<Int>()
+        val d = NativeInteractiveDriver(spec, 101, emptyMap(), mapOf(0 to 102, 1 to 103), null,
+            { requested += it; null }, advanceViaOutro = setOf(101))
+        d.observe(NativeInteractiveDriver.Observation(101, 500))
+        assertTrue(d.canAdvance)
+        assertFalse(d.canEnd)
+        assertNull(d.advance())
+        assertEquals(listOf(103), requested)
+    }
+    @Test fun requiredAutomaticBridgeHandoverCannotBeCancelled() {
+        var cancellations = 0
+        val d = NativeInteractiveDriver(spec, 100, emptyMap(), emptyMap(), null, { null },
+            cancelRequest = { cancellations++; null }, mandatoryAutomaticSources = setOf(100))
+        d.observe(NativeInteractiveDriver.Observation(100, 10, transitioning = true, destination = 101, canCancel = true))
+        assertFalse(d.canCancelPending)
+        assertNotNull(d.cancelPending())
+        assertEquals(0, cancellations)
+        d.observe(NativeInteractiveDriver.Observation(101, 0))
+        assertEquals(101, d.current)
+        assertNull(d.pending)
+    }
     @Test fun fadeStopCannotBeCancelledOrReplacedByASectionRequest() {
         var requests=0
         val d=driver { requests++; null }

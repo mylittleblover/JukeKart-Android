@@ -43,7 +43,7 @@
     <string name="discovery_home_today">Today&#8217;s picks</string>
     <string name="discovery_home_open">Open course</string>
     <string name="discovery_home_daily_hint">Daily picks refresh at midnight.</string>
-    <string name="discovery_home_subtitle">Your music, your world</string>
+    <string name="discovery_home_subtitle">MKW music deserves more than starting from the beginning.</string>
     <string name="discovery_previous_recommendation">Previous recommendation</string>
     <string name="discovery_next_recommendation">Next recommendation</string>
     <string name="discovery_playing">Playing</string>
@@ -54,4 +54,8 @@
     <string name="discovery_interactive_note">Control the available stages of this course.</string>
     <string name="discovery_recent">Recently played</string>
     <string name="discovery_favorites_empty">Your favorite music will appear here.</string>
+    <string name="discovery_course_music">Course music</string>
+    <string name="discovery_search_empty">No matching courses or cups. Try another name.</string>
+    <string name="discovery_view_map">View on map</string>
+    <string name="discovery_course_order">Course order</string>
 </resources>

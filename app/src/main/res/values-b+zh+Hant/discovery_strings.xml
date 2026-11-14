@@ -43,7 +43,7 @@
     <string name="discovery_home_today">今日聽聽</string>
     <string name="discovery_home_open">查看曲目詳情</string>
     <string name="discovery_home_daily_hint">每日推薦在本地午夜更新。</string>
-    <string name="discovery_home_subtitle">你的音樂，你的世界</string>
+    <string name="discovery_home_subtitle">MKW 的音樂，不應該只能從頭播放。</string>
     <string name="discovery_previous_recommendation">上一則推薦</string>
     <string name="discovery_next_recommendation">下一則推薦</string>
     <string name="discovery_playing">正在播放</string>
@@ -54,4 +54,8 @@
     <string name="discovery_interactive_note">依事件控制目前賽道中可用的音樂階段。</string>
     <string name="discovery_recent">最近播放</string>
     <string name="discovery_favorites_empty">收藏的音樂會顯示在這裡。</string>
+    <string name="discovery_course_music">賽道音樂</string>
+    <string name="discovery_search_empty">找不到符合的賽道或盃賽，請試試其他名稱。</string>
+    <string name="discovery_view_map">在地圖中查看</string>
+    <string name="discovery_course_order">賽道順序</string>
 </resources>
