@@ -12,6 +12,9 @@ import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Album
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.foundation.Image
@@ -79,7 +82,8 @@ private fun CourseTile(code: String, name: String, favorite: Boolean, map: Image
 @Composable
 internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.State, language: String, unlocked: Boolean,
                            onOpen: (String) -> Unit, onFavorite: (String) -> Unit,
-                           onImport: () -> Unit, onPlayer: () -> Unit, hasPlayer: Boolean) {
+                           onImport: () -> Unit, onPlayer: () -> Unit, onToggle: () -> Unit, onMedia: () -> Unit,
+                           session: com.mylittleblover.mkwplayer.player.PlayerViewModel.Ui, currentCode: String?) {
     val context = LocalContext.current
     val map by produceState<ImageBitmap?>(null, context) {
         value = withContext(Dispatchers.IO) {
@@ -97,7 +101,7 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
                 Text(stringResource(R.string.discovery_home_subtitle), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        if (state.favoritesError != null || state.dailyError != null) item {
+        if (state.favoritesError != null || state.dailyError != null || state.recentError != null) item {
             Text(stringResource(R.string.discovery_save_failed), color = MaterialTheme.colorScheme.error)
         }
         val visibleDaily = state.dailyIds.filter { it in catalog?.courses(unlocked).orEmpty() }
@@ -150,13 +154,51 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
             }
         }
         item { OutlinedButton(onClick = onImport, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.discovery_import)) } }
-        if (hasPlayer) item { Button(onClick = onPlayer, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.discovery_open_player)) } }
+        if (session.canStop) {
+            item { Text(stringResource(R.string.discovery_continue), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+            item {
+                Card(onClick = onPlayer, modifier = Modifier.fillMaxWidth()) {
+                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        currentCode?.let { StageArt.resolve(it) }?.let { Image(painterResource(it), null, Modifier.size(64.dp)) }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(currentCode?.let { catalog?.displayName(it, language) } ?: session.title, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                            val flow = session.flow
+                            Text(flow?.let { com.mylittleblover.mkwplayer.ui.interactive.performanceStageText(it) }
+                                ?: stringResource(if (session.canResume) R.string.discovery_paused else R.string.discovery_playing),
+                                style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                            val fraction = if (flow?.sourceFrame != null && flow.sourceFrames != null && flow.sourceFrames > 0)
+                                (flow.sourceFrame.toDouble() / flow.sourceFrames).toFloat().coerceIn(0f, 1f) else session.progress.coerceIn(0f, 1f)
+                            LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+                        }
+                        val label = stringResource(if (session.canPause) R.string.interactive_pause else R.string.interactive_resume)
+                        FilledIconButton(onClick = onToggle, enabled = session.canPause || session.canResume,
+                            modifier = Modifier.semantics { contentDescription = label }) {
+                            Icon(if (session.canPause) Icons.Filled.Pause else Icons.Filled.PlayArrow, null)
+                        }
+                    }
+                }
+            }
+        }
         val favorites = state.favorites.filter { it in catalog?.courses(unlocked).orEmpty() }
+        item { Text(stringResource(R.string.discovery_favorites), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
         if (favorites.isNotEmpty()) {
-            item { Text(stringResource(R.string.discovery_favorites), style = MaterialTheme.typography.titleLarge) }
             item { LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(favorites, key = { it }) { id -> CourseTile(id, catalog?.displayName(id, language) ?: id, true, map, anchors, { onOpen(id) }, { onFavorite(id) }) }
             } }
+        } else item {
+            Card(onClick = onMedia, modifier = Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Icon(Icons.Outlined.FavoriteBorder, null)
+                    Text(stringResource(R.string.discovery_favorites_empty), modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.discovery_media), color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+        val recent = state.recentIds.filter { it in catalog?.courses(unlocked).orEmpty() }.take(5)
+        if (recent.isNotEmpty()) {
+            item { Text(stringResource(R.string.discovery_recent), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+            items(recent, key = { "recent:$it" }) { id -> RecentCourseRow(id, catalog?.displayName(id, language) ?: id) { onOpen(id) } }
         }
     }
 }
@@ -164,7 +206,7 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
 @Composable
 internal fun DiscoveryMedia(catalog: BrowseCatalog?, unlocked: Boolean, language: String,
                             category: Int, onCategory: (Int) -> Unit, query: String, onQuery: (String) -> Unit,
-                            onCourse: (String) -> Unit, onCup: (String) -> Unit) {
+                            recentIds: List<String>, onCourse: (String) -> Unit, onCup: (String) -> Unit) {
     androidx.activity.compose.BackHandler(enabled = category >= 0) { onCategory(-1) }
     val categories = listOf(R.string.discovery_gp, R.string.discovery_rally, R.string.discovery_vs,
         R.string.discovery_free, R.string.discovery_other, R.string.discovery_sounds)
@@ -211,6 +253,21 @@ internal fun DiscoveryMedia(catalog: BrowseCatalog?, unlocked: Boolean, language
             }
         }
         if (category >= 0 && routes.isEmpty() && courses.isEmpty()) item { Text(stringResource(R.string.discovery_empty)) }
+        val recent = if (category < 0 && query.isBlank()) recentIds.filter { it in catalog?.courses(unlocked).orEmpty() }.take(6) else emptyList()
+        if (recent.isNotEmpty()) {
+            item { Text(stringResource(R.string.discovery_recent), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+            items(recent, key = { "recent:$it" }) { id -> RecentCourseRow(id, catalog?.displayName(id, language) ?: id) { onCourse(id) } }
+        }
+    }
+}
+
+@Composable
+private fun RecentCourseRow(code: String, title: String, onClick: () -> Unit) {
+    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StageArt.resolve(code)?.let { Image(painterResource(it), null, Modifier.size(48.dp)) }
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+        }
     }
 }
 
@@ -263,18 +320,51 @@ internal fun DiscoveryPlaylists(catalog: BrowseCatalog?, unlocked: Boolean, lang
         item { OutlinedButton(onClick = { creating = true }) { Icon(Icons.Filled.Add, contentDescription = null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.discovery_create_playlist)) } }
         if (state.playlistError != null) item { Text(stringResource(R.string.discovery_save_failed), color = MaterialTheme.colorScheme.error) }
         if (state.playlists.isEmpty()) item { Text(stringResource(R.string.discovery_no_saved)) }
-        items(if (showAll) state.playlists else state.playlists.take(5), key = { "playlist:${it.id}" }) { playlist ->
-            Card(onClick = { onPlaylist(playlist.id) }, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(18.dp)) { Text(playlist.name, style = MaterialTheme.typography.titleMedium); Text(playlist.courseIds.size.toString()) }
+        item {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(if (showAll) state.playlists else state.playlists.take(5), key = { "playlist:${it.id}" }) { playlist ->
+                    Card(onClick = { onPlaylist(playlist.id) }, modifier = Modifier.width(164.dp)) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(Modifier.fillMaxWidth().height(112.dp), contentAlignment = Alignment.Center) {
+                                val first = playlist.courseIds.firstOrNull { it in catalog?.courses(unlocked).orEmpty() }
+                                val art = first?.let { StageArt.resolve(it) }
+                                if (art != null) Image(painterResource(art), null, Modifier.size(90.dp))
+                                else Icon(Icons.Outlined.MusicNote, null, Modifier.size(40.dp))
+                            }
+                            Text(playlist.name, style = MaterialTheme.typography.titleMedium, maxLines = 2)
+                            Text(playlist.courseIds.size.toString(), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
             }
         }
         if (!showAll && state.playlists.size > 5) item { TextButton(onClick = { showAll = true }) { Text(stringResource(R.string.discovery_show_all)) } }
         item { Text(stringResource(R.string.discovery_my_routes), style = MaterialTheme.typography.titleLarge) }
         item { Text(stringResource(R.string.discovery_no_saved)) }
         item { Text(stringResource(R.string.discovery_gp), style = MaterialTheme.typography.titleLarge) }
-        items(routes.filter { it.kind == OfficialRouteKind.GRAND_PRIX }, key = { it.id }) { route -> RouteRow(route, language) { onCup(route.id) } }
+        item { OfficialRouteStrip(routes.filter { it.kind == OfficialRouteKind.GRAND_PRIX }, language, onCup) }
         item { Text(stringResource(R.string.discovery_rally), style = MaterialTheme.typography.titleLarge) }
-        items(routes.filter { it.kind == OfficialRouteKind.RALLY }, key = { it.id }) { route -> RouteRow(route, language) { onCup(route.id) } }
+        item { OfficialRouteStrip(routes.filter { it.kind == OfficialRouteKind.RALLY }, language, onCup) }
+    }
+}
+
+@Composable
+private fun OfficialRouteStrip(routes: List<OfficialRoute>, language: String, onCup: (String) -> Unit) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        items(routes, key = { it.id }) { route ->
+            Card(onClick = { onCup(route.id) }, modifier = Modifier.width(164.dp)) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.fillMaxWidth().height(112.dp), contentAlignment = Alignment.Center) {
+                        val cup = if (route.kind == OfficialRouteKind.GRAND_PRIX)
+                            com.mylittleblover.mkwplayer.ui.art.CupArt.all().firstOrNull { "${it.id}_cup" == route.id } else null
+                        if (cup != null) Image(painterResource(cup.drawable), null, Modifier.size(90.dp))
+                        else Image(painterResource(R.drawable.mode_knockout), null, Modifier.size(80.dp))
+                    }
+                    Text(route.displayName(language), style = MaterialTheme.typography.titleMedium, maxLines = 2)
+                    Text(stringResource(R.string.map_route_stops, route.stops.size), style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
     }
 }
 

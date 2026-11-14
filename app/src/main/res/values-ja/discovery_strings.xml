@@ -48,4 +48,10 @@
     <string name="discovery_next_recommendation">次のおすすめ</string>
     <string name="discovery_playing">再生中</string>
     <string name="discovery_paused">一時停止中</string>
+    <string name="discovery_continue">続きを聴く</string>
+    <string name="discovery_normal_playback">通常再生</string>
+    <string name="discovery_suite_note">完全組曲の編成は後日提供されます。</string>
+    <string name="discovery_interactive_note">コースで利用できる音楽の各パートを操作します。</string>
+    <string name="discovery_recent">最近再生した曲</string>
+    <string name="discovery_favorites_empty">お気に入りの音楽がここに表示されます。</string>
 </resources>

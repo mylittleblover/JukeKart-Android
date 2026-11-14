@@ -32,16 +32,19 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 internal class DiscoveryViewModel(application: Application) : AndroidViewModel(application) {
-    enum class Error { FAVORITES_READ, FAVORITES_WRITE, DAILY_SELECTION, PLAYLISTS }
+    enum class Error { FAVORITES_READ, FAVORITES_WRITE, DAILY_SELECTION, PLAYLISTS, RECENT }
     data class State(
         val favorites: Set<String> = emptySet(), val day: LocalDate = LocalDate.now(),
         val dailyIds: List<String> = emptyList(), val favoritesReady: Boolean = false, val dailyReady: Boolean = false,
         val favoritesError: Error? = null, val dailyError: Error? = null,
         val playlists: List<com.mylittleblover.mkwplayer.library.UserPlaylist> = emptyList(), val playlistError: Error? = null,
+        val recentIds: List<String> = emptyList(), val recentError: Error? = null,
     ) {
-        val error: Error? get() = favoritesError ?: dailyError ?: playlistError
+        val error: Error? get() = favoritesError ?: dailyError ?: playlistError ?: recentError
     }
     private val favorites = FavoriteStore(File(application.filesDir, "user-favorites.json"))
+    private val recent = com.mylittleblover.mkwplayer.library.RecentCourseStore(File(application.filesDir, "recent-courses.json"))
+    private val recentOperations = Mutex()
     private val playlists = com.mylittleblover.mkwplayer.library.PlaylistStore(File(application.filesDir, "user-playlists.json"))
     private val playlistOperations = Mutex()
     private val daily = DailySelectionStore(File(application.filesDir, "daily-selection.json"))
@@ -61,6 +64,7 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
         else application.registerReceiver(dateReceiver, filter)
         reloadFavorites()
         updatePlaylists { playlists.read() }
+        updateRecent { recent.read() }
         viewModelScope.launch {
             while (isActive) {
                 refreshDate()
@@ -97,6 +101,18 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
             }
         }
     }
+    private fun updateRecent(operation: () -> Result<List<String>>) {
+        viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            withContext(NonCancellable) {
+                recentOperations.withLock {
+                    val result = withContext(Dispatchers.IO) { operation() }
+                    result.onSuccess { value -> _state.update { it.copy(recentIds = value, recentError = null) } }
+                        .onFailure { _state.update { it.copy(recentError = Error.RECENT) } }
+                }
+            }
+        }
+    }
+    fun recordRecent(code: String) = updateRecent { recent.record(code.removeSuffix("_00")) }
     private fun updatePlaylists(operation: () -> Result<List<com.mylittleblover.mkwplayer.library.UserPlaylist>>) {
         viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
             withContext(NonCancellable) {

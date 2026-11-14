@@ -5,6 +5,8 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.Headphones
+import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -156,6 +158,15 @@ internal fun MkwApp(
         }
     }
     LaunchedEffect(eligible) { discovery.updateEligible(eligible) }
+    val playingCourse = model.currentStageCode
+    var lastRecordedCourse by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(ui.canStop, ui.canPause, ui.flow?.voiceCount, playingCourse) {
+        if (!ui.canStop) lastRecordedCourse = null
+        else if (ui.canPause && playingCourse != null && (ui.flow?.voiceCount ?: 0) > 0 && lastRecordedCourse != playingCourse) {
+            discovery.recordRecent(playingCourse)
+            lastRecordedCourse = playingCourse
+        }
+    }
     val configuration = LocalConfiguration.current
     val sideNavigation = configuration.screenWidthDp >= 600 ||
         (configuration.screenWidthDp > configuration.screenHeightDp && configuration.screenHeightDp < 500)
@@ -219,11 +230,17 @@ internal fun MkwApp(
                     testUnlockVisible = com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(ui.unlock),
                     onTestUnlock = model::setUnlockTestMode,
                 )
-                detail is NavState.Detail.Course -> CoursePage(model, ui, detail.code) {
-                    nav = nav.open(NavState.Detail.Interactive(detail.code))
+                detail is NavState.Detail.Course -> {
+                    if (browse == null || detail.code.removeSuffix("_00") !in browse.courses(unlocked)) {
+                        Text(androidx.compose.ui.res.stringResource(R.string.discovery_empty), Modifier.padding(24.dp))
+                    } else CoursePage(model, ui, detail.code) {
+                        nav = nav.open(NavState.Detail.Interactive(detail.code))
+                    }
                 }
                 detail is NavState.Detail.Interactive -> {
-                    if (model.isStageOpen(detail.code)) ConsolePage(model, ui, openPack, openFiles)
+                    if (browse == null || detail.code.removeSuffix("_00") !in browse.courses(unlocked)) {
+                        Text(androidx.compose.ui.res.stringResource(R.string.discovery_empty), Modifier.padding(24.dp))
+                    } else if (model.isStageOpen(detail.code)) ConsolePage(model, ui, openPack, openFiles)
                     else Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         Text(browse?.displayName(detail.code, languageTag) ?: detail.code, style = MaterialTheme.typography.headlineSmall)
                         if (model.canStartStage(detail.code)) {
@@ -250,9 +267,13 @@ internal fun MkwApp(
                 else -> when (page.tab) {
                     Tab.HOME -> com.mylittleblover.mkwplayer.ui.home.DiscoveryHome(browse, discoveryState, languageTag, unlocked,
                         onOpen = { nav = nav.open(NavState.Detail.Course(it)) }, onFavorite = discovery::toggleFavorite,
-                        onImport = openPack, onPlayer = { nav = nav.open(NavState.Detail.Flow) }, hasPlayer = ui.flow != null && ui.canStop)
+                        onImport = openPack, onPlayer = { nav = nav.open(if (ui.flow == null) NavState.Detail.Track else NavState.Detail.Flow) },
+                        onToggle = { if (ui.canPause) model.pause() else if (ui.canResume) model.resume() },
+                        onMedia = { mediaCategory = -1; mediaQuery = ""; nav = nav.select(Tab.MEDIA) },
+                        session = ui, currentCode = model.currentStageCode)
                     Tab.MEDIA -> com.mylittleblover.mkwplayer.ui.home.DiscoveryMedia(browse, unlocked, languageTag,
                         category = mediaCategory, onCategory = { mediaCategory = it }, query = mediaQuery, onQuery = { mediaQuery = it },
+                        recentIds = discoveryState.recentIds,
                         onCourse = { nav = nav.open(NavState.Detail.Course(it)) }, onCup = { nav = nav.open(NavState.Detail.Cup(it)) })
                     Tab.WORLD_MAP -> MapPage(model, ui, mapState) { code -> nav = nav.open(NavState.Detail.Course(code)) }
                     Tab.PLAYLISTS -> com.mylittleblover.mkwplayer.ui.home.DiscoveryPlaylists(browse, unlocked, languageTag,
@@ -341,9 +362,21 @@ private fun CoursePage(model: PlayerViewModel, ui: PlayerViewModel.Ui, code: Str
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
     val names = remember { runCatching { LocalizedNames.parse(context.assets.open("localized_names.json").bufferedReader().use { it.readText() }) }.getOrNull() }
     val title = names?.name(code, languageTag) ?: androidx.compose.ui.res.stringResource(R.string.map_course)
+    val discovery: com.mylittleblover.mkwplayer.ui.home.DiscoveryViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val saved by discovery.state.collectAsStateWithLifecycle()
+    val stableCode = code.removeSuffix("_00")
     LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
+        item {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(title, Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                val favorite = stableCode in saved.favorites
+                val label = androidx.compose.ui.res.stringResource(if (favorite) R.string.discovery_favorite_remove else R.string.discovery_favorite_add)
+                androidx.compose.material3.IconButton(onClick = { discovery.toggleFavorite(stableCode) }, modifier = Modifier.semantics { contentDescription = label }) {
+                    androidx.compose.material3.Icon(if (favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, contentDescription = null)
+                }
+            }
+        }
         item {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -356,15 +389,19 @@ private fun CoursePage(model: PlayerViewModel, ui: PlayerViewModel.Ui, code: Str
         item {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(androidx.compose.ui.res.stringResource(R.string.discovery_suite), style = MaterialTheme.typography.titleLarge)
-                    Text(androidx.compose.ui.res.stringResource(R.string.discovery_later))
+                    androidx.compose.material3.Icon(Icons.Outlined.Headphones, contentDescription = null, modifier = Modifier.size(32.dp))
+                    Text(androidx.compose.ui.res.stringResource(R.string.discovery_normal_playback), style = MaterialTheme.typography.titleLarge)
+                    Text(androidx.compose.ui.res.stringResource(R.string.discovery_suite), style = MaterialTheme.typography.titleSmall)
+                    Text(androidx.compose.ui.res.stringResource(R.string.discovery_suite_note), style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
         item {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    androidx.compose.material3.Icon(Icons.Outlined.GraphicEq, contentDescription = null, modifier = Modifier.size(32.dp))
                     Text(androidx.compose.ui.res.stringResource(R.string.discovery_interactive), style = MaterialTheme.typography.titleLarge)
+                    Text(androidx.compose.ui.res.stringResource(R.string.discovery_interactive_note), style = MaterialTheme.typography.bodyMedium)
                     Button(onClick = onInteractive) { Text(androidx.compose.ui.res.stringResource(R.string.discovery_open_player)) }
                 }
             }

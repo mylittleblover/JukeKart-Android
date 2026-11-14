@@ -33,7 +33,7 @@ class InteractiveFadeStopDeviceTest {
             await("Prelude did not become ready") { model.ui.value.flow?.canAdvance == true && model.ui.value.outputActive }
             val screen = InstalledUi()
             screen.awaitOrientation(false)
-            screen.tapText("Interactive")
+            screen.tapText("DK Spaceport")
             screen.awaitText("Interactive playback")
             screen.longPressText("Stop")
             screen.awaitText("Fade out and stop")

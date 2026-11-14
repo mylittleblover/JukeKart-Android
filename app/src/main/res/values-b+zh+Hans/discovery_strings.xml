@@ -48,4 +48,10 @@
     <string name="discovery_next_recommendation">下一条推荐</string>
     <string name="discovery_playing">正在播放</string>
     <string name="discovery_paused">已暂停</string>
+    <string name="discovery_continue">继续收听</string>
+    <string name="discovery_normal_playback">普通播放</string>
+    <string name="discovery_suite_note">完整组曲的编排将在后续提供。</string>
+    <string name="discovery_interactive_note">按事件控制当前赛道中可用的音乐阶段。</string>
+    <string name="discovery_recent">最近播放</string>
+    <string name="discovery_favorites_empty">收藏的音乐会显示在这里。</string>
 </resources>

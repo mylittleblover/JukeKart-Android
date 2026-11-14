@@ -48,4 +48,10 @@
     <string name="discovery_next_recommendation">Next recommendation</string>
     <string name="discovery_playing">Playing</string>
     <string name="discovery_paused">Paused</string>
+    <string name="discovery_continue">Continue listening</string>
+    <string name="discovery_normal_playback">Regular playback</string>
+    <string name="discovery_suite_note">The complete suite will be available when its arrangement is provided.</string>
+    <string name="discovery_interactive_note">Control the available stages of this course.</string>
+    <string name="discovery_recent">Recently played</string>
+    <string name="discovery_favorites_empty">Your favorite music will appear here.</string>
 </resources>
