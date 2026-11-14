@@ -608,7 +608,7 @@ private fun PlayerInformation(model: PlayerViewModel, ui: PlayerViewModel.Ui, ti
 private fun MiniPlayer(title: String, courseCode: String?, ui: PlayerViewModel.Ui, onOpen: () -> Unit, onToggle: () -> Unit) {
     val flow = ui.flow
     val label = androidx.compose.ui.res.stringResource(if (ui.canPause) R.string.interactive_pause else R.string.interactive_resume)
-    androidx.compose.material3.Surface(tonalElevation = 3.dp, shadowElevation = 3.dp) {
+    androidx.compose.material3.Surface(modifier = Modifier.testTag("mini-player"), tonalElevation = 3.dp, shadowElevation = 3.dp) {
         Column {
             Row(Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 courseCode?.let { com.mylittleblover.mkwplayer.ui.art.StageArt.resolve(it) }?.let { art ->
