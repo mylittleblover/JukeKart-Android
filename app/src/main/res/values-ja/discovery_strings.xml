@@ -1,0 +1,27 @@
+<resources>
+    <string name="discovery_home">ホーム</string>
+    <string name="discovery_media">メディア</string>
+    <string name="discovery_playlists">プレイリスト</string>
+    <string name="discovery_daily">今日のおすすめ</string>
+    <string name="discovery_import">音楽をインポート</string>
+    <string name="discovery_search">コースとカップを検索</string>
+    <string name="discovery_gp">グランプリ</string>
+    <string name="discovery_rally">サバイバル</string>
+    <string name="discovery_vs">VSレース</string>
+    <string name="discovery_free">フリーラン音楽</string>
+    <string name="discovery_other">その他の音楽</string>
+    <string name="discovery_sounds">短い効果音</string>
+    <string name="discovery_empty">利用可能なコンテンツはありません</string>
+    <string name="discovery_favorites">お気に入り</string>
+    <string name="discovery_open_player">インタラクティブプレイヤーを開く</string>
+    <string name="discovery_ordinary_lists">通常のリスト</string>
+    <string name="discovery_my_routes">マイルート</string>
+    <string name="discovery_no_saved">保存された項目はありません</string>
+    <string name="discovery_suite">完全組曲</string>
+    <string name="discovery_later">後日提供</string>
+    <string name="discovery_interactive">インタラクティブ再生</string>
+    <string name="discovery_start">開始</string>
+    <string name="discovery_favorite_add">お気に入りに追加</string>
+    <string name="discovery_favorite_remove">お気に入りを解除</string>
+    <string name="discovery_placeholder">仮のカバー画像</string>
+</resources>

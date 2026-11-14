@@ -1,0 +1,27 @@
+<resources>
+    <string name="discovery_home">首頁</string>
+    <string name="discovery_media">媒體</string>
+    <string name="discovery_playlists">播放清單</string>
+    <string name="discovery_daily">每日推薦</string>
+    <string name="discovery_import">匯入音樂</string>
+    <string name="discovery_search">搜尋賽道和盃賽</string>
+    <string name="discovery_gp">大獎賽</string>
+    <string name="discovery_rally">生存賽</string>
+    <string name="discovery_vs">VS賽</string>
+    <string name="discovery_free">自由駕駛音樂</string>
+    <string name="discovery_other">其他配樂</string>
+    <string name="discovery_sounds">短音效</string>
+    <string name="discovery_empty">暫無可用內容</string>
+    <string name="discovery_favorites">收藏</string>
+    <string name="discovery_open_player">開啟互動播放器</string>
+    <string name="discovery_ordinary_lists">一般清單</string>
+    <string name="discovery_my_routes">我的路線</string>
+    <string name="discovery_no_saved">暫無儲存的內容</string>
+    <string name="discovery_suite">完整組曲</string>
+    <string name="discovery_later">稍後提供</string>
+    <string name="discovery_interactive">互動播放</string>
+    <string name="discovery_start">開始</string>
+    <string name="discovery_favorite_add">收藏</string>
+    <string name="discovery_favorite_remove">取消收藏</string>
+    <string name="discovery_placeholder">封面佔位圖</string>
+</resources>

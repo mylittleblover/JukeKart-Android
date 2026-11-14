@@ -16,10 +16,10 @@ internal enum class Tab(
     /** Where this destination sits, from the contract. */
     val order: Int,
 ) {
-    LIBRARY("Library", 0),
-    WORLD_MAP("Map", 1),
-    INTERACTIVE("Interactive", 2),
-    MY_ROUTES("Routes", 3),
+    HOME("Home", 0),
+    MEDIA("Media", 1),
+    WORLD_MAP("Map", 2),
+    PLAYLISTS("Playlists", 3),
     ;
 
     companion object {
@@ -32,7 +32,7 @@ internal enum class Tab(
          * Back from a root tab exits, which is what Android users expect; back from a detail page
          * returns to its tab. Keeping the rule here means every call site agrees.
          */
-        fun default(): Tab = LIBRARY
+        fun default(): Tab = HOME
     }
 }
 
@@ -47,6 +47,7 @@ internal class NavState(
     val tab: Tab = Tab.default(),
     /** The page open above the tab, or null at the tab root. */
     val detail: Detail? = null,
+    private val previous: List<Detail> = emptyList(),
 ) {
 
     /**
@@ -61,6 +62,8 @@ internal class NavState(
 
         /** The flow currently loaded, with its sections. */
         data object Flow : Detail
+        data class Cup(val id: String) : Detail
+        data class Interactive(val code: String) : Detail
 
         data object Settings : Detail
     }
@@ -69,9 +72,9 @@ internal class NavState(
     val canGoBack: Boolean get() = detail != null
 
     fun select(next: Tab): NavState =
-        if (next == tab) this else NavState(tab = next, detail = null)
+        NavState(tab = next, detail = null)
 
-    fun open(next: Detail): NavState = NavState(tab = tab, detail = next)
+    fun open(next: Detail): NavState = NavState(tab = tab, detail = next, previous = previous + listOfNotNull(detail))
 
     /**
      * Handles back.
@@ -79,26 +82,39 @@ internal class NavState(
      * Returns null when there is nothing left to close, which is the signal to let the system finish
      * the activity. Returning `this` instead would trap the user in the app.
      */
-    fun back(): NavState? = if (detail != null) NavState(tab, detail = null) else null
+    fun back(): NavState? = if (detail != null) NavState(tab, previous.lastOrNull(), previous.dropLast(if (previous.isEmpty()) 0 else 1)) else null
     /** Stable identity snapshot; translated labels are never saved as navigation keys. */
-    fun snapshot(): List<String> = when (val page = detail) {
-        null -> listOf(tab.name, "root")
-        is Detail.Course -> listOf(tab.name, "course", page.code)
-        Detail.Flow -> listOf(tab.name, "flow")
-        Detail.Settings -> listOf(tab.name, "settings")
+    fun snapshot(): List<String> = listOf(tab.name, "stack-v2") + (previous + listOfNotNull(detail)).flatMap { page ->
+        when (page) {
+            is Detail.Course -> listOf("course", page.code)
+            Detail.Flow -> listOf("flow", "")
+            is Detail.Cup -> listOf("cup", page.id)
+            is Detail.Interactive -> listOf("interactive", page.code)
+            Detail.Settings -> listOf("settings", "")
+        }
     }
 
     companion object {
         fun restore(state: List<String>): NavState {
-            val tab = Tab.entries.firstOrNull { it.name == state.firstOrNull() } ?: return NavState()
-            val detail = when (state.getOrNull(1)) {
-                "course" -> state.getOrNull(2)?.takeIf { it.isNotBlank() }?.let(Detail::Course)
+            val tab = when (state.firstOrNull()) {
+                "LIBRARY" -> Tab.MEDIA
+                "MY_ROUTES" -> Tab.PLAYLISTS
+                "INTERACTIVE" -> Tab.MEDIA
+                else -> Tab.entries.firstOrNull { it.name == state.firstOrNull() } ?: return NavState()
+            }
+            fun page(kind: String?, value: String?): Detail? = when (kind) {
+                "course" -> value?.takeIf { it.isNotBlank() }?.let(Detail::Course)
                 "flow" -> Detail.Flow
+                "cup" -> value?.takeIf { it.isNotBlank() }?.let(Detail::Cup)
+                "interactive" -> value?.takeIf { it.isNotBlank() }?.let(Detail::Interactive)
                 "settings" -> Detail.Settings
                 else -> null
             }
-            return NavState(tab, detail)
+            val stack = if (state.getOrNull(1) == "stack-v2") {
+                state.drop(2).chunked(2).mapNotNull { page(it.firstOrNull(), it.getOrNull(1)) }
+            } else listOfNotNull(page(state.getOrNull(1), state.getOrNull(2)))
+            val restored = if (state.firstOrNull() == "INTERACTIVE" && stack.isEmpty()) listOf(Detail.Flow) else stack
+            return NavState(tab, restored.lastOrNull(), restored.dropLast(if (restored.isEmpty()) 0 else 1))
         }
     }
-
 }

@@ -1,0 +1,27 @@
+<resources>
+    <string name="discovery_home">首页</string>
+    <string name="discovery_media">媒体</string>
+    <string name="discovery_playlists">播放列表</string>
+    <string name="discovery_daily">每日推荐</string>
+    <string name="discovery_import">导入音乐</string>
+    <string name="discovery_search">搜索赛道和杯赛</string>
+    <string name="discovery_gp">大奖赛</string>
+    <string name="discovery_rally">生存赛</string>
+    <string name="discovery_vs">VS赛</string>
+    <string name="discovery_free">自由驾驶音乐</string>
+    <string name="discovery_other">其他配乐</string>
+    <string name="discovery_sounds">短音效</string>
+    <string name="discovery_empty">暂无可用内容</string>
+    <string name="discovery_favorites">收藏</string>
+    <string name="discovery_open_player">打开互动播放器</string>
+    <string name="discovery_ordinary_lists">普通列表</string>
+    <string name="discovery_my_routes">我的路线</string>
+    <string name="discovery_no_saved">暂无保存的内容</string>
+    <string name="discovery_suite">完整组曲</string>
+    <string name="discovery_later">后续提供</string>
+    <string name="discovery_interactive">互动播放</string>
+    <string name="discovery_start">开始</string>
+    <string name="discovery_favorite_add">收藏</string>
+    <string name="discovery_favorite_remove">取消收藏</string>
+    <string name="discovery_placeholder">封面占位图</string>
+</resources>

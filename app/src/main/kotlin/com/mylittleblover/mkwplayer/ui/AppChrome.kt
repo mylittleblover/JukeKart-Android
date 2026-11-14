@@ -22,10 +22,10 @@ import kotlin.math.sin
 
 @Composable
 internal fun tabTitle(tab: Tab): String = stringResource(when (tab) {
-    Tab.LIBRARY -> R.string.nav_library
+    Tab.HOME -> R.string.discovery_home
+    Tab.MEDIA -> R.string.discovery_media
     Tab.WORLD_MAP -> R.string.nav_map
-    Tab.INTERACTIVE -> R.string.nav_interactive
-    Tab.MY_ROUTES -> R.string.nav_routes
+    Tab.PLAYLISTS -> R.string.discovery_playlists
 })
 
 @Composable
@@ -60,6 +60,37 @@ internal fun AppHeader(title: String, canBack: Boolean, showSettings: Boolean, o
                 }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        }
+    }
+}
+
+/** Compact icons remain legible without requiring an additional icon font. */
+@Composable
+internal fun TabIcon(tab: Tab) {
+    val ink = LocalContentColor.current
+    Canvas(Modifier.size(24.dp).clearAndSetSemantics { }) {
+        val w = size.width
+        val line = 2.dp.toPx()
+        when (tab) {
+            Tab.HOME -> {
+                drawLine(ink, Offset(w * .15f, w * .47f), Offset(w * .5f, w * .16f), line)
+                drawLine(ink, Offset(w * .5f, w * .16f), Offset(w * .85f, w * .47f), line)
+                drawLine(ink, Offset(w * .25f, w * .43f), Offset(w * .25f, w * .85f), line)
+                drawLine(ink, Offset(w * .75f, w * .43f), Offset(w * .75f, w * .85f), line)
+                drawLine(ink, Offset(w * .25f, w * .85f), Offset(w * .75f, w * .85f), line)
+            }
+            Tab.MEDIA -> {
+                drawCircle(ink, w * .31f, style = Stroke(line))
+                drawCircle(ink, w * .055f)
+            }
+            Tab.WORLD_MAP -> {
+                drawCircle(ink, w * .34f, style = Stroke(line))
+                drawLine(ink, Offset(w * .16f, w * .5f), Offset(w * .84f, w * .5f), line)
+                drawLine(ink, Offset(w * .5f, w * .16f), Offset(w * .5f, w * .84f), line)
+            }
+            Tab.PLAYLISTS -> {
+                for (i in 0..2) drawLine(ink, Offset(w * .17f, w * (.25f + i * .24f)), Offset(w * .83f, w * (.25f + i * .24f)), line)
+            }
         }
     }
 }

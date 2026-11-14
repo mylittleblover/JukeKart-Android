@@ -19,14 +19,14 @@ class NavStateTest {
     @Test
     fun theFourContractTabsExistInOrder() {
         assertEquals(
-            listOf("Library", "Map", "Interactive", "Routes"),
+            listOf("Home", "Media", "Map", "Playlists"),
             Tab.ordered().map { it.label },
         )
     }
 
     @Test
     fun theDefaultTabIsTheLibrary() {
-        assertEquals(Tab.LIBRARY, Tab.default())
+        assertEquals(Tab.HOME, Tab.default())
     }
 
     @Test
@@ -40,10 +40,10 @@ class NavStateTest {
     }
 
     @Test
-    fun selectingTheCurrentTabKeepsTheDetail() {
+    fun selectingTheCurrentTabReturnsToRoot() {
         // Re-tapping the active tab should not silently close what the user is reading.
         val state = NavState().open(NavState.Detail.Course("Coaster"))
-        assertEquals(state, state.select(state.tab))
+        assertNull(state.select(state.tab).detail)
     }
 
     // ---------------------------------------------------------------- details
@@ -56,8 +56,8 @@ class NavStateTest {
 
     @Test
     fun openingADetailKeepsTheTab() {
-        val state = NavState(tab = Tab.MY_ROUTES).open(NavState.Detail.Flow)
-        assertEquals(Tab.MY_ROUTES, state.tab)
+        val state = NavState(tab = Tab.PLAYLISTS).open(NavState.Detail.Flow)
+        assertEquals(Tab.PLAYLISTS, state.tab)
         assertEquals(NavState.Detail.Flow, state.detail)
     }
 
@@ -65,11 +65,11 @@ class NavStateTest {
 
     @Test
     fun backFromADetailReturnsToTheTabRoot() {
-        val state = NavState(tab = Tab.LIBRARY).open(NavState.Detail.Course("Coaster"))
+        val state = NavState(tab = Tab.HOME).open(NavState.Detail.Course("Coaster"))
         val back = state.back()
 
         assertTrue(back != null, "back from a detail must stay in the app")
-        assertEquals(Tab.LIBRARY, back!!.tab)
+        assertEquals(Tab.HOME, back!!.tab)
         assertNull(back.detail)
     }
 
@@ -77,7 +77,7 @@ class NavStateTest {
     fun backFromATabRootHasNothingToClose() {
         // null is the signal to let the system finish the activity. Returning a state here would trap
         // the user in the app with no way out.
-        assertNull(NavState(tab = Tab.LIBRARY).back())
+        assertNull(NavState(tab = Tab.HOME).back())
     }
 
     @Test
@@ -108,7 +108,7 @@ class NavStateTest {
     }
 
     @Test
-    fun openingAnotherDetailFromADetailReplacesRatherThanStacks() {
+    fun openingAnotherDetailFromADetailPreservesBackStack() {
         // There is no deep stack in this app: a course detail opens another course detail by replacing
         // it, so back always returns to the tab rather than unwinding an invisible history.
         val state = NavState()
@@ -116,6 +116,6 @@ class NavStateTest {
             .open(NavState.Detail.Course("Rainbow"))
 
         assertEquals(NavState.Detail.Course("Rainbow"), state.detail)
-        assertNull(state.back()!!.detail)
+        assertEquals(NavState.Detail.Course("Coaster"), state.back()!!.detail)
     }
 }

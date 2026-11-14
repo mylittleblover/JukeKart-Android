@@ -1,0 +1,27 @@
+<resources>
+    <string name="discovery_home">Home</string>
+    <string name="discovery_media">Media</string>
+    <string name="discovery_playlists">Playlists</string>
+    <string name="discovery_daily">Daily picks</string>
+    <string name="discovery_import">Import music</string>
+    <string name="discovery_search">Search courses and cups</string>
+    <string name="discovery_gp">Grand Prix</string>
+    <string name="discovery_rally">Knockout Tour</string>
+    <string name="discovery_vs">VS Race</string>
+    <string name="discovery_free">Free Roam music</string>
+    <string name="discovery_other">Other music</string>
+    <string name="discovery_sounds">Short sounds</string>
+    <string name="discovery_empty">No content available yet</string>
+    <string name="discovery_favorites">Favorites</string>
+    <string name="discovery_open_player">Open interactive player</string>
+    <string name="discovery_ordinary_lists">Regular playlists</string>
+    <string name="discovery_my_routes">My routes</string>
+    <string name="discovery_no_saved">No saved items yet</string>
+    <string name="discovery_suite">Complete suite</string>
+    <string name="discovery_later">Coming later</string>
+    <string name="discovery_interactive">Interactive playback</string>
+    <string name="discovery_start">Start</string>
+    <string name="discovery_favorite_add">Add favorite</string>
+    <string name="discovery_favorite_remove">Remove favorite</string>
+    <string name="discovery_placeholder">Artwork placeholder</string>
+</resources>

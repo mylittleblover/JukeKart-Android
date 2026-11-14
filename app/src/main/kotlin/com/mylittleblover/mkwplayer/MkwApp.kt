@@ -49,6 +49,7 @@ import com.mylittleblover.mkwplayer.ui.library.LibraryScreen
 import com.mylittleblover.mkwplayer.ui.play.PlayScreen
 import com.mylittleblover.mkwplayer.ui.AppHeader
 import com.mylittleblover.mkwplayer.ui.tabTitle
+import com.mylittleblover.mkwplayer.ui.TabIcon
 import com.mylittleblover.mkwplayer.ui.settings.AppSettingsScreen
 import com.mylittleblover.mkwplayer.i18n.AppLanguageSettings
 import com.mylittleblover.mkwplayer.ui.routes.OfficialMapScreen
@@ -112,31 +113,65 @@ internal fun MkwApp(
     BackHandler(enabled = nav.canGoBack) { nav = nav.back() ?: nav }
     val context = LocalContext.current
     val language = AppLanguageSettings.current(context)
+    val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
+    val discovery: com.mylittleblover.mkwplayer.ui.home.DiscoveryViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val discoveryState by discovery.state.collectAsStateWithLifecycle()
+    val browse = remember(model) {
+        runCatching {
+            val anchors = requireNotNull(model.mapAnchors)
+            val official = requireNotNull(OfficialRouteCatalog.parse(
+                context.assets.open("official_routes.json").bufferedReader().use { it.readText() },
+                anchors.stages.map { it.code }.toSet()))
+            val names = requireNotNull(LocalizedNames.parse(context.assets.open("localized_names.json").bufferedReader().use { it.readText() }))
+            com.mylittleblover.mkwplayer.library.BrowseCatalog.create(official, names, anchors)
+        }.getOrNull()
+    }
+    val unlocked = com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(ui.unlock)
+    val eligible = remember(browse, unlocked, ui.pack, ui.flow?.title) {
+        browse?.courses(unlocked).orEmpty().map { id ->
+            com.mylittleblover.mkwplayer.library.RecommendationCandidate(id,
+                com.mylittleblover.mkwplayer.library.RecommendationKind.COURSE, model.canStartStage(id))
+        }
+    }
+    LaunchedEffect(eligible) { discovery.updateEligible(eligible) }
+    val configuration = LocalConfiguration.current
+    val sideNavigation = configuration.screenWidthDp >= 600 ||
+        (configuration.screenWidthDp > configuration.screenHeightDp && configuration.screenHeightDp < 500)
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
             val title = when (nav.detail) {
                 NavState.Detail.Settings -> androidx.compose.ui.res.stringResource(R.string.settings_title)
                 is NavState.Detail.Course -> androidx.compose.ui.res.stringResource(R.string.nav_course)
+                is NavState.Detail.Cup -> androidx.compose.ui.res.stringResource(R.string.discovery_gp)
+                NavState.Detail.Flow -> androidx.compose.ui.res.stringResource(R.string.discovery_interactive)
+                is NavState.Detail.Interactive -> androidx.compose.ui.res.stringResource(R.string.discovery_interactive)
                 else -> tabTitle(nav.tab)
             }
             AppHeader(title, nav.canGoBack, nav.detail != NavState.Detail.Settings,
                 onBack = { nav = nav.back() ?: nav }, onSettings = { nav = nav.open(NavState.Detail.Settings) })
         },
         bottomBar = {
-            NavigationBar {
+            if (!sideNavigation) NavigationBar {
                 Tab.ordered().forEach { tab ->
                     NavigationBarItem(
                         selected = nav.tab == tab,
                         onClick = { nav = nav.select(tab) },
                         label = { Text(tabTitle(tab)) },
-                        icon = {},
+                        icon = { TabIcon(tab) },
                     )
                 }
             }
         },
     ) { inner ->
-        Column(Modifier.padding(inner).fillMaxSize()) {
+        Row(Modifier.padding(inner).fillMaxSize()) {
+            if (sideNavigation) androidx.compose.material3.NavigationRail {
+                Tab.ordered().forEach { tab ->
+                    androidx.compose.material3.NavigationRailItem(selected = nav.tab == tab,
+                        onClick = { nav = nav.select(tab) }, icon = { TabIcon(tab) }, label = { Text(tabTitle(tab)) })
+                }
+            }
+            Column(Modifier.weight(1f).fillMaxSize()) {
             val detail = nav.detail
             when {
                 detail == NavState.Detail.Settings -> AppSettingsScreen(
@@ -147,15 +182,35 @@ internal fun MkwApp(
                     onTestUnlock = model::setUnlockTestMode,
                 )
                 detail is NavState.Detail.Course -> CoursePage(model, ui, detail.code) {
-                    model.startStagePerformance(detail.code)
-                    nav=nav.select(Tab.INTERACTIVE)
+                    nav = nav.open(NavState.Detail.Interactive(detail.code))
                 }
+                detail is NavState.Detail.Interactive -> {
+                    if (model.isStageOpen(detail.code)) ConsolePage(model, ui, openPack, openFiles)
+                    else Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Text(browse?.displayName(detail.code, languageTag) ?: detail.code, style = MaterialTheme.typography.headlineSmall)
+                        if (model.canStartStage(detail.code)) {
+                            Button(onClick = { model.startStagePerformance(detail.code) }, enabled = !ui.busy) {
+                                Text(androidx.compose.ui.res.stringResource(R.string.discovery_start))
+                            }
+                        } else {
+                            Text(androidx.compose.ui.res.stringResource(R.string.interactive_empty))
+                            OutlinedButton(onClick = openPack) { Text(androidx.compose.ui.res.stringResource(R.string.discovery_import)) }
+                        }
+                    }
+                }
+                detail is NavState.Detail.Cup -> com.mylittleblover.mkwplayer.ui.home.DiscoveryCup(
+                    browse?.route(detail.id, unlocked), browse, languageTag) { code -> nav = nav.open(NavState.Detail.Course(code)) }
+                detail == NavState.Detail.Flow -> ConsolePage(model, ui, openPack, openFiles)
                 else -> when (nav.tab) {
-                    Tab.LIBRARY -> LibraryPage(model, ui, openPack, openFiles)
+                    Tab.HOME -> com.mylittleblover.mkwplayer.ui.home.DiscoveryHome(browse, discoveryState, languageTag, unlocked,
+                        onOpen = { nav = nav.open(NavState.Detail.Course(it)) }, onFavorite = discovery::toggleFavorite,
+                        onImport = openPack, onPlayer = { nav = nav.open(NavState.Detail.Flow) }, hasPlayer = ui.flow != null && ui.canStop)
+                    Tab.MEDIA -> com.mylittleblover.mkwplayer.ui.home.DiscoveryMedia(browse, unlocked, languageTag,
+                        onCourse = { nav = nav.open(NavState.Detail.Course(it)) }, onCup = { nav = nav.open(NavState.Detail.Cup(it)) })
                     Tab.WORLD_MAP -> MapPage(model, ui, mapState) { code -> nav = nav.open(NavState.Detail.Course(code)) }
-                    Tab.INTERACTIVE -> ConsolePage(model, ui, openPack, openFiles)
-                    Tab.MY_ROUTES -> RoutesPage()
+                    Tab.PLAYLISTS -> com.mylittleblover.mkwplayer.ui.home.DiscoveryPlaylists(browse, unlocked, languageTag) { nav = nav.open(NavState.Detail.Cup(it)) }
                 }
+            }
             }
         }
     }
@@ -235,19 +290,27 @@ private fun CoursePage(model: PlayerViewModel, ui: PlayerViewModel.Ui, code: Str
     val context = LocalContext.current
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
     val names = remember { runCatching { LocalizedNames.parse(context.assets.open("localized_names.json").bufferedReader().use { it.readText() }) }.getOrNull() }
-    val active = ui.flow.takeIf { model.isStageOpen(code) }
     val title = names?.name(code, languageTag) ?: androidx.compose.ui.res.stringResource(R.string.map_course)
-    DetailScreen(
-        header = UiMapping.detailHeader(active).copy(title = title),
-        cues = emptyList(),
-        cueWarning = null,
-        structure = UiMapping.structure(active),
-        provenance = UiMapping.provenance(active),
-        onPlay = { model.startStagePerformance(code) },
-        onInteractive = onInteractive,
-        canPlay = model.canStartStage(code) && active?.performanceBlocker == null,
-        modifier = Modifier.fillMaxSize(),
-    )
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        item { Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
+        item {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(androidx.compose.ui.res.stringResource(R.string.discovery_suite), style = MaterialTheme.typography.titleLarge)
+                    Text(androidx.compose.ui.res.stringResource(R.string.discovery_later))
+                }
+            }
+        }
+        item {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(androidx.compose.ui.res.stringResource(R.string.discovery_interactive), style = MaterialTheme.typography.titleLarge)
+                    Button(onClick = onInteractive) { Text(androidx.compose.ui.res.stringResource(R.string.discovery_open_player)) }
+                }
+            }
+        }
+    }
 }
 
 /**
