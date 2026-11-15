@@ -1,0 +1,308 @@
+package com.mylittleblover.mkwplayer.player
+
+import kotlin.random.Random
+
+/**
+ * Pure Kotlin queue & history state machine for linear playback (Jukebox / standard lists).
+ *
+ * Implements the session rules specified in the design baseline:
+ * - Freezes the base queue at session start (#61).
+ * - Maintains a separate LIFO "Play next" temporary queue (#63, #64).
+ * - Maintains real chronological playback history for Previous and forward history priority on Next (#58, #59).
+ * - Shuffles each round as a complete permutation without repeats until exhausted (#55, #57).
+ * - Gives Repeat-One priority over temporary/base queue on natural completion (#65), while manual
+ *   Next still advances and preserves Repeat-One (#66).
+ */
+internal class LinearQueue(
+    private val random: Random = Random.Default,
+) {
+    enum class RepeatMode {
+        LIST,
+        SINGLE,
+        OFF,
+        ;
+
+        fun next(): RepeatMode = when (this) {
+            LIST -> SINGLE
+            SINGLE -> OFF
+            OFF -> LIST
+        }
+    }
+
+    data class Entry(
+        val key: String,
+        val title: String,
+        val subtitle: String = "",
+        val gameId: String? = null,
+        val gameTitle: String? = null,
+        val yearLabel: String? = null,
+        val arrangement: String? = null,
+        val ostIndex: Int? = null,
+        val durationMs: Long = 0L,
+        val artworkName: String? = null,
+        val assetSha256: String? = null,
+        val loop: Boolean = false,
+        val loopStart: Long? = null,
+        val loopEnd: Long? = null,
+        val overlaidOpening: com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.OverlaidOpening? = null,
+        val chainedSequence: com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.ChainedSequence? = null,
+    )
+
+    data class Snapshot(
+        val current: Entry? = null,
+        val tempQueue: List<Entry> = emptyList(),
+        val upNext: List<Entry> = emptyList(),
+        val historyCount: Int = 0,
+        val repeatMode: RepeatMode = RepeatMode.LIST,
+        val shuffle: Boolean = false,
+        val baseCount: Int = 0,
+    ) {
+        val hasQueue: Boolean
+            get() = current != null && (tempQueue.isNotEmpty() || upNext.isNotEmpty() || historyCount > 0 || baseCount > 1)
+    }
+
+    sealed interface StepResult {
+        data class Play(val entry: Entry) : StepResult
+        data object RestartCurrent : StepResult
+        data object Ended : StepResult
+    }
+
+    private var frozenBase: List<Entry> = emptyList()
+    private var currentEntry: Entry? = null
+    private var currentBaseIndex: Int = -1
+    private val pastHistory = ArrayDeque<Pair<Entry, Int>>()
+    private val forwardHistory = ArrayDeque<Pair<Entry, Int>>()
+    private val tempNextQueue = ArrayDeque<Entry>()
+    private val upcomingBase = ArrayDeque<Pair<Entry, Int>>()
+
+    var repeatMode: RepeatMode = RepeatMode.LIST
+        private set
+
+    var shuffle: Boolean = false
+        private set
+
+    fun snapshot(): Snapshot = Snapshot(
+        current = currentEntry,
+        tempQueue = tempNextQueue.toList(),
+        upNext = upcomingBase.map { it.first },
+        historyCount = pastHistory.size,
+        repeatMode = repeatMode,
+        shuffle = shuffle,
+        baseCount = frozenBase.size,
+    )
+
+    /**
+     * Freezes [entries] as the session's base queue and starts at [startIndex].
+     * Previous history and forward history reset; temporary queue clears for a fresh queue session.
+     */
+    fun startSession(entries: List<Entry>, startIndex: Int, shuffleOverride: Boolean? = null): Entry? {
+        if (entries.isEmpty()) {
+            clear()
+            return null
+        }
+        val safeIndex = startIndex.coerceIn(0, entries.lastIndex)
+        frozenBase = entries.toList()
+        pastHistory.clear()
+        forwardHistory.clear()
+        tempNextQueue.clear()
+        upcomingBase.clear()
+        if (shuffleOverride != null) {
+            shuffle = shuffleOverride
+        }
+
+        currentEntry = frozenBase[safeIndex]
+        currentBaseIndex = safeIndex
+        rebuildUpcomingAfterStart(safeIndex)
+        return currentEntry
+    }
+
+    fun clear() {
+        frozenBase = emptyList()
+        currentEntry = null
+        currentBaseIndex = -1
+        pastHistory.clear()
+        forwardHistory.clear()
+        tempNextQueue.clear()
+        upcomingBase.clear()
+    }
+
+    /** LIFO insertion at the front of the temporary queue (#64). */
+    fun enqueueNext(entry: Entry) {
+        if (currentEntry == null && frozenBase.isEmpty()) {
+            startSession(listOf(entry), 0)
+            return
+        }
+        tempNextQueue.addFirst(entry)
+    }
+
+    /** Removes a pending item from the temporary "Play next" queue (#67). */
+    fun removeTempAt(index: Int): Boolean {
+        if (index !in tempNextQueue.indices) return false
+        tempNextQueue.removeAt(index)
+        return true
+    }
+
+    fun setShuffle(enabled: Boolean) {
+        if (shuffle == enabled) return
+        shuffle = enabled
+        val active = currentEntry ?: return
+        if (frozenBase.isEmpty()) return
+
+        if (enabled) {
+            // Keep remaining unplayed items from current round when toggling ON mid-session.
+            val remaining = if (upcomingBase.isNotEmpty()) {
+                upcomingBase.toList().shuffled(random)
+            } else {
+                frozenBase.indices
+                    .filter { it != currentBaseIndex }
+                    .map { frozenBase[it] to it }
+                    .shuffled(random)
+            }
+            upcomingBase.clear()
+            upcomingBase.addAll(remaining)
+        } else {
+            val anchorIndex = currentBaseIndex.takeIf { it in frozenBase.indices }
+                ?: frozenBase.indexOfFirst { it.key == active.key }
+            upcomingBase.clear()
+            if (anchorIndex >= 0) {
+                for (i in (anchorIndex + 1) until frozenBase.size) {
+                    upcomingBase.addLast(frozenBase[i] to i)
+                }
+            }
+        }
+    }
+
+    fun cycleRepeatMode(): RepeatMode {
+        repeatMode = repeatMode.next()
+        return repeatMode
+    }
+
+    fun setRepeatMode(mode: RepeatMode) {
+        repeatMode = mode
+    }
+
+    /** Advances automatically when the active linear track reaches natural completion (#65). */
+    fun onNaturalEnd(): StepResult {
+        val active = currentEntry ?: return StepResult.Ended
+        if (repeatMode == RepeatMode.SINGLE) {
+            return StepResult.RestartCurrent
+        }
+        return advance(fromUser = false, current = active)
+    }
+
+    /** Manual Next (#59, #66). Preserves [repeatMode] even when RepeatMode.SINGLE is active. */
+    fun next(): StepResult {
+        val active = currentEntry ?: return StepResult.Ended
+        return advance(fromUser = true, current = active)
+    }
+
+    /** Manual Previous (#58). Steps strictly along real playback history; restarts if at start. */
+    fun previous(restartThresholdMs: Long = 0L, elapsedMs: Long = 0L): StepResult {
+        val active = currentEntry ?: return StepResult.Ended
+        if (pastHistory.isEmpty() || (restartThresholdMs > 0L && elapsedMs > restartThresholdMs)) {
+            return StepResult.RestartCurrent
+        }
+        forwardHistory.addFirst(active to currentBaseIndex)
+        val (prev, prevIdx) = pastHistory.removeLast()
+        currentEntry = prev
+        currentBaseIndex = prevIdx
+        return StepResult.Play(prev)
+    }
+
+    /** Jumps directly to an item in the temporary queue (consuming prior temp items above it). */
+    fun jumpToTemp(index: Int): Entry? {
+        if (index !in tempNextQueue.indices) return null
+        currentEntry?.let { pastHistory.addLast(it to currentBaseIndex) }
+        forwardHistory.clear()
+        val target = tempNextQueue[index]
+        repeat(index + 1) { tempNextQueue.removeFirst() }
+        currentEntry = target
+        currentBaseIndex = frozenBase.indexOfFirst { it.key == target.key }
+        return target
+    }
+
+    /** Jumps directly to an upcoming item in the frozen base queue. */
+    fun jumpToUpcoming(index: Int): Entry? {
+        if (index !in upcomingBase.indices) return null
+        currentEntry?.let { pastHistory.addLast(it to currentBaseIndex) }
+        forwardHistory.clear()
+        val chosen = upcomingBase[index]
+        repeat(index + 1) { upcomingBase.removeFirst() }
+        currentEntry = chosen.first
+        currentBaseIndex = chosen.second
+        return chosen.first
+    }
+
+    private fun advance(fromUser: Boolean, current: Entry): StepResult {
+        // 1. If we stepped backwards through history earlier, move forward through that history first (#59).
+        if (forwardHistory.isNotEmpty()) {
+            pastHistory.addLast(current to currentBaseIndex)
+            val (target, targetIdx) = forwardHistory.removeFirst()
+            currentEntry = target
+            currentBaseIndex = targetIdx
+            return StepResult.Play(target)
+        }
+
+        // 2. Temporary "Play next" queue takes priority over the frozen base queue (#63).
+        if (tempNextQueue.isNotEmpty()) {
+            pastHistory.addLast(current to currentBaseIndex)
+            val target = tempNextQueue.removeFirst()
+            currentEntry = target
+            currentBaseIndex = frozenBase.indexOfFirst { it.key == target.key }
+            return StepResult.Play(target)
+        }
+
+        // 3. Remaining tracks of the frozen base queue (sequential or current shuffled round).
+        if (upcomingBase.isNotEmpty()) {
+            pastHistory.addLast(current to currentBaseIndex)
+            val (target, targetIdx) = upcomingBase.removeFirst()
+            currentEntry = target
+            currentBaseIndex = targetIdx
+            return StepResult.Play(target)
+        }
+
+        // 4. End of round: List Loop restarts a new round (new shuffle permutation if Shuffle ON);
+        // manual Next also wraps cleanly across the frozen list when List Loop or Single Loop is set
+        // (or if base has >1 items on explicit Next skip).
+        val shouldWrap = repeatMode == RepeatMode.LIST ||
+            (fromUser && repeatMode == RepeatMode.SINGLE && frozenBase.isNotEmpty())
+        if (!shouldWrap || frozenBase.isEmpty()) {
+            return StepResult.Ended
+        }
+
+        pastHistory.addLast(current to currentBaseIndex)
+        val round = if (shuffle) {
+            frozenBase.indices.map { frozenBase[it] to it }.shuffled(random).let { list ->
+                // Avoid repeating the just-finished song at boundary when multiple tracks exist.
+                if (list.size > 1 && list.first().second == currentBaseIndex) {
+                    list.drop(1) + list.first()
+                } else {
+                    list
+                }
+            }
+        } else {
+            frozenBase.indices.map { frozenBase[it] to it }
+        }
+        upcomingBase.clear()
+        upcomingBase.addAll(round)
+        val (nextItem, nextIdx) = upcomingBase.removeFirst()
+        currentEntry = nextItem
+        currentBaseIndex = nextIdx
+        return StepResult.Play(nextItem)
+    }
+
+    private fun rebuildUpcomingAfterStart(startIndex: Int) {
+        upcomingBase.clear()
+        if (shuffle) {
+            val rest = frozenBase.indices
+                .filter { it != startIndex }
+                .map { frozenBase[it] to it }
+                .shuffled(random)
+            upcomingBase.addAll(rest)
+        } else {
+            for (i in (startIndex + 1) until frozenBase.size) {
+                upcomingBase.addLast(frozenBase[i] to i)
+            }
+        }
+    }
+}

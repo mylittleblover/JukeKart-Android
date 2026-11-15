@@ -21,7 +21,7 @@ class MapAnchorsTest {
           "schemaVersion": 1,
           "provenance": "EXTRACTED_ANCHORS",
           "provenanceNote": "Normalised positions measured on the map canvas.",
-          "canvas": [2500, 2400],
+          "canvas": [2857, 2400],
           "stages": [
             {"code": "Coaster", "u": 0.292, "v": 0.72},
             {"code": "AirshipFortress_00", "u": 0.216, "v": 0.364},
@@ -54,7 +54,7 @@ class MapAnchorsTest {
     @Test
     fun theCanvasIsCarried() {
         // Not used for placement, but it documents which render the fractions came from.
-        assertEquals(2500, catalog().canvasWidth)
+        assertEquals(2857, catalog().canvasWidth)
         assertEquals(2400, catalog().canvasHeight)
     }
 
@@ -73,13 +73,13 @@ class MapAnchorsTest {
 
     @Test
     fun aMissingCanvasIsRefused() {
-        val bad = sample.replace("\"canvas\": [2500, 2400],", "")
+        val bad = sample.replace("\"canvas\": [2857, 2400],", "")
         assertNull(MapAnchors.parse(bad))
     }
 
     @Test
     fun aZeroCanvasIsRefused() {
-        assertNull(MapAnchors.parse(sample.replace("[2500, 2400]", "[0, 0]")))
+        assertNull(MapAnchors.parse(sample.replace("[2857, 2400]", "[0, 0]")))
     }
 
     @Test

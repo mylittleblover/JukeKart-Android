@@ -5,8 +5,20 @@ internal interface SessionAudioEngine : PlaybackEngine {
     fun nativeHandle(): Long
     fun fadeStop(beats: Double): Int = 1
     fun cancelPendingTransition(): Int
-    fun sourceSnapshot(slot: Int): LongArray?
+    override fun sourceSnapshot(slot: Int): LongArray?
     fun bindStreamedBwav(assetIndex: Int,bytes: ByteArray,assetId: String): Int = bindBwav(assetIndex,bytes,assetId)
+
+    /**
+     * Master output trim: lift the mix by [gainDb], then hold it under [ceilingDb].
+     *
+     * Lives on the engine rather than in the UI so it applies to every source the session plays, and so a
+     * setting change can be applied to the running engine without reopening the track. Implementations that
+     * cannot do it say so by returning a non-zero status rather than pretending.
+     */
+    fun setOutputGain(gainDb: Double, ceilingDb: Double): Int = 1
+
+    /** Set dynamic gain (dB) for a compiled track layer node (`track.index`). */
+    fun setLayerGain(trackIndex: Int, gainDb: Double): Int = 1
 }
 
 internal interface SessionAudioOutput {

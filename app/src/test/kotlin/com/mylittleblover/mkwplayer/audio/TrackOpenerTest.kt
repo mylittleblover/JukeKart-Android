@@ -71,10 +71,10 @@ class TrackOpenerTest {
     }
 
     @Test
-    fun refusesAnUnsupportedCodec() {
-        // Kind 2 is the 253-entry case; it must be refused by name, not by a
-        // generic decode failure later.
-        val reason = refusal(bwav(kind = 2))
+    fun anUnknownCodecIsRefusedByName() {
+        // Kinds 1 and 2 decode; anything else must be refused at the codec check, not by a generic
+        // decode failure later. Kind 2 is no longer the unsupported case -- it is the jukebox codec.
+        val reason = refusal(bwav(kind = 3))
         assertTrue(reason.contains("codec", ignoreCase = true), "reason was: $reason")
     }
 
@@ -92,7 +92,7 @@ class TrackOpenerTest {
             ByteArray(20),
             bwav(rate = 1000),
             bwav(frames = 0),
-            bwav(kind = 2),
+            bwav(kind = 3),
             bwav(loopStart = 900, loopEnd = 100),
         )
         for (case in cases) {
@@ -101,9 +101,9 @@ class TrackOpenerTest {
     }
 
     @Test
-    fun refusalForUnsupportedCodecDoesNotSayMalformed() {
-        // Kind 2 is a known limitation of this build, not a damaged file.
-        val reason = refusal(bwav(kind = 2))
+    fun refusalForAnUnsupportedCodecDoesNotSayMalformed() {
+        // A codec this build does not implement is a limitation, not a damaged file.
+        val reason = refusal(bwav(kind = 3))
         assertTrue(!reason.contains("malformed", ignoreCase = true), "reason was: $reason")
     }
 

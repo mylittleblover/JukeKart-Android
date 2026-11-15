@@ -101,6 +101,7 @@ internal object TrackClassifier {
         val stem = fileName.substringBeforeLast('.').lowercase()
         return when {
             stem.contains("juke") -> ResourceKind.JUKEBOX
+            stem.startsWith("nm_special") -> ResourceKind.SPECIAL
             stem.contains("stage_") || stem.contains("battle_") && stem.contains("stage") ->
                 ResourceKind.COURSE
             stem.startsWith("bgm_battle") -> ResourceKind.BATTLE

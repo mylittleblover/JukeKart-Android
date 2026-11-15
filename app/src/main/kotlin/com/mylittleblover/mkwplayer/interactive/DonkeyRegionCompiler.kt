@@ -52,7 +52,14 @@ internal object DonkeyRegionCompiler {
         val spec=base.spec.copy(assets=assets,segments=segments,tracks=tracks,transitions=transitions)
         val packet=G.build(spec)
         val paths=base.assetPaths+patterns.map { it.second.fileName }
-        return base.copy(spec=spec,packet=packet,assetPaths=paths,streamed=true,regions=regions,next=base.next+progression,
+        val preparedImmediate = buildSet {
+            addAll(base.preparedAssets)
+            val immediateSegs = listOfNotNull(base.entry, base.fast).toSet()
+            spec.tracks.filter { it.segment in immediateSegs }.forEach { track ->
+                track.clips.forEach { clip -> add(spec.assets[clip.asset].path) }
+            }
+        }
+        return base.copy(spec=spec,packet=packet,assetPaths=paths,streamed=true,preparedAssets=preparedImmediate,regions=regions,next=base.next+progression,
             labels=base.labels+regions.filterKeys { it!=1 }.entries.associate { it.value to "Region ${it.key}" },
             standard=base.standard.copy(packet=packet,assetPaths=paths))
     }

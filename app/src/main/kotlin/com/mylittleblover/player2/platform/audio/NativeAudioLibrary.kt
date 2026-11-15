@@ -52,6 +52,17 @@ internal object NativeAudioLibrary {
         handle: Long, kind: Int, target: Int, value: Int, number: Double, at: Long,
     ): Int
 
+    /**
+     * Master output trim: lift the mix by [gainDb], then hold the result under [ceilingDb].
+     *
+     * Applied after the mixer in the native runtime, so it covers every path -- flows, stingers, streamed
+     * sources and modules -- and never feeds back into the transport clock.
+     */
+    external fun setOutputGain(handle: Long, gainDb: Double, ceilingDb: Double): Int
+
+    /** How many samples the ceiling has caught on this engine, for diagnostics. */
+    external fun limitedSampleCount(handle: Long): Long
+
     external fun loadLinearInput(
         handle: Long, provider: String, input: java.io.FileDescriptor, loop: Boolean,
         preparation: Int, assetId: String, entryId: String?, subsongId: String?,

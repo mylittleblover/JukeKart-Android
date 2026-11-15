@@ -1,17 +1,33 @@
 package com.mylittleblover.mkwplayer
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.MusicNote
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,16 +51,25 @@ import androidx.compose.animation.core.tween
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -62,10 +87,21 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.asImageBitmap
+import com.mylittleblover.mkwplayer.ui.art.ArtworkSlot
+import com.mylittleblover.mkwplayer.ui.art.FadingArtwork
+import com.mylittleblover.mkwplayer.ui.art.PackArtwork
+import com.mylittleblover.mkwplayer.ui.art.ResourceArtwork
+import com.mylittleblover.mkwplayer.ui.art.rememberArtworkRatio
+import com.mylittleblover.mkwplayer.ui.art.rememberResourceArtwork
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mylittleblover.mkwplayer.R
+import com.mylittleblover.mkwplayer.audio.EngineSnapshot
+import com.mylittleblover.mkwplayer.player.LinearQueue
 import com.mylittleblover.mkwplayer.player.PlayerViewModel
 import com.mylittleblover.mkwplayer.ui.NavState
 import com.mylittleblover.mkwplayer.ui.Tokens
@@ -144,6 +180,12 @@ internal fun MkwApp(
     val context = LocalContext.current
     val language = AppLanguageSettings.current(context)
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
+    // The master trim is a device preference, read once and pushed to the running engine when it changes.
+    // `remember` on the context keeps it stable across recompositions; the session owns the live value.
+    var outputTrim by remember(context) {
+        mutableStateOf(com.mylittleblover.mkwplayer.audio.OutputTrimSettings.current(context))
+    }
+    LaunchedEffect(outputTrim) { model.applyOutputTrim(outputTrim) }
     val discovery: com.mylittleblover.mkwplayer.ui.home.DiscoveryViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val discoveryState by discovery.state.collectAsStateWithLifecycle()
     val browse = remember(model) {
@@ -181,14 +223,22 @@ internal fun MkwApp(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
-            val title = when (nav.detail) {
+            val title = when (val detail = nav.detail) {
                 NavState.Detail.Settings -> androidx.compose.ui.res.stringResource(R.string.settings_title)
                 is NavState.Detail.Course -> androidx.compose.ui.res.stringResource(R.string.nav_course)
-                is NavState.Detail.Cup -> androidx.compose.ui.res.stringResource(R.string.discovery_gp)
+                is NavState.Detail.Cup -> androidx.compose.ui.res.stringResource(
+                    if (browse?.route(detail.id, unlocked)?.kind == com.mylittleblover.mkwplayer.routes.OfficialRouteKind.RALLY) {
+                        R.string.discovery_rally
+                    } else {
+                        R.string.discovery_gp
+                    },
+                )
                 NavState.Detail.Flow -> androidx.compose.ui.res.stringResource(R.string.discovery_interactive)
                 NavState.Detail.Track -> androidx.compose.ui.res.stringResource(R.string.discovery_media)
                 is NavState.Detail.Interactive -> androidx.compose.ui.res.stringResource(R.string.discovery_interactive)
                 is NavState.Detail.Playlist -> androidx.compose.ui.res.stringResource(R.string.discovery_playlists)
+                is NavState.Detail.JukeboxGame -> ui.jukebox.gameById(detail.id)?.localizedName(languageTag)
+                    ?: androidx.compose.ui.res.stringResource(R.string.discovery_free)
                 else -> tabTitle(nav.tab)
             }
             AppHeader(title, nav.canGoBack, nav.detail != NavState.Detail.Settings,
@@ -210,8 +260,10 @@ internal fun MkwApp(
                 } else {
                     androidx.compose.animation.AnimatedVisibility(
                         visible = ui.canStop, enter = fadeIn(tween(180)), exit = fadeOut(tween(150))) {
-                        val miniTitle = model.currentStageCode?.let { browse?.displayName(it, languageTag) } ?: ui.title
-                        MiniPlayer(miniTitle, model.currentStageCode, ui,
+                        val miniTitle = model.currentStageCode?.let { browse?.displayName(it, languageTag) }
+                            ?: ui.linearTrack?.title?.takeIf { it.isNotBlank() }
+                            ?: ui.title
+                        MiniPlayer(miniTitle, model.currentStageCode, model.packDirectory, playbackArtworkNames(model, ui), ui,
                             onOpen = { nav = nav.open(if (ui.flow == null) NavState.Detail.Track else NavState.Detail.Flow) },
                             onToggle = { if (ui.canPause) model.pause() else if (ui.canResume) model.resume() })
                     }
@@ -250,6 +302,12 @@ internal fun MkwApp(
                     testMode = ui.unlockTestMode,
                     testUnlockVisible = com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(ui.unlock),
                     onTestUnlock = model::setUnlockTestMode,
+                    outputTrim = outputTrim,
+                    onOutputTrim = { chosen ->
+                        outputTrim = chosen
+                        com.mylittleblover.mkwplayer.audio.OutputTrimSettings.select(context, chosen)
+                        model.applyOutputTrim(chosen)
+                    },
                     sourceCount = ui.pack?.trackCount, playableCount = ui.pack?.playableCount,
                     importProgress = ui.pack?.progress.orEmpty(), importDetail = ui.detail,
                 )
@@ -265,7 +323,7 @@ internal fun MkwApp(
                         Text(androidx.compose.ui.res.stringResource(R.string.discovery_empty), Modifier.padding(24.dp))
                     } else if (model.isStageOpen(detail.code)) ConsolePage(model, ui, openPack, openFiles)
                     else Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        com.mylittleblover.mkwplayer.ui.art.CoursePlaceholder(detail.code,
+                        com.mylittleblover.mkwplayer.ui.art.CourseCover(detail.code,
                             Modifier.fillMaxWidth().aspectRatio(1.7f).clip(MaterialTheme.shapes.large))
                         Text(browse?.displayName(detail.code, languageTag) ?: detail.code, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                         Text(androidx.compose.ui.res.stringResource(R.string.discovery_interactive_note), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -301,6 +359,19 @@ internal fun MkwApp(
                         mapState.selectRoute(id, points)
                         nav = nav.select(Tab.WORLD_MAP)
                     }) { code -> nav = nav.open(NavState.Detail.Course(code)) }
+                detail is NavState.Detail.JukeboxGame -> com.mylittleblover.mkwplayer.ui.home.DiscoveryJukeboxGame(
+                    game = ui.jukebox.gameById(detail.id),
+                    language = languageTag,
+                    activeTrackKey = ui.selectedKey,
+                    packDirectory = model.packDirectory,
+                    onPlayFromIndex = { game, index, shuffle ->
+                        model.playJukeboxQueue(game, index, languageTag, shuffle = shuffle)
+                        nav = nav.open(NavState.Detail.Track)
+                    },
+                    onPlayNext = { item, game ->
+                        model.playJukeboxNext(item, game, languageTag)
+                    },
+                )
                 detail == NavState.Detail.Flow -> ConsolePage(model, ui, openPack, openFiles)
                 detail == NavState.Detail.Track -> SingleTrackPlayer(model, ui)
                 else -> when (page.tab) {
@@ -312,8 +383,46 @@ internal fun MkwApp(
                         session = ui, currentCode = model.currentStageCode)
                     Tab.MEDIA -> com.mylittleblover.mkwplayer.ui.home.DiscoveryMedia(browse, unlocked, languageTag,
                         category = mediaCategory, onCategory = { mediaCategory = it }, query = mediaQuery, onQuery = { mediaQuery = it },
-                        recentIds = discoveryState.recentIds,
-                        onCourse = { nav = nav.open(NavState.Detail.Course(it)) }, onCup = { nav = nav.open(NavState.Detail.Cup(it)) })
+                        onCourse = { nav = nav.open(NavState.Detail.Course(it)) }, onCup = { nav = nav.open(NavState.Detail.Cup(it)) },
+                        jukebox = ui.jukebox,
+                        extraCatalog = model.extraCatalog,
+                        packDirectory = model.packDirectory,
+                        activeTrackKey = ui.selectedKey,
+                        onJukeboxGame = { gameId -> nav = nav.open(NavState.Detail.JukeboxGame(gameId)) },
+                        onPlayJukeboxTrack = { game, index ->
+                            model.playJukeboxQueue(game, index, languageTag, shuffle = false)
+                            nav = nav.open(NavState.Detail.Track)
+                        },
+                        onPlayAllJukebox = { shuffle ->
+                            model.playAllJukebox(languageTag, shuffle = shuffle)
+                            nav = nav.open(NavState.Detail.Track)
+                        },
+                        onPlayJukeboxNext = { item, game ->
+                            model.playJukeboxNext(item, game, languageTag)
+                        },
+                        onJukeboxTrack = { key ->
+                            model.openJukeboxTrack(key, languageTag)
+                            // The free-driving pieces are single tracks, not stage flows, so they belong on
+                            // the single-track screen. Sending them to the console would offer stage events
+                            // for music that has no stages.
+                            nav = nav.open(NavState.Detail.Track)
+                        },
+                        onSfcCourse = { track ->
+                            model.openInteractiveTwoState(track, isBattle = false, languageTag = languageTag, autoStart = true)
+                            nav = nav.open(NavState.Detail.Flow)
+                        },
+                        onBattleTrack = { track ->
+                            model.openInteractiveTwoState(track, isBattle = true, languageTag = languageTag, autoStart = true)
+                            nav = nav.open(NavState.Detail.Flow)
+                        },
+                        onOpenTitle = {
+                            model.openInteractiveTitle(languageTag = languageTag, autoStart = false)
+                            nav = nav.open(NavState.Detail.Flow)
+                        },
+                        onPlayExtraQueue = { entries, startIndex, repeatMode, shuffle ->
+                            model.playExtraLinearQueue(entries, startIndex, repeatMode, shuffle)
+                            nav = nav.open(NavState.Detail.Track)
+                        })
                     Tab.WORLD_MAP -> MapPage(model, ui, mapState) { code -> nav = nav.open(NavState.Detail.Course(code)) }
                     Tab.PLAYLISTS -> com.mylittleblover.mkwplayer.ui.home.DiscoveryPlaylists(browse, unlocked, languageTag,
                         discoveryState, onCreate = discovery::createPlaylist,
@@ -420,10 +529,16 @@ private fun CoursePage(model: PlayerViewModel, ui: PlayerViewModel.Ui, code: Str
         }
         item {
             Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    com.mylittleblover.mkwplayer.ui.art.CoursePlaceholder(code, Modifier.fillMaxWidth().aspectRatio(1.7f))
-                    Text(androidx.compose.ui.res.stringResource(R.string.discovery_placeholder),
-                        modifier = Modifier.padding(8.dp), style = MaterialTheme.typography.labelSmall)
+                val cover = com.mylittleblover.mkwplayer.ui.art.courseCoverDrawable(code)
+                if (cover != null) {
+                    ArtworkSlot(Modifier.fillMaxWidth()) { edge ->
+                        val art = rememberResourceArtwork(cover, edge)
+                        val frame = Modifier.fillMaxWidth().aspectRatio(rememberArtworkRatio(cover, art, 16f / 9f))
+                        if (art == null) Box(frame)
+                        else FadingArtwork(art.bitmap, frame)
+                    }
+                } else {
+                    com.mylittleblover.mkwplayer.ui.art.CourseCover(code, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
                 }
             }
         }
@@ -479,7 +594,13 @@ private fun MapPage(model: PlayerViewModel, ui: PlayerViewModel.Ui, state: World
                 ))
                 val names = requireNotNull(LocalizedNames.parse(context.assets.open("localized_names.json").bufferedReader().use { it.readText() }))
                 val image = requireNotNull(com.mylittleblover.mkwplayer.ui.art.MapArtworkCache.load(context))
-                MapResources(image, anchors, routes, names)
+                // The game's own connection table. Absent is allowed: the map then draws no roads rather
+                // than inventing them, and the editor is not offered.
+                val connections = runCatching {
+                    com.mylittleblover.mkwplayer.library.StageConnections.parse(
+                        context.assets.open("stage_connections.json").bufferedReader().use { it.readText() })
+                }.getOrNull()
+                MapResources(image, anchors, routes, names, connections)
             }
         }
     }
@@ -498,6 +619,7 @@ private fun MapPage(model: PlayerViewModel, ui: PlayerViewModel.Ui, state: World
         image = data.image, anchors = data.anchors, routes = data.routes, names = data.names,
         languageTag = languageTag, specialUnlocked = com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(ui.unlock),
         playableStages = playable, state = state, onOpenCourse = onOpenCourse,
+        connections = data.connections,
     )
 }
 
@@ -506,6 +628,7 @@ private data class MapResources(
     val anchors: com.mylittleblover.mkwplayer.library.MapAnchors.Catalog,
     val routes: OfficialRouteCatalog,
     val names: LocalizedNames,
+    val connections: com.mylittleblover.mkwplayer.library.StageConnections.Catalog? = null,
 )
 
 /** The routes page. No saved routes exist yet, and it says so rather than showing an empty list. */
@@ -544,6 +667,8 @@ private fun ConsolePage(
     val displayTitle = model.currentStageCode
         ?.let { names?.name(it, languageTag) } ?: ui.title
 
+    val coverArtNames = playbackArtworkNames(model, ui)
+
     Column(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.weight(1f).testTag("interactive-page"),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 24.dp, vertical = 20.dp),
@@ -553,12 +678,12 @@ private fun ConsolePage(
                     if (maxWidth >= 640.dp) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(36.dp),
                             verticalAlignment = Alignment.CenterVertically) {
-                            PlayerCover(model.currentStageCode, Modifier.weight(1f))
+                            PlayerCover(model.currentStageCode, model.packDirectory, coverArtNames, Modifier.weight(1f))
                             PlayerInformation(model, ui, displayTitle, Modifier.weight(1f))
                         }
                     } else {
                         Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                            PlayerCover(model.currentStageCode, Modifier.fillMaxWidth())
+                            PlayerCover(model.currentStageCode, model.packDirectory, coverArtNames, Modifier.fillMaxWidth())
                             PlayerInformation(model, ui, displayTitle, Modifier.fillMaxWidth())
                         }
                     }
@@ -579,6 +704,35 @@ private fun ConsolePage(
                                 com.mylittleblover.mkwplayer.ui.interactive.InteractiveActionBar(flow,
                                     onAdvance = model::advancePerformance, onFast = model::toggleFast,
                                     onCancel = model::cancelPendingPerformance, onEnd = model::takeOutro)
+                                if (flow.outros.size > 1 && flow.canEnd) {
+                                    androidx.compose.foundation.layout.FlowRow(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        flow.outros.forEach { number ->
+                                            OutlinedButton(onClick = { model.takeOutro(number) }) {
+                                                Text(androidx.compose.ui.res.stringResource(R.string.stage_outro_numbered, number + 1))
+                                            }
+                                        }
+                                    }
+                                }
+                                if (flow.hasSpeakerOverlay) {
+                                    Row(
+                                        Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                    ) {
+                                        Text(
+                                            androidx.compose.ui.res.stringResource(R.string.discovery_speaker_overlay),
+                                            style = MaterialTheme.typography.titleSmall,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        androidx.compose.material3.Switch(
+                                            checked = flow.speakerEnabled,
+                                            onCheckedChange = { model.toggleSpeakerOverlay() },
+                                        )
+                                    }
+                                }
                                 if (flow.versionNumbers.isNotEmpty()) {
                                     Text(androidx.compose.ui.res.stringResource(R.string.recording_version), style = MaterialTheme.typography.titleSmall)
                                     androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -610,14 +764,25 @@ private fun ConsolePage(
 }
 
 @Composable
-private fun PlayerCover(code: String?, modifier: Modifier = Modifier) {
+private fun PlayerCover(
+    code: String?,
+    packDirectory: java.io.File?,
+    artworkNames: List<String>,
+    modifier: Modifier = Modifier,
+) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        androidx.compose.material3.Surface(
-            modifier = Modifier.widthIn(max = 440.dp).fillMaxWidth().aspectRatio(1f),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-        ) { com.mylittleblover.mkwplayer.ui.art.CoursePlaceholder(code, Modifier.fillMaxSize()) }
-        Text(androidx.compose.ui.res.stringResource(R.string.discovery_placeholder), style = MaterialTheme.typography.labelSmall)
+        ArtworkSlot(Modifier.widthIn(max = 440.dp).fillMaxWidth()) { edge ->
+            val loadedArt = PackArtwork.rememberArtwork(packDirectory, artworkNames, edge)
+            val ratio = rememberArtworkRatio(artworkNames, loadedArt, if (code != null) 16f / 9f else 1f)
+            androidx.compose.material3.Surface(
+                modifier = Modifier.fillMaxWidth().aspectRatio(ratio),
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+            ) {
+                if (loadedArt != null) FadingArtwork(loadedArt.bitmap, Modifier.fillMaxSize())
+                else com.mylittleblover.mkwplayer.ui.art.CourseCover(code, Modifier.fillMaxSize())
+            }
+        }
     }
 }
 
@@ -664,21 +829,60 @@ private fun PlayerInformation(model: PlayerViewModel, ui: PlayerViewModel.Ui, ti
     }
 }
 
+private fun playbackArtworkNames(model: PlayerViewModel, ui: PlayerViewModel.Ui): List<String> {
+    val track = ui.linearTrack
+    val names = if (track != null) {
+        listOfNotNull(
+            track.artworkName,
+            track.ostIndex?.let { "t_%03d.webp".format(java.util.Locale.ROOT, it) },
+            track.gameId?.let { model.extraCatalog.jukeboxGameArtwork[it] },
+        )
+    } else {
+        listOfNotNull(ui.artworkName, model.currentStageCode?.let { model.extraCatalog.courseArtwork[it] })
+    }
+    val courseCover = model.currentStageCode?.let { com.mylittleblover.mkwplayer.ui.art.courseCoverDrawable(it) }
+    return (if (courseCover == null) names + "album.webp" else names).distinct()
+}
+
 @Composable
-private fun MiniPlayer(title: String, courseCode: String?, ui: PlayerViewModel.Ui, onOpen: () -> Unit, onToggle: () -> Unit) {
+private fun MiniPlayer(
+    title: String,
+    courseCode: String?,
+    packDirectory: java.io.File?,
+    artworkNames: List<String>,
+    ui: PlayerViewModel.Ui,
+    onOpen: () -> Unit,
+    onToggle: () -> Unit,
+) {
     val flow = ui.flow
     val label = androidx.compose.ui.res.stringResource(if (ui.canPause) R.string.interactive_pause else R.string.interactive_resume)
+    val stateLabel = androidx.compose.ui.res.stringResource(if (ui.canResume) R.string.discovery_paused else R.string.discovery_playing)
+    val subtitle = flow?.let { com.mylittleblover.mkwplayer.ui.interactive.performanceStageText(it) }
+        ?: ui.linearTrack?.subtitle?.takeIf { it.isNotBlank() }?.let { "$it · $stateLabel" }
+        ?: stateLabel
     androidx.compose.material3.Surface(modifier = Modifier.testTag("mini-player").height(72.dp), color = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp, shadowElevation = 2.dp) {
         Column {
             Row(Modifier.weight(1f).fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                courseCode?.let { com.mylittleblover.mkwplayer.ui.art.StageArt.resolve(it) }?.let { art ->
-                    androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(art), contentDescription = null, modifier = Modifier.size(44.dp))
+                PackArtwork.Thumbnail(packDirectory, artworkNames, Modifier.size(44.dp).clip(RoundedCornerShape(10.dp))) {
+                    val courseArt = com.mylittleblover.mkwplayer.ui.art.courseCoverDrawable(courseCode)
+                    if (courseArt != null) {
+                        ResourceArtwork(courseArt, Modifier.fillMaxSize(), androidx.compose.ui.layout.ContentScale.Crop)
+                    } else {
+                        androidx.compose.material3.Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                        ) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                androidx.compose.material3.Icon(
+                                    Icons.Outlined.MusicNote, null, tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                )
+                            }
+                        }
+                    }
                 }
                 Column(Modifier.weight(1f).padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(title, maxLines = 1, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
-                        Text(flow?.let { com.mylittleblover.mkwplayer.ui.interactive.performanceStageText(it) } ?: androidx.compose.ui.res.stringResource(
-                            if (ui.canResume) R.string.discovery_paused else R.string.discovery_playing),
-                            maxLines = 1, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                        Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 androidx.compose.material3.IconButton(onClick = onToggle, enabled = ui.canPause || ui.canResume,
                     modifier = Modifier.size(48.dp).semantics { contentDescription = label }) {
@@ -696,19 +900,408 @@ private fun MiniPlayer(title: String, courseCode: String?, ui: PlayerViewModel.U
 
 @Composable
 private fun SingleTrackPlayer(model: PlayerViewModel, ui: PlayerViewModel.Ui) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally) {
-        androidx.compose.material3.Surface(Modifier.widthIn(max = 440.dp).fillMaxWidth().aspectRatio(1f),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
-            com.mylittleblover.mkwplayer.ui.art.CoursePlaceholder(model.currentStageCode, Modifier.fillMaxSize())
+    val stageCode = model.currentStageCode
+    val linearTrack = ui.linearTrack
+    val hasLinearTrack = ui.linearMode && linearTrack != null
+    var showQueueSheet by rememberSaveable { mutableStateOf(false) }
+    var scrubbing by remember(ui.selectedKey) { mutableStateOf(false) }
+    var scrubFraction by remember(ui.selectedKey) { mutableStateOf(0f) }
+
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        ArtworkSlot(Modifier.widthIn(max = 420.dp).fillMaxWidth()) { edge ->
+            val art = PackArtwork.rememberArtwork(model.packDirectory, playbackArtworkNames(model, ui), edge)
+            val ratio = rememberArtworkRatio(ui.selectedKey, art, if (stageCode != null) 16f / 9f else 1f)
+            androidx.compose.material3.Surface(
+                Modifier.fillMaxWidth().aspectRatio(ratio),
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+            ) {
+                when {
+                    art != null -> FadingArtwork(art.bitmap, Modifier.fillMaxSize())
+                    stageCode != null -> com.mylittleblover.mkwplayer.ui.art.CourseCover(stageCode, Modifier.fillMaxSize())
+                    else -> JukeboxArtworkCard(linearTrack)
+                }
+            }
         }
-        Text(ui.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        com.mylittleblover.mkwplayer.ui.SmoothProgressIndicator(ui.progress, modifier = Modifier.fillMaxWidth())
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(ui.position); Text(ui.total) }
+
+        Column(
+            Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                linearTrack?.title ?: ui.title,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+            )
+            if (linearTrack != null) {
+                val metaParts = buildList {
+                    if (linearTrack.subtitle.isNotBlank()) add(linearTrack.subtitle)
+                    linearTrack.arrangement?.takeIf { it.isNotBlank() }?.let { add(it) }
+                    linearTrack.ostIndex?.let { add("#$it") }
+                }
+                if (metaParts.isNotEmpty()) {
+                    Text(
+                        metaParts.joinToString(" · "),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+        }
+
+        // The status line is not decoration: without it a refused track shows an empty player with a clock
+        // reading --:-- and no explanation, which reads as a broken app rather than a stated refusal.
+        if (!ui.canPause && !ui.canResume && !hasLinearTrack) {
+            Text(ui.status, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        ui.detail?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+        }
+
+        val displayedProgress = if (scrubbing) scrubFraction else ui.progress.coerceIn(0f, 1f)
+        val displayedPosition = if (scrubbing && ui.totalFrames > 0L && ui.sampleRate > 0) {
+            EngineSnapshot.formatPosition((scrubFraction.toDouble() * ui.totalFrames).toLong(), ui.sampleRate)
+        } else {
+            ui.position
+        }
+
+        Column(Modifier.fillMaxWidth()) {
+            if (ui.canSeek && ui.totalFrames > 0L) {
+                Slider(
+                    value = displayedProgress,
+                    onValueChange = { fraction ->
+                        scrubbing = true
+                        scrubFraction = fraction.coerceIn(0f, 1f)
+                    },
+                    onValueChangeFinished = {
+                        val target = scrubFraction
+                        scrubbing = false
+                        model.seekTo(target)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                com.mylittleblover.mkwplayer.ui.SmoothProgressIndicator(ui.progress, modifier = Modifier.fillMaxWidth())
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(displayedPosition, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(ui.total, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
         val label = androidx.compose.ui.res.stringResource(if (ui.canPause) R.string.interactive_pause else R.string.interactive_resume)
-        androidx.compose.material3.FilledIconButton(onClick = { if (ui.canPause) model.pause() else model.resume() },
-            enabled = ui.canPause || ui.canResume, modifier = Modifier.size(68.dp).semantics { contentDescription = label }) {
-            androidx.compose.material3.Icon(if (ui.canPause) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(30.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            if (hasLinearTrack) {
+                FilledTonalIconButton(
+                    onClick = model::skipPrevious,
+                    modifier = Modifier.size(52.dp),
+                ) {
+                    androidx.compose.material3.Icon(
+                        Icons.Filled.SkipPrevious,
+                        contentDescription = androidx.compose.ui.res.stringResource(R.string.jukebox_previous),
+                    )
+                }
+            }
+            androidx.compose.material3.FilledIconButton(
+                onClick = {
+                    when {
+                        ui.canPause -> model.pause()
+                        hasLinearTrack -> model.replayOrResumeLinear()
+                        else -> model.resume()
+                    }
+                },
+                enabled = ui.canPause || ui.canResume || hasLinearTrack,
+                modifier = Modifier.size(68.dp).semantics { contentDescription = label },
+            ) {
+                androidx.compose.material3.Icon(
+                    if (ui.canPause) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = null,
+                    modifier = Modifier.size(30.dp),
+                )
+            }
+            if (hasLinearTrack) {
+                FilledTonalIconButton(
+                    onClick = model::skipNext,
+                    modifier = Modifier.size(52.dp),
+                ) {
+                    androidx.compose.material3.Icon(
+                        Icons.Filled.SkipNext,
+                        contentDescription = androidx.compose.ui.res.stringResource(R.string.jukebox_next),
+                    )
+                }
+            }
+        }
+
+        if (hasLinearTrack) {
+            val repeatLabel = androidx.compose.ui.res.stringResource(
+                when (ui.queue.repeatMode) {
+                    LinearQueue.RepeatMode.LIST -> R.string.jukebox_repeat_list
+                    LinearQueue.RepeatMode.SINGLE -> R.string.jukebox_repeat_single
+                    LinearQueue.RepeatMode.OFF -> R.string.jukebox_repeat_off
+                },
+            )
+            val repeatIcon = if (ui.queue.repeatMode == LinearQueue.RepeatMode.SINGLE) {
+                Icons.Filled.RepeatOne
+            } else {
+                Icons.Filled.Repeat
+            }
+            val queuedTotal = ui.queue.tempQueue.size + ui.queue.upNext.size
+            val queueLabel = androidx.compose.ui.res.stringResource(R.string.jukebox_queue)
+
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                FilterChip(
+                    selected = ui.queue.shuffle,
+                    onClick = model::toggleShuffle,
+                    label = {
+                        Text(
+                            androidx.compose.ui.res.stringResource(
+                                if (ui.queue.shuffle) R.string.jukebox_shuffle_on else R.string.jukebox_shuffle,
+                            ),
+                            maxLines = 1,
+                        )
+                    },
+                    leadingIcon = { androidx.compose.material3.Icon(Icons.Filled.Shuffle, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                )
+                FilterChip(
+                    selected = ui.queue.repeatMode != LinearQueue.RepeatMode.OFF,
+                    onClick = model::cycleRepeatMode,
+                    label = { Text(repeatLabel, maxLines = 1) },
+                    leadingIcon = { androidx.compose.material3.Icon(repeatIcon, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                )
+                AssistChip(
+                    onClick = { showQueueSheet = true },
+                    label = {
+                        Text(if (queuedTotal > 0) "$queueLabel ($queuedTotal)" else queueLabel, maxLines = 1)
+                    },
+                    leadingIcon = {
+                        androidx.compose.material3.Icon(
+                            Icons.AutoMirrored.Filled.QueueMusic,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                )
+            }
         }
     }
+
+    if (showQueueSheet && hasLinearTrack) {
+        LinearQueueBottomSheet(
+            queue = ui.queue,
+            onDismiss = { showQueueSheet = false },
+            onJumpToTemp = { index ->
+                model.jumpToTempQueueItem(index)
+                showQueueSheet = false
+            },
+            onRemoveTemp = model::removeTempQueueItem,
+            onJumpToUpcoming = { index ->
+                model.jumpToUpcomingQueueItem(index)
+                showQueueSheet = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun JukeboxArtworkCard(entry: LinearQueue.Entry?) {
+    val gradient = Brush.linearGradient(
+        listOf(
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.tertiaryContainer,
+        ),
+    )
+    Box(
+        Modifier.fillMaxSize().background(gradient).padding(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (entry != null) {
+                androidx.compose.material3.Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
+                ) {
+                    Text(
+                        androidx.compose.ui.res.stringResource(R.string.jukebox_eyebrow),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            androidx.compose.material3.Surface(
+                modifier = Modifier.size(112.dp),
+                shape = RoundedCornerShape(32.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    androidx.compose.material3.Icon(
+                        Icons.Outlined.MusicNote,
+                        contentDescription = null,
+                        modifier = Modifier.size(56.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            entry?.yearLabel?.takeIf { it.isNotBlank() }?.let { year ->
+                Text(
+                    year,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LinearQueueBottomSheet(
+    queue: LinearQueue.Snapshot,
+    onDismiss: () -> Unit,
+    onJumpToTemp: (Int) -> Unit,
+    onRemoveTemp: (Int) -> Unit,
+    onJumpToUpcoming: (Int) -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                androidx.compose.ui.res.stringResource(R.string.jukebox_queue),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                androidx.compose.ui.res.stringResource(R.string.jukebox_queue_subtitle),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        HorizontalDivider()
+        LazyColumn(
+            Modifier.fillMaxWidth().height(380.dp),
+            contentPadding = PaddingValues(vertical = 8.dp),
+        ) {
+            queue.current?.let { now ->
+                item(key = "now-hdr") {
+                    QueueSectionHeader(androidx.compose.ui.res.stringResource(R.string.jukebox_now_playing))
+                }
+                item(key = "now-item") {
+                    QueueEntryRow(entry = now, highlight = true, onClick = onDismiss)
+                }
+            }
+            if (queue.tempQueue.isNotEmpty()) {
+                item(key = "temp-hdr") {
+                    QueueSectionHeader(androidx.compose.ui.res.stringResource(R.string.jukebox_up_next_temp))
+                }
+                itemsIndexed(queue.tempQueue, key = { idx, item -> "temp:$idx:${item.key}" }) { idx, item ->
+                    QueueEntryRow(
+                        entry = item,
+                        highlight = false,
+                        onClick = { onJumpToTemp(idx) },
+                        onRemove = { onRemoveTemp(idx) },
+                    )
+                }
+            }
+            if (queue.upNext.isNotEmpty()) {
+                item(key = "upnext-hdr") {
+                    QueueSectionHeader(androidx.compose.ui.res.stringResource(R.string.jukebox_up_next_list))
+                }
+                itemsIndexed(queue.upNext, key = { idx, item -> "upnext:$idx:${item.key}" }) { idx, item ->
+                    QueueEntryRow(
+                        entry = item,
+                        highlight = false,
+                        onClick = { onJumpToUpcoming(idx) },
+                    )
+                }
+            }
+            if (queue.tempQueue.isEmpty() && queue.upNext.isEmpty()) {
+                item(key = "queue-empty") {
+                    Text(
+                        androidx.compose.ui.res.stringResource(R.string.jukebox_queue_empty),
+                        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 20.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun QueueSectionHeader(text: String) {
+    Text(
+        text,
+        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+    )
+}
+
+@Composable
+private fun QueueEntryRow(
+    entry: LinearQueue.Entry,
+    highlight: Boolean,
+    onClick: () -> Unit,
+    onRemove: (() -> Unit)? = null,
+) {
+    val sub = buildList {
+        if (entry.subtitle.isNotBlank()) add(entry.subtitle)
+        entry.arrangement?.takeIf { it.isNotBlank() }?.let { add(it) }
+        if (entry.durationMs > 0L) add(EngineSnapshot.formatPosition(entry.durationMs / 1000L, 1))
+    }.joinToString(" · ")
+    ListItem(
+        headlineContent = {
+            Text(
+                entry.title,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontWeight = if (highlight) FontWeight.Bold else FontWeight.Medium,
+            )
+        },
+        supportingContent = if (sub.isNotEmpty()) {
+            { Text(sub, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        } else null,
+        trailingContent = if (onRemove != null) {
+            {
+                androidx.compose.material3.IconButton(onClick = onRemove) {
+                    androidx.compose.material3.Icon(
+                        Icons.Filled.Close,
+                        contentDescription = androidx.compose.ui.res.stringResource(R.string.discovery_remove),
+                    )
+                }
+            }
+        } else null,
+        colors = if (highlight) {
+            ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f))
+        } else {
+            ListItemDefaults.colors()
+        },
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+    )
 }

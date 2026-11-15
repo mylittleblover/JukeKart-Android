@@ -37,8 +37,13 @@ internal class PlaybackController(private val engine: PlaybackEngine) {
             val sampleRate: Int,
         ) : State
 
-        /** Stopped by the user, position reset. */
-        data class Stopped(val title: String, val totalFrames: Long, val sampleRate: Int) : State
+        /** Stopped by the user or natural track end, position reset. */
+        data class Stopped(
+            val title: String,
+            val totalFrames: Long,
+            val sampleRate: Int,
+            val naturalEnd: Boolean = false,
+        ) : State
 
         data class Failed(val reason: String) : State
     }
@@ -49,6 +54,11 @@ internal class PlaybackController(private val engine: PlaybackEngine) {
     private var title: String = ""
     private var totalFrames: Long = 0
     private var sampleRate: Int = 0
+    private var linearMode: Boolean = false
+    private var linearRepeating: Boolean = false
+    private var userStopped: Boolean = false
+    private var sawActivePlayback: Boolean = false
+    private var reportedNaturalEnd: Boolean = false
 
     /**
      * Loads a prepared track and starts it.
@@ -71,6 +81,11 @@ internal class PlaybackController(private val engine: PlaybackEngine) {
             return fail("Could not read the audio: ${describe(bound)}")
         }
 
+        linearMode = false
+        linearRepeating = false
+        userStopped = false
+        sawActivePlayback = false
+        reportedNaturalEnd = false
         this.title = title
         this.sampleRate = engine.sampleRate
 
@@ -81,6 +96,52 @@ internal class PlaybackController(private val engine: PlaybackEngine) {
 
         state = State.Ready(title, totalFrames = 0, sampleRate = this.sampleRate)
         return state
+    }
+
+    /** Loads and starts a single non-graph linear source (streamed by default for Jukebox/OST tracks). */
+    fun loadLinear(
+        title: String,
+        audio: ByteArray,
+        assetId: String,
+        loop: Boolean = false,
+        streamed: Boolean = true,
+    ): State {
+        if (state is State.Playing || state is State.Paused) {
+            engine.stop()
+        }
+        val loaded = engine.loadLinearBwav(audio, assetId, loop = loop, streamed = streamed)
+        if (loaded != AudioEngine.STATUS_OK) {
+            return fail("Could not read the audio: ${describe(loaded)}")
+        }
+        linearMode = true
+        linearRepeating = loop
+        userStopped = false
+        sawActivePlayback = false
+        reportedNaturalEnd = false
+        this.title = title
+        this.sampleRate = engine.sampleRate
+
+        val started = engine.play(AudioEngine.PLAY_LINEAR)
+        if (started != AudioEngine.STATUS_OK) {
+            return fail("Could not start playback: ${describe(started)}")
+        }
+        state = State.Ready(title, totalFrames = 0, sampleRate = this.sampleRate)
+        return state
+    }
+
+    /** Updates linear single-track repeat state while the output consumer is released. */
+    fun setLinearRepeat(enabled: Boolean, begin: Long = 0L, end: Long = totalFrames): State {
+        if (!linearMode) return state
+        val status = if (enabled && begin >= 0L && end > begin) {
+            engine.setLinearRepeat(true, begin, end)
+        } else {
+            engine.setLinearRepeat(enabled, -1L, -1L)
+        }
+        if (status != AudioEngine.STATUS_OK) {
+            return fail("Could not update repeat: ${describe(status)}")
+        }
+        linearRepeating = enabled
+        return poll()
     }
 
     /** Records the track length once the caller knows it from the header. */
@@ -108,6 +169,11 @@ internal class PlaybackController(private val engine: PlaybackEngine) {
         if (status != AudioEngine.STATUS_OK) {
             return fail("Could not load the flow: ${describe(status)}")
         }
+        linearMode = false
+        linearRepeating = false
+        userStopped = false
+        sawActivePlayback = false
+        reportedNaturalEnd = false
         state = State.Ready(title, totalFrames = 0, sampleRate = engine.sampleRate)
         sampleRate = engine.sampleRate
         return state
@@ -121,6 +187,8 @@ internal class PlaybackController(private val engine: PlaybackEngine) {
      * graph.
      */
     fun playSegment(segment: Int): State {
+        userStopped = false
+        reportedNaturalEnd = false
         val status = engine.play(segment)
         if (status != AudioEngine.STATUS_OK) {
             return fail("Could not play section $segment: ${describe(status)}")
@@ -138,12 +206,38 @@ internal class PlaybackController(private val engine: PlaybackEngine) {
         val fields = EngineSnapshot.read(engine.snapshot())
             ?: return if (state is State.Idle) state else fail("The engine stopped reporting state.")
 
-        val position = fields.transportFrame
+        val rawPosition = fields.transportFrame
+        val position = if (linearMode && totalFrames > 0L) {
+            val source = engine.sourceSnapshot(0)
+            if (source != null && source.size >= 11 && source[1] == 1L) {
+                source[10].coerceIn(0L, totalFrames)
+            } else if (linearRepeating) {
+                rawPosition % totalFrames
+            } else {
+                rawPosition.coerceIn(0L, totalFrames)
+            }
+        } else {
+            rawPosition
+        }
+        val previous = state
+        if (fields.isPlaying || fields.isPaused) {
+            sawActivePlayback = true
+            reportedNaturalEnd = false
+        }
+        val reachedNaturalEnd = !reportedNaturalEnd && fields.isStopped && !userStopped &&
+            (sawActivePlayback || totalFrames in 1..rawPosition)
+        if (reachedNaturalEnd) {
+            sawActivePlayback = false
+            reportedNaturalEnd = true
+        }
         state = when {
             fields.isPlaying -> State.Playing(title, position, totalFrames, sampleRate)
             fields.isPaused -> State.Paused(title, position, totalFrames, sampleRate)
-            fields.isStopped && totalFrames in 1..position -> State.Stopped(title, totalFrames, sampleRate)
-            else -> state
+            reachedNaturalEnd -> State.Stopped(title, totalFrames, sampleRate, naturalEnd = true)
+            fields.isStopped && previous is State.Stopped && previous.naturalEnd ->
+                State.Stopped(title, totalFrames, sampleRate, naturalEnd = false)
+            fields.isStopped && totalFrames in 1..rawPosition -> State.Stopped(title, totalFrames, sampleRate)
+            else -> previous
         }
         return state
     }
@@ -155,15 +249,21 @@ internal class PlaybackController(private val engine: PlaybackEngine) {
     }
 
     fun resume(): State {
+        userStopped = false
+        reportedNaturalEnd = false
         val result = engine.resume()
         if (result != AudioEngine.STATUS_OK) return fail("Could not resume: ${describe(result)}")
         return poll()
     }
 
     fun stop(): State {
+        userStopped = true
+        sawActivePlayback = false
+        reportedNaturalEnd = false
+        linearRepeating = false
         val result = engine.stop()
         if (result != AudioEngine.STATUS_OK) return fail("Could not stop: ${describe(result)}")
-        state = State.Stopped(title, totalFrames, sampleRate)
+        state = State.Stopped(title, totalFrames, sampleRate, naturalEnd = false)
         return state
     }
 
@@ -178,6 +278,8 @@ internal class PlaybackController(private val engine: PlaybackEngine) {
         if (!SeekTarget.isAddressable(frame, totalFrames)) {
             return fail("Cannot seek to frame $frame of $totalFrames.")
         }
+        userStopped = false
+        reportedNaturalEnd = false
         val result = engine.seek(frame)
         if (result != AudioEngine.STATUS_OK) {
             return fail("Could not seek: ${describe(result)}")
@@ -192,6 +294,11 @@ internal class PlaybackController(private val engine: PlaybackEngine) {
         title = ""
         totalFrames = 0
         sampleRate = 0
+        linearMode = false
+        linearRepeating = false
+        userStopped = false
+        sawActivePlayback = false
+        reportedNaturalEnd = false
         return state
     }
 

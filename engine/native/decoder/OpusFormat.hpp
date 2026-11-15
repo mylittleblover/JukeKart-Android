@@ -1,4 +1,5 @@
 #pragma once
+#include "api/StreamTypes.hpp"
 #include "decoder/SourceBytes.hpp"
 #include <opus.h>
 #include <algorithm>
@@ -107,5 +108,10 @@ template<class Bytes> OpusLayout parseOpus(Bytes& bytes,const DecodeLimits& limi
     return result;
 }
 std::unique_ptr<AudioFrameSource> makePacketOpusSource(std::unique_ptr<EncodedSourceInput> input,const DecodeLimits& limits,OpusLayout layout);
+// A BWAV codec-2 file stores one independent mono Opus stream per speaker. This builds a source that
+// decodes each chain separately and interleaves them, which is the only reading that matches the container.
+std::unique_ptr<AudioFrameSource> makeMultiPacketOpusSource(std::unique_ptr<EncodedSourceInput> input,
+    const DecodeLimits& limits,std::vector<OpusLayout> layouts,SourceMetadata metadata,
+    std::optional<SourceStreamInfo> stream=std::nullopt);
 
 }

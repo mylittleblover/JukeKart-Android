@@ -36,8 +36,17 @@ class TrackEntryTest {
     }
 
     @Test
-    fun kindTwoIsNotPlayable() {
+    fun opusIsPlayable() {
+        // Codec 2 is the jukebox and cutscene codec. It was refused until `parseBwavOpusChannel` stopped
+        // reading the pre-skip from the wrong word; all 227 jukebox files now decode through the real reader.
         val result = Playability.evaluate(2)
+        assertTrue(result.playable)
+        assertNull(result.reason)
+    }
+
+    @Test
+    fun anUnknownCodecKindIsNotPlayable() {
+        val result = Playability.evaluate(3)
         assertFalse(result.playable)
         assertEquals(Playability.REASON_UNSUPPORTED_CODEC, result.reason)
     }
@@ -130,8 +139,10 @@ class TrackEntryTest {
     }
 
     @Test
-    fun supportedCodecConstantIsOne() {
-        // Kind 1 is DSP-ADPCM; kind 0 is raw PCM which no MKW file uses.
+    fun supportedCodecKindsAreDspAndOpus() {
+        // Kind 1 is DSP-ADPCM (course themes), kind 2 is chunked Opus (jukebox and cutscenes). Kind 0 is
+        // raw PCM, which no MKW file uses, so it stays out.
         assertEquals(1, Playability.SUPPORTED_BWAV_CODEC_KIND)
+        assertEquals(setOf(1, 2), Playability.SUPPORTED_BWAV_CODEC_KINDS)
     }
 }

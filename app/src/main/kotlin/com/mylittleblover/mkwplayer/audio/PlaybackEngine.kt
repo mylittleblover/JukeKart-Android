@@ -16,6 +16,9 @@ internal interface PlaybackEngine {
 
     fun loadGraph(packet: ByteArray): Int
     fun bindBwav(assetIndex: Int, bytes: ByteArray, assetId: String): Int
+    fun loadLinearBwav(bytes: ByteArray, assetId: String, loop: Boolean = false, streamed: Boolean = true): Int = 1
+    fun setLinearRepeat(enabled: Boolean, begin: Long = -1L, end: Long = -1L): Int = 1
+    fun sourceSnapshot(slot: Int): LongArray? = null
     fun play(target: Int): Int
     fun stop(): Int
     fun pause(): Int
@@ -36,6 +39,11 @@ internal class NativePlaybackEngine(private val engine: AudioEngine) : PlaybackE
     override fun loadGraph(packet: ByteArray): Int = engine.loadGraph(packet)
     override fun bindBwav(assetIndex: Int, bytes: ByteArray, assetId: String): Int =
         engine.bindBwav(assetIndex, bytes, assetId)
+    override fun loadLinearBwav(bytes: ByteArray, assetId: String, loop: Boolean, streamed: Boolean): Int =
+        engine.loadLinearBwav(bytes, assetId, loop, streamed)
+    override fun setLinearRepeat(enabled: Boolean, begin: Long, end: Long): Int =
+        engine.setLinearRepeat(enabled, begin, end)
+    override fun sourceSnapshot(slot: Int): LongArray? = engine.sourceSnapshot(slot)
     override fun play(target: Int): Int = engine.play(target)
     override fun stop(): Int = engine.stop()
     override fun pause(): Int = engine.pause()

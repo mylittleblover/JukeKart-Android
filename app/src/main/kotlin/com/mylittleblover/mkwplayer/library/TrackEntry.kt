@@ -57,28 +57,33 @@ enum class TrackCategory(val label: String) {
  * Decides whether a track can be played by this build.
  *
  * Two facts drive it, both measured rather than assumed:
- *  - 253 of 650 entries use a BWAV codec (kind 2) this build does not decode
+ *  - the decoder handles DSP-ADPCM (codec 1) and chunked Opus (codec 2)
  *  - every course theme is decodable, so a course theme must never be greyed out
  *
  * The measured distribution, checked against the real files:
  *
- *   COURSE    338 x kind1                     -> fully playable
- *   JUKEBOX   227 x kind2                     -> fully blocked
- *   CUTSCENE   22 x kind2                     -> fully blocked
- *   BATTLE     16 x kind1                     -> fully playable
- *   SEQUENCE   33 x kind1 + 1 x kind2         -> mixed
- *   DEMO        1 x kind1 + 3 x kind2         -> mixed
+ *   COURSE    338 x kind1                     -> playable
+ *   JUKEBOX   227 x kind2                     -> playable since codec 2 was wired up
+ *   CUTSCENE   22 x kind2                     -> playable
+ *   BATTLE     16 x kind1                     -> playable
+ *   SEQUENCE   33 x kind1 + 1 x kind2         -> playable
+ *   DEMO        1 x kind1 + 3 x kind2         -> playable
  *
- * The mixed groups are why playability must be decided per entry. Grouping by
- * category and assuming the group's capability would either hide playable tracks
- * or offer tracks that produce silence.
+ * Codec 2 used to be refused wholesale, which greyed out the entire jukebox. That was a limitation of the
+ * reader, not of the container: `parseBwavOpusChannel` read the pre-skip from the wrong word of the config
+ * block, so no codec-2 file ever reached the decoder. With that fixed, all 227 jukebox files decode (probed
+ * one at a time through the real `openBwav`, 227 OK / 0 refused / 0 silent).
  *
- * Keeping this rule in one place means the UI cannot drift from the decoder's
- * actual capability: if the decoder gains kind 2, only this function changes.
+ * The mixed groups are still why playability must be decided per entry rather than by category.
+ *
+ * Keeping this rule in one place means the UI cannot drift from the decoder's actual capability.
  */
 object Playability {
 
-    /** The only BWAV codec this build decodes: Nintendo DSP-ADPCM. */
+    /** BWAV codec kinds this build decodes: Nintendo DSP-ADPCM and chunked Opus. */
+    val SUPPORTED_BWAV_CODEC_KINDS: Set<Int> = setOf(1, 2)
+
+    /** The codec a build without Opus would stop at. Kept as the documented lower bound. */
     const val SUPPORTED_BWAV_CODEC_KIND = 1
 
     /** What the UI shows for a file whose codec is not implemented. */
@@ -92,7 +97,7 @@ object Playability {
         if (codecKind == null) {
             return Result(playable = false, reason = "Unreadable source.")
         }
-        return if (codecKind == SUPPORTED_BWAV_CODEC_KIND) {
+        return if (codecKind in SUPPORTED_BWAV_CODEC_KINDS) {
             Result(playable = true, reason = null)
         } else {
             Result(playable = false, reason = REASON_UNSUPPORTED_CODEC)

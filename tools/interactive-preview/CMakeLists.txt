@@ -20,3 +20,14 @@ target_compile_features(mkw_global_fade_stop_test PRIVATE cxx_std_17)
 add_executable(mkw_pending_transition_bench pending_transition_bench.cpp)
 target_link_libraries(mkw_pending_transition_bench PRIVATE player2_engine)
 target_compile_features(mkw_pending_transition_bench PRIVATE cxx_std_17)
+
+add_executable(mkw_bwav_decode_probe bwav_decode_probe.cpp)
+target_link_libraries(mkw_bwav_decode_probe PRIVATE player2_engine)
+target_compile_features(mkw_bwav_decode_probe PRIVATE cxx_std_17)
+target_include_directories(mkw_bwav_decode_probe PRIVATE ${MKW_ROOT}/third_party/opus/upstream/include)
+
+# The NDK toolchain does not add libc++ to an executable that links a mixed C/C++ static library, so the
+# probe states it explicitly, exactly as the app target does.
+if(ANDROID)
+    target_link_libraries(mkw_bwav_decode_probe PRIVATE c++_shared)
+endif()

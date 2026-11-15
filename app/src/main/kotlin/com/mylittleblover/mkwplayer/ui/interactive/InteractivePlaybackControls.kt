@@ -165,7 +165,7 @@ internal fun InteractiveActionBar(flow: PlayerViewModel.FlowUi, onAdvance: () ->
     onFast: () -> Unit, onCancel: () -> Unit, onEnd: () -> Unit) {
     val actions = listOf(
         Triple(Icons.Filled.SkipNext, R.string.interactive_action_next, onAdvance) to (flow.canAdvance && flow.selectedRegion != 5),
-        Triple(Icons.Filled.Speed, R.string.interactive_action_fast, onFast) to flow.canFast,
+        Triple(Icons.Filled.Speed, if (flow.isBattleTrack) R.string.stage_battle_fast else R.string.interactive_action_fast, onFast) to flow.canFast,
         Triple(Icons.Filled.Flag, R.string.interactive_action_end, onEnd) to (flow.canEnd && flow.selectedRegion != 5),
         Triple(Icons.AutoMirrored.Filled.Undo, R.string.interactive_action_cancel, onCancel) to flow.canCancelPending)
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

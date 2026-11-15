@@ -211,7 +211,7 @@ internal fun clampPan(x: Float, y: Float, scale: Float, viewport: Size): Pair<Fl
 }
 
 /** The shipped map's own proportions. A pin's fractions refer to this frame. */
-internal const val MAP_ASPECT = 2500f / 2400f
+internal const val MAP_ASPECT = 2857f / 2400f
 
 /** The same ratio under the name the screen uses, so the asset and the frame cannot drift apart. */
 internal const val MAP_IMAGE_ASPECT = MAP_ASPECT

@@ -33,7 +33,12 @@ template<class Bytes> OpusLayout parseBwavOpusChannel(Bytes& input,std::size_t s
     if(input.u32(start)!=BwavChunkConfig)fail(SourceStatus::UnsupportedCodec);
     const auto configBytes=input.u32(start+4);
     if(configBytes<24 || configBytes>64)fail(SourceStatus::MalformedSource);
-    if(input.u32(start+8+16)!=BwavOpusPreSkip)fail(SourceStatus::UnsupportedCodec);
+    // The config block's *sixth* word carries the pre-skip. Counting from one, that is the word at +20 from
+    // the block's start at `start+8`, not +16: the layout is {rate, 256, 48000, 32, 0, 0, 120} for the real
+    // jukebox corpus, and reading +16 lands on a zero. That off-by-one-word was why every codec-2 file was
+    // refused before the payload was ever looked at.
+    const auto preSkipWord=input.u32(start+8+20);
+    if(preSkipWord!=BwavOpusPreSkip)fail(SourceStatus::UnsupportedCodec);
     const auto payload=start+8+configBytes;
     if(input.u32(payload)!=BwavChunkPayload)fail(SourceStatus::UnsupportedCodec);
     const auto payloadBytes=input.u32(payload+4);
@@ -90,15 +95,11 @@ template<class Bytes> BwavLayout parseBwav(Bytes& input,const DecodeLimits& limi
         validateFormat(static_cast<std::int32_t>(hz),1);boundStreamDuration(samples,hz,limits);
         if(full!=samples || input.u32(h+48)!=input.u32(h+52) || input.u32(h+56)!=1 || input.u16(h+74))fail(SourceStatus::UnsupportedCodec);
         if((count==1 && speaker!=0 && speaker!=2) || (count==2 && speaker!=ch))fail(SourceStatus::UnsupportedChannels);
-        if(speaker>2)fail(SourceStatus::UnsupportedChannels);
+        if(speaker>5)fail(SourceStatus::UnsupportedChannels);
         result.speakers[ch]=static_cast<std::uint8_t>(speaker);
         const auto last=input.u32(h+60),first=input.u32(h+64);
         std::optional<SourceLoopMetadata> channelLoop;
-        if(kind==2) {
-            // Opus files carry no loop window; the marker records that the game uses are elsewhere, and a
-            // loop invented here would be this reader's claim rather than the container's.
-            if(last!=0xffffffffu || first)fail(SourceStatus::UnsupportedCodec);
-        } else if(last!=0xffffffffu) {
+        if(last!=0xffffffffu) {
             if(first>=last || last>samples)fail(SourceStatus::SourceLoopBounds);
             channelLoop=SourceLoopMetadata{{first},{last}};
         } else if(first)fail(SourceStatus::UnsupportedCodec);
@@ -164,6 +165,8 @@ template<class Bytes> BwavLayout parseBwav(Bytes& input,const DecodeLimits& limi
         if(result.opusChannels.size()!=count)fail(SourceStatus::MalformedSource);
         result.metadata=result.opusChannels.front().metadata;
         result.metadata.channels=static_cast<std::int32_t>(count);
+        result.metadata.sourceLoop=loop;
+        if(loop)result.metadata.flags|=LoopMetadata;
         return result;
     }
     result.metadata={"native.bwav",SourceKind::GameStream,static_cast<std::int32_t>(rate),count,{frames},SeekSupport::Fast,

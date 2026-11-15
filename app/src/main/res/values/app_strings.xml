@@ -23,4 +23,9 @@
     <string name="language_ja_native" translatable="false">日本語</string>
     <string name="settings_library_counts">%1$d tracks imported · %2$d playable</string>
     <string name="settings_import_details">Import details</string>
+    <string name="settings_output_title">Output level</string>
+    <string name="settings_output_hint">The game\'s own audio is mastered quietly. Raising it here lifts every track; the ceiling keeps the peaks from clipping.</string>
+    <string name="settings_output_flat">Full range kept, no ceiling</string>
+    <string name="settings_output_limited">Peaks held under the ceiling</string>
+    <string name="settings_output_default">Default</string>
 </resources>

@@ -137,8 +137,26 @@ class PlaybackService : Service() {
                 }
 
                 override fun onSeekTo(pos: Long) {
-                    session.seek(pos)
+                    val current = session.state.value
+                    val targetFrame = if (current.sampleRate > 0 && current.totalFrames > 0) {
+                        (pos * current.sampleRate / 1000L).coerceIn(0L, current.totalFrames)
+                    } else {
+                        pos.coerceAtLeast(0L)
+                    }
+                    session.seek(targetFrame)
                     refresh()
+                }
+
+                override fun onSkipToNext() {
+                    if (session.onSkipNext?.invoke() == true) {
+                        refresh()
+                    }
+                }
+
+                override fun onSkipToPrevious() {
+                    if (session.onSkipPrevious?.invoke() == true) {
+                        refresh()
+                    }
                 }
             })
             isActive = true
@@ -203,6 +221,12 @@ class PlaybackService : Service() {
             }
             ACTION_RESUME -> {
                 if (requestFocusForPlayback()) session.resume()
+            }
+            ACTION_PREV -> {
+                session.onSkipPrevious?.invoke()
+            }
+            ACTION_NEXT -> {
+                session.onSkipNext?.invoke()
             }
             ACTION_STOP -> {
                 session.stop()
@@ -281,14 +305,18 @@ class PlaybackService : Service() {
                 .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, durationMillis(state))
                 .build(),
         )
+        val baseActions = PlaybackStateCompat.ACTION_PLAY or
+            PlaybackStateCompat.ACTION_PAUSE or
+            PlaybackStateCompat.ACTION_STOP or
+            PlaybackStateCompat.ACTION_SEEK_TO
+        val actions = if (state.linear && this.session.canSkipQueue?.invoke() == true) {
+            baseActions or PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or PlaybackStateCompat.ACTION_SKIP_TO_NEXT
+        } else {
+            baseActions
+        }
         session.setPlaybackState(
             PlaybackStateCompat.Builder()
-                .setActions(
-                    PlaybackStateCompat.ACTION_PLAY or
-                        PlaybackStateCompat.ACTION_PAUSE or
-                        PlaybackStateCompat.ACTION_STOP or
-                        PlaybackStateCompat.ACTION_SEEK_TO,
-                )
+                .setActions(actions)
                 .setState(playbackState, position, if (state.playing) 1f else 0f)
                 .build(),
         )
@@ -322,6 +350,12 @@ class PlaybackService : Service() {
             .setOnlyAlertOnce(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
 
+        if (state.linear && session.canSkipQueue?.invoke() == true) {
+            builder.addAction(
+                android.R.drawable.ic_media_previous, "Previous",
+                command(ACTION_PREV),
+            )
+        }
         if (!state.playing) {
             builder.addAction(
                 android.R.drawable.ic_media_play, "Resume",
@@ -332,6 +366,12 @@ class PlaybackService : Service() {
             builder.addAction(
                 android.R.drawable.ic_media_pause, "Pause",
                 command(ACTION_PAUSE),
+            )
+        }
+        if (state.linear && session.canSkipQueue?.invoke() == true) {
+            builder.addAction(
+                android.R.drawable.ic_media_next, "Next",
+                command(ACTION_NEXT),
             )
         }
         builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", command(ACTION_STOP))
@@ -374,6 +414,8 @@ class PlaybackService : Service() {
 
         const val ACTION_PAUSE = "com.mylittleblover.mkwplayer.PAUSE"
         const val ACTION_RESUME = "com.mylittleblover.mkwplayer.RESUME"
+        const val ACTION_PREV = "com.mylittleblover.mkwplayer.PREV"
+        const val ACTION_NEXT = "com.mylittleblover.mkwplayer.NEXT"
         const val ACTION_STOP = "com.mylittleblover.mkwplayer.STOP"
 
         /**

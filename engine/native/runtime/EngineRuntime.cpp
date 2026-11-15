@@ -1,4 +1,6 @@
 #include "runtime/EngineRuntime.hpp"
+#include <algorithm>
+#include <cmath>
 #include <limits>
 namespace player2 {
 using api::EngineStatus;
@@ -242,6 +244,13 @@ void EngineRuntime::execute(const api::EngineCommand& command,int depth) noexcep
             break;
         case EngineCommandKind::LayerGain:
             if(!parameters_ || !parameters_->setLayerGain(command.target,command.number))last_=EngineStatus::InvalidRequest;
+            break;
+        case EngineCommandKind::OutputGain:
+            // Master trim: `target` carries the gain in decibels as an integer tenth, `value` the ceiling the
+            // same way, so the wire stays integral like every other command. A ceiling of 0 dB means "hold the
+            // gain but never let the result clip", which is the useful default.
+            outputGain_=static_cast<float>(dbGain(std::clamp(static_cast<double>(command.target)/10.0,-60.0,24.0)));
+            outputCeiling_=static_cast<float>(dbGain(std::clamp(static_cast<double>(command.value)/10.0,-60.0,0.0)));
             break;
         case EngineCommandKind::Event: {
             const auto* event=graph_ ? find(graph_->events,command.target) : nullptr;
@@ -519,6 +528,14 @@ void EngineRuntime::render(float* output,std::size_t frames) noexcept {
             }
         }
         advanceMusicalLoop();
+        // Master trim, then the ceiling. The gain is applied before the limit so a quiet source is lifted and
+        // only what would exceed the ceiling is reduced -- limiting first and gaining after would just clip.
+        if(outputGain_!=1.0f) {
+            mixed.left=static_cast<double>(static_cast<float>(mixed.left)*outputGain_);
+            mixed.right=static_cast<double>(static_cast<float>(mixed.right)*outputGain_);
+        }
+        if(std::abs(mixed.left)>outputCeiling_) {mixed.left=std::copysign(static_cast<double>(outputCeiling_),mixed.left);++limitedSamples_;}
+        if(std::abs(mixed.right)>outputCeiling_) {mixed.right=std::copysign(static_cast<double>(outputCeiling_),mixed.right);++limitedSamples_;}
         output[frame*2]=mixed.left; output[frame*2+1]=mixed.right;
         peakLeft_=std::max(peakLeft_,std::abs(mixed.left)); peakRight_=std::max(peakRight_,std::abs(mixed.right));
     }

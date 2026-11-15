@@ -30,4 +30,22 @@
     <string name="map_stop_separator">、</string>
     <string name="map_course">赛道</string>
     <string name="map_close">关闭</string>
+    <string name="map_course_connections">游戏定义的 %1$d 条连接：%2$s</string>
+    <string name="map_course_sink">这里是终点。游戏没有为它定义任何出口连接。</string>
+    <string name="map_course_no_connections">游戏没有为此赛道定义连接。</string>
+    <string name="map_edit_enter">开始连线</string>
+    <string name="map_edit_exit">退出连线</string>
+    <string name="map_edit_title">正在连线</string>
+    <string name="map_edit_hint">点选一条游戏定义的连接；方向固定，不会自动补反向。</string>
+    <string name="map_edit_undo">撤回上一条</string>
+    <string name="map_edit_clear">清空</string>
+    <string name="map_edit_empty">还没有添加连接。</string>
+    <string name="map_edit_not_allowed">游戏没有定义这条连接。</string>
+    <string name="map_edit_reverse_only">游戏只定义了反方向。</string>
+    <string name="map_edit_sink">这里是终点，没有出口连接。</string>
+    <string name="map_edit_need_start">先点选一条连接。</string>
+    <string name="map_edit_save">保存为路线</string>
+    <string name="map_edit_saved">已保存</string>
+    <string name="map_edit_source">连接表来自游戏导出的 Stage_Connections_Final。</string>
+    <string name="map_course_connections_hidden">另有 %1$d 条连接已定义，但未显示在这张地图上。</string>
 </resources>

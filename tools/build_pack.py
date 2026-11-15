@@ -10,10 +10,10 @@ Three decisions are worth stating, because each one is a place the tool could qu
 sample rate and a channel count, and every one of them comes from the file. A file that will not parse is
 counted and reported, never included with placeholder numbers.
 
-**Codec 2 is included and declared as unplayable.** 227 jukebox tracks use it. Leaving them out would make
-the pack look complete while it is not; including them and claiming they play would be worse. The manifest
-declares the codec kind per asset and the coverage counts say how many are playable in a build that can
-only decode DSP-ADPCM.
+**Both codecs are included and both are declared playable.** 227 jukebox tracks use chunked Opus (codec 2)
+and the reader decodes it; the rest are DSP-ADPCM (codec 1). The manifest still declares the codec kind per
+asset, so a build that cannot decode one of them can say exactly what it is missing rather than quietly
+offering silence.
 
 **The unlock scope comes from the catalogue, not from what was scanned.** The Special Cup is defined by a
 frozen list of stage codes chosen once, so a pack built from a partial tree cannot accidentally define a
@@ -299,12 +299,13 @@ def build_tracks(files: list[Bwav]) -> list[Track]:
 
 
 def playable(codec_kind: int) -> bool:
-    """Whether a build that decodes DSP-ADPCM can play this asset.
+    """Whether this build can play an asset with [codec_kind].
 
-    Kept in step with the reader's own rule: only kind 1 is decodable today, and the coverage numbers in the
-    manifest say so rather than rounding up.
+    Kept in step with `Playability.SUPPORTED_BWAV_CODEC_KINDS` in the reader: kinds 1 (DSP-ADPCM) and 2
+    (chunked Opus) both decode. The coverage numbers in the manifest say so rather than rounding down; a
+    pack full of jukebox tracks is not "29 playable of 256" any more.
     """
-    return codec_kind == 1
+    return codec_kind in (1, 2)
 
 
 def build(
@@ -472,7 +473,7 @@ def build(
     print(f"pack      : {out}")
     print(f"size      : {out.stat().st_size / (1024 ** 3):.2f} GiB")
     print(f"assets    : {len(files)}")
-    print(f"tracks    : {len(tracks)} ({playable_tracks} playable in a DSP-ADPCM build)")
+    print(f"tracks    : {len(tracks)} ({playable_tracks} playable in this build)")
     print(f"stages    : {len(stages_present(tracks))}")
     print(f"codecs    : {codec_kinds}")
     scope_size = len(manifest["unlock"]["stages"])

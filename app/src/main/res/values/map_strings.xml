@@ -30,4 +30,23 @@
     <string name="map_stop_separator">", "</string>
     <string name="map_course">Course</string>
     <string name="map_close">Close</string>
+    <string name="map_course_connections">%1$d connections from the game: %2$s</string>
+    <string name="map_course_sink">This is the finish line. The game gives it no outgoing connection.</string>
+    <string name="map_course_no_connections">The game defines no connection from this course.</string>
+    <string name="map_edit_enter">Edit connections</string>
+    <string name="map_edit_exit">Exit connection editor</string>
+    <string name="map_edit_title">Editing connections</string>
+    <string name="map_edit_hint">Tap a connection the game defines. Direction is fixed; the reverse is never added for you.</string>
+    <string name="map_edit_undo">Undo last</string>
+    <string name="map_edit_clear">Clear</string>
+    <string name="map_edit_empty">No connections added yet.</string>
+    <string name="map_edit_not_allowed">The game does not define this connection.</string>
+    <string name="map_edit_reverse_only">The game only defines the reverse direction.</string>
+    <string name="map_edit_sink">This is the finish line; it has no outgoing connection.</string>
+    <string name="map_edit_need_start">Choose a connection first.</string>
+    <string name="map_edit_save">Save as route</string>
+    <string name="map_edit_saved">Saved</string>
+    <string name="map_edit_source">The connection table is the game export Stage_Connections_Final.</string>
+    <string name="map_edit_refusal_missing">The game defines no connection between those two courses.</string>
+    <string name="map_course_connections_hidden">%1$d more are defined but not shown on this map.</string>
 </resources>

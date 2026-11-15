@@ -73,6 +73,57 @@ internal object CupArt {
      * visibly different from one that does not.
      */
     fun cupIncludingHidden(id: String): Cup? = all().firstOrNull { it.id == id }
+
+    /** A Knockout Tour rally crest matching `official_routes.json` route ids. */
+    data class Rally(val id: String, val label: String, val drawable: Int, val code: String)
+
+    /** The twelve Knockout Tour rallies in game order (`SV00`..`SV11`). */
+    val rallies: List<Rally> = listOf(
+        Rally("golden_rally", "Golden Rally", R.drawable.sv_00, "SV00"),
+        Rally("ice_rally", "Ice Rally", R.drawable.sv_01, "SV01"),
+        Rally("moon_rally", "Moon Rally", R.drawable.sv_02, "SV02"),
+        Rally("spiny_rally", "Spiny Rally", R.drawable.sv_03, "SV03"),
+        Rally("cherry_rally", "Cherry Rally", R.drawable.sv_04, "SV04"),
+        Rally("acorn_rally", "Acorn Rally", R.drawable.sv_05, "SV05"),
+        Rally("cloud_rally", "Cloud Rally", R.drawable.sv_06, "SV06"),
+        Rally("heart_rally", "Heart Rally", R.drawable.sv_07, "SV07"),
+        Rally("drill_rally", "Drill Rally", R.drawable.sv_08, "SV08"),
+        Rally("boomerang_rally", "Boomerang Rally", R.drawable.sv_09, "SV09"),
+        Rally("propeller_rally", "Propeller Rally", R.drawable.sv_10, "SV10"),
+        Rally("turnip_rally", "Turnip Rally", R.drawable.sv_11, "SV11"),
+    )
+
+    fun rally(id: String): Rally? = rallies.firstOrNull { it.id == id }
+
+    /** Resolves an official route id (either `<cup>_cup` or `<name>_rally`) to its badge drawable. */
+    fun routeEmblem(routeId: String): Int? =
+        all().firstOrNull { "${it.id}_cup" == routeId }?.drawable ?: rally(routeId)?.drawable
+
+    private val routeMasks: Map<String, Int> = mapOf(
+        "mushroom_cup" to R.drawable.map_light_gp00,
+        "flower_cup" to R.drawable.map_light_gp01,
+        "star_cup" to R.drawable.map_light_gp02,
+        "shell_cup" to R.drawable.map_light_gp03,
+        "banana_cup" to R.drawable.map_light_gp04,
+        "leaf_cup" to R.drawable.map_light_gp05,
+        "lightning_cup" to R.drawable.map_light_gp06,
+        "special_cup" to R.drawable.map_light_gp07,
+        "golden_rally" to R.drawable.map_light_sv00,
+        "ice_rally" to R.drawable.map_light_sv01,
+        "moon_rally" to R.drawable.map_light_sv02,
+        "spiny_rally" to R.drawable.map_light_sv03,
+        "cherry_rally" to R.drawable.map_light_sv04,
+        "acorn_rally" to R.drawable.map_light_sv05,
+        "cloud_rally" to R.drawable.map_light_sv06,
+        "heart_rally" to R.drawable.map_light_sv07,
+        "drill_rally" to R.drawable.map_light_sv08,
+        "boomerang_rally" to R.drawable.map_light_sv09,
+        "propeller_rally" to R.drawable.map_light_sv10,
+        "turnip_rally" to R.drawable.map_light_sv11,
+    )
+
+    /** Resolves an official route id to its `Map_00` corridor highlight mask drawable. */
+    fun routeHighlightMask(routeId: String): Int? = routeMasks[routeId]
 }
 
 /**

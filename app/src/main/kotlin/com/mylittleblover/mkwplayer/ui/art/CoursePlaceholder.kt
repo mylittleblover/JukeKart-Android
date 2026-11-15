@@ -32,13 +32,10 @@ internal fun CoursePlaceholder(code: String?, modifier: Modifier = Modifier, sho
             MapAnchors.parse(context.assets.open("map_anchors.json").bufferedReader().use { it.readText() })?.stageTolerant(code.orEmpty())
         }.getOrNull()
     }
-    val map by produceState(MapArtworkCache.cached(), context) {
-        value = MapArtworkCache.load(context)
-    }
-    Box(modifier, contentAlignment = Alignment.Center) {
-        if (map != null && anchor != null) {
-            val image = map!!
-            Canvas(Modifier.fillMaxSize()) {
+    ArtworkSlot(modifier) { edge ->
+        val image = rememberResourceArtwork(R.drawable.world_map.takeIf { anchor != null }, if (edge == 0) 0 else 960)?.bitmap
+        if (image != null && anchor != null) {
+            Canvas(Modifier.fillMaxSize().then(artworkFade(image))) {
                 val width = (image.width * .24f).toInt().coerceAtLeast(1)
                 val height = (image.height * .18f).toInt().coerceAtLeast(1)
                 val left = (anchor.u * image.width - width / 2).toInt().coerceIn(0, image.width - width)
@@ -47,6 +44,6 @@ internal fun CoursePlaceholder(code: String?, modifier: Modifier = Modifier, sho
                     dstSize = IntSize(size.width.toInt().coerceAtLeast(1), size.height.toInt().coerceAtLeast(1)))
             }
         }
-        if (showIcon) code?.let { StageArt.resolve(it) }?.let { Image(painterResource(it), null, Modifier.size(120.dp)) }
+        if (showIcon) code?.let { StageArt.resolve(it) }?.let { ResourceArtwork(it, Modifier.size(120.dp)) }
     }
 }

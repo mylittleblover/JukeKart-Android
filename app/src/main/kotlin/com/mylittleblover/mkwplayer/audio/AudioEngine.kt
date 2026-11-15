@@ -1,4 +1,4 @@
-﻿package com.mylittleblover.mkwplayer.audio
+package com.mylittleblover.mkwplayer.audio
 
 import com.mylittleblover.player2.platform.audio.NativeAudioLibrary
 
@@ -45,15 +45,34 @@ internal class AudioEngine private constructor(private val handle: Long) : Sessi
     override fun bindStreamedBwav(assetIndex: Int,bytes: ByteArray,assetId: String): Int =
         if(closed) CLOSED else NativeAudioLibrary.bindSource(handle,assetIndex,PROVIDER_BWAV,bytes,1,assetId,null,null,null)
 
-    fun loadLinearBwav(bytes: ByteArray, assetId: String, loop: Boolean): Int =
+    override fun setOutputGain(gainDb: Double, ceilingDb: Double): Int =
+        if (closed) CLOSED else NativeAudioLibrary.setOutputGain(handle, gainDb, ceilingDb)
+
+    override fun setLayerGain(trackIndex: Int, gainDb: Double): Int =
+        if (closed) CLOSED else NativeAudioLibrary.command(handle, COMMAND_LAYER_GAIN, trackIndex, 0, gainDb, -1L)
+
+    /** Samples the ceiling has caught, for a diagnostic line. */
+    fun limitedSamples(): Long = if (closed) 0 else NativeAudioLibrary.limitedSampleCount(handle)
+
+    override fun loadLinearBwav(bytes: ByteArray, assetId: String, loop: Boolean, streamed: Boolean): Int =
         if (closed) {
             CLOSED
         } else {
             NativeAudioLibrary.loadLinear(
-                handle, PROVIDER_BWAV, bytes, loop, PREPARATION_PREPARED,
-                assetId, null, null, null,
+                handle,
+                PROVIDER_BWAV,
+                bytes,
+                loop,
+                if (streamed) PREPARATION_STREAMED else PREPARATION_PREPARED,
+                assetId,
+                null,
+                null,
+                null,
             )
         }
+
+    override fun setLinearRepeat(enabled: Boolean, begin: Long, end: Long): Int =
+        if (closed) CLOSED else NativeAudioLibrary.setLinearRepeat(handle, enabled, begin, end)
 
     /**
      * Submits Play.
@@ -112,6 +131,9 @@ internal class AudioEngine private constructor(private val handle: Long) : Sessi
         /** SourcePreparation.Prepared: decode up front instead of streaming. */
         const val PREPARATION_PREPARED = 0
 
+        /** SourcePreparation.Streamed: decode pages on demand from an active worker. */
+        const val PREPARATION_STREAMED = 1
+
         /** EngineCommandKind.Play */
         const val COMMAND_PLAY = 0
 
@@ -123,6 +145,9 @@ internal class AudioEngine private constructor(private val handle: Long) : Sessi
 
         /** EngineCommandKind.Resume */
         const val COMMAND_RESUME = 3
+
+        /** EngineCommandKind.LayerGain */
+        const val COMMAND_LAYER_GAIN = 10
 
         const val COMMAND_CANCEL_PENDING = 17
 

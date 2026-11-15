@@ -21,7 +21,7 @@ class FullMapTest {
 
     @Test
     fun aWiderImageFillsTheWidth() {
-        // 2500/2400 is slightly wider than a portrait phone, so it fills the width and letterboxes.
+        // 2857/2400 is wider than a portrait phone, so it fills the width and letterboxes.
         val fitted = fit(viewport, MAP_ASPECT)
         assertEquals(1000f, fitted.width, 0.01f)
         assertTrue(fitted.height < viewport.height)
@@ -124,6 +124,6 @@ class FullMapTest {
     @Test
     fun theMapAspectIsTheShippedImagesOwn() {
         // Stretching the map would put every pin in the wrong place, so the constant must match the asset.
-        assertEquals(2500f / 2400f, MAP_ASPECT, 1e-6f)
+        assertEquals(2857f / 2400f, MAP_ASPECT, 1e-6f)
     }
 }

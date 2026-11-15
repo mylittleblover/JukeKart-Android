@@ -92,6 +92,8 @@ enum class ResourceKind {
     COURSE,
     /** Jukebox compilation track. */
     JUKEBOX,
+    /** Nintendo Music special release track. */
+    SPECIAL,
     /** Title / results / goal sequence music. */
     SEQUENCE,
     /** Cutscene music. */

@@ -21,4 +21,9 @@
     <string name="stage_start_label">Starting stage</string>
     <string name="stage_start_choose">Choose starting stage</string>
     <string name="stage_start_stop_hint">Stop playback to change the starting stage.</string>
+    <string name="stage_title_extended">Extended (with Harmonica)</string>
+    <string name="stage_title_normal">Normal (No Prefix)</string>
+    <string name="stage_title_brasscut">Short (Brasscut)</string>
+    <string name="stage_battle_fast">Ending Soon</string>
+    <string name="stage_outro_numbered">Outro %1$d</string>
 </resources>

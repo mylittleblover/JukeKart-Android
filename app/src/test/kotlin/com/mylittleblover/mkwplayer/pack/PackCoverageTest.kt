@@ -36,7 +36,7 @@ class PackCoverageTest {
         const val DECODABLE = 1
 
         /** The kind-2 container the measured catalogue shows 253 entries of; not decodable. */
-        const val UNDECODABLE = 2
+        const val UNDECODABLE = 3
     }
 
     private fun asset(digest: AudioAssetId, codecKind: Int = DECODABLE) = PackManifest.Asset(
@@ -208,7 +208,7 @@ class PackCoverageTest {
 
         val limitation = assertNotNull(coverage.limitation, "a limitation line is required")
         assertTrue(
-            limitation.contains("codec 2"),
+            limitation.contains("codec $UNDECODABLE"),
             "the limitation names the codec, got: $limitation",
         )
         assertTrue(

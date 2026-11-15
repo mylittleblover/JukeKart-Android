@@ -2,15 +2,18 @@ package com.mylittleblover.mkwplayer.library
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
  * Checks the playability rule against the measured shape of the real library.
  *
- * The point is the mixed categories. SEQUENCE and DEMO each contain both kind 1
- * and kind 2 entries, so any rule that decides playability per category is wrong
- * for them: it would either hide 33 playable sequences or offer 3 unplayable
- * demos.
+ * The measured counts are facts about the corpus and do not change: 650 entries, 397 kind 1, 253 kind 2.
+ * What changed is which of them this build can decode. Codec 2 used to be refused wholesale, which greyed
+ * out the entire jukebox; the reader was fixed and all 227 jukebox files now decode (probed individually
+ * through the real `openBwav`). So the rule is no longer "kind 1 only" but "kind 1 or kind 2", and the
+ * mixed-category argument that motivated the original per-entry rule still holds -- it is now simply that a
+ * category's capability cannot be assumed either way.
  */
 class PlayabilityAgainstMeasuredLibraryTest {
 
@@ -22,15 +25,15 @@ class PlayabilityAgainstMeasuredLibraryTest {
     }
 
     @Test
-    fun kindOneMeansPlayableAndKindTwoDoesNot() {
+    fun bothMeasuredCodecsArePlayable() {
         for ((category, mix) in MeasuredLibrary.mix) {
             if (mix.kindOne > 0) {
-                val result = Playability.evaluate(Playability.SUPPORTED_BWAV_CODEC_KIND)
+                val result = Playability.evaluate(1)
                 assertTrue(result.playable, "$category has kind 1 entries that must play")
             }
             if (mix.kindTwo > 0) {
                 val result = Playability.evaluate(2)
-                assertTrue(!result.playable, "$category has kind 2 entries that must not play")
+                assertTrue(result.playable, "$category has kind 2 entries that must play")
             }
         }
     }
@@ -45,12 +48,14 @@ class PlayabilityAgainstMeasuredLibraryTest {
     }
 
     @Test
-    fun jukeboxIsFullyBlocked() {
+    fun theJukeboxIsNoLongerBlocked() {
+        // 227 entries, every one of them codec 2. They were the single largest blocked group, and the
+        // reason the media page's free-driving category had nothing to offer.
         val jukebox = MeasuredLibrary.mix.getValue(TrackCategory.JUKEBOX)
         assertEquals(227, jukebox.total)
         assertEquals(0, jukebox.kindOne)
         assertEquals(227, jukebox.kindTwo)
-        assertEquals(0.0, jukebox.playableShare)
+        assertTrue(Playability.evaluate(2).playable, "jukebox entries are codec 2 and must play")
     }
 
     @Test
@@ -64,28 +69,21 @@ class PlayabilityAgainstMeasuredLibraryTest {
 
     @Test
     fun perCategoryRulesWouldBeWrongForMixedCategories() {
-        // Demonstrate the mistake this test file exists to prevent: if the UI
-        // greyed out a whole mixed category, these counts would be the cost.
+        // The mistake this file exists to prevent: a category's codec mix is not uniform, so neither
+        // "always playable" nor "always blocked" is a safe assumption for SEQUENCE or DEMO.
         val sequence = MeasuredLibrary.mix.getValue(TrackCategory.SEQUENCE)
         val demo = MeasuredLibrary.mix.getValue(TrackCategory.DEMO)
 
-        assertTrue(
-            sequence.kindOne > 0,
-            "SEQUENCE has playable entries, so blocking the whole category would hide them",
-        )
-        assertTrue(
-            demo.kindTwo > 0,
-            "DEMO has blocked entries, so allowing the whole category would offer silence",
-        )
+        assertTrue(sequence.kindOne > 0 && sequence.kindTwo > 0, "SEQUENCE mixes both codecs")
+        assertTrue(demo.kindOne > 0 && demo.kindTwo > 0, "DEMO mixes both codecs")
     }
 
     @Test
-    fun blockedShareIsMeaningfulButNotDominant() {
-        val blocked = MeasuredLibrary.totalKindTwo
-        val total = MeasuredLibrary.totalEntries
-        val share = blocked.toDouble() / total
-        assertTrue(share > 0.0 && share < 0.5, "blocked share is ${share.coerceIn(0.0, 1.0)}")
-        assertEquals(253.0 / 650.0, share, 1e-9)
+    fun anUnknownCodecIsStillRefused() {
+        // The decoder supports kinds 1 and 2 and nothing else, so a file claiming a third kind must be
+        // refused rather than attempted.
+        assertFalse(Playability.evaluate(3).playable)
+        assertFalse(Playability.evaluate(0).playable)
     }
 
     @Test

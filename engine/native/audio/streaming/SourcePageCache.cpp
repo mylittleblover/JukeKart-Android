@@ -177,7 +177,7 @@ SourceStatus SourcePageCache::load(Key key) noexcept {
         if(page.key.asset>=0)cached_.fetch_sub(1,std::memory_order_relaxed);
         page.key={};auto& source=*sources_[key.asset].frames;
         const SourceSamplePosition position{key.page*static_cast<std::int64_t>(FramesPerPage)};
-        auto status=source.seek(position);
+        auto status=source.position().value==position.value?SourceStatus::Ok:source.seek(position);
         const auto expected=std::min<std::size_t>(FramesPerPage,static_cast<std::size_t>(source.metadata().duration.value-position.value));
         if(status==SourceStatus::Ok) {
             const auto rendered=source.render(page.pcm.data(),expected);

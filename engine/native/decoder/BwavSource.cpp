@@ -94,12 +94,15 @@ std::unique_ptr<AudioFrameSource> openBwav(std::unique_ptr<EncodedSourceInput> i
         EncodedSourceBytes probe(*input,limits);
         BwavLayout layout=parseBwav(probe,limits);
         if(!layout.opusChannels.empty()) {
-            // One stream for now. The multichannel files are the opening cinematics and sound effects; the
-            // music that matters is mono per channel region, and mixing several Opus decoders into one
-            // source is a separate piece of work. Reported as unsupported rather than played as channel 0.
-            if(layout.opusChannels.size()!=1)fail(SourceStatus::UnsupportedChannels);
-            return projectStreamStereo(makePacketOpusSource(std::move(input),limits,
-                std::move(layout.opusChannels.front())));
+            // Each region is one *independent mono* Opus stream -- not a channel of a multichannel stream.
+            // The jukebox corpus is exactly that: two regions, 960-frame CELT packets, 120-sample pre-skip
+            // each. Handing one region to a stereo decoder would fail every packet, and refusing the file
+            // outright is what left 227 jukebox tracks unplayable. So each chain gets its own mono decoder
+            // and the results are interleaved.
+            const auto channels=static_cast<unsigned>(layout.opusChannels.size());
+            if(channels>MaximumNintendoStreamChannels)fail(SourceStatus::UnsupportedChannels);
+            return projectStreamStereo(makeMultiPacketOpusSource(std::move(input),limits,std::move(layout.opusChannels),layout.metadata,
+                channels>2 ? std::optional<SourceStreamInfo>(bwavStereoGroups(layout)) : std::nullopt));
         }
     }
     return projectStreamStereo(std::make_unique<BwavSource>(std::move(input),limits));

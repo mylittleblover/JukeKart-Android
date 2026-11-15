@@ -23,9 +23,11 @@ public:
                 if(group.channels.size()==1){++routes[0];++routes[1];}else ++routes[n%2];
             }
         }
-        // Fixed headroom for every declared route. Mute/solo does not change
-        // other lanes' gain or create pumping. Mono groups feed both outputs.
-        scale_=1.0/std::max({1u,routes[0],routes[1]});info_.stereoScale=scale_;metadata_.channels=2;
+        // Preserve unity gain for front L/R channels so 5.1/multichannel mixes (e.g. Opening dm_op,
+        // Title Theme) match 2-channel tracks in loudness; EngineRuntime's output ceiling limiter
+        // prevents clipping on peaks.
+        (void)routes;
+        scale_=1.0;info_.stereoScale=scale_;metadata_.channels=2;
         metadata_.flags=(metadata_.flags|ChannelControl)&~RealtimeRender;
     }
     const SourceMetadata& metadata()const noexcept override{return metadata_;}

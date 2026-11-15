@@ -26,8 +26,16 @@ internal fun stageText(raw: String): String {
     }
     if (value == "Final_Pre") return stringResource(R.string.stage_join,
         stringResource(R.string.stage_final_lap), stringResource(R.string.stage_prelude))
-    if (value.startsWith("Outro")) return stringResource(R.string.stage_outro)
+    if (value.startsWith("Outro")) {
+        val number = value.removePrefix("Outro").toIntOrNull()
+        return if (number != null) stringResource(R.string.stage_outro_numbered, number + 1)
+        else stringResource(R.string.stage_outro)
+    }
     return when (value.lowercase()) {
+        "titleextended" -> stringResource(R.string.stage_title_extended)
+        "titlenormal" -> stringResource(R.string.stage_title_normal)
+        "titlebrasscut" -> stringResource(R.string.stage_title_brasscut)
+        "battlefast" -> stringResource(R.string.stage_battle_fast)
         "pre", "prelude", "prelude, looping" -> stringResource(R.string.stage_prelude)
         "preshort", "pre (short)", "short prelude", "short prelude, looping" -> stringResource(R.string.stage_short_prelude)
         "full", "main", "main loop" -> stringResource(R.string.stage_main)

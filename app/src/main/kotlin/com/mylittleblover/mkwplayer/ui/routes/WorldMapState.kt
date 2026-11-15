@@ -25,6 +25,63 @@ internal class WorldMapState(
     private var aspect = 1f
     private var padding = 0f
 
+    /** True while the listener is composing a route from the game's own connections. */
+    var editing by mutableStateOf(false)
+        private set
+
+    /** The stage the next connection starts from, while editing. */
+    var editFrom by mutableStateOf<String?>(null)
+        private set
+
+    /** The connections chosen so far, in order. Each entry is one row of the game's table. */
+    var draft by mutableStateOf<List<Pair<String, String>>>(emptyList())
+        private set
+
+    /**
+     * Why the last picked connection was refused, or null.
+     *
+     * The reason is shown rather than the tap being silently ignored: a listener who taps two pins and sees
+     * nothing happen cannot tell "the game has no road here" from "the app is broken".
+     */
+    var editRefusal by mutableStateOf<String?>(null)
+        private set
+
+    fun enterEdit() { editing = true; editFrom = null; draft = emptyList(); editRefusal = null; selectedRouteId = null }
+    fun exitEdit() { editing = false; editFrom = null; draft = emptyList(); editRefusal = null }
+
+    /** Records that [from] is the start of the next connection; null clears the pending start. */
+    fun editStart(from: String?) { editFrom = from?.removeSuffix("_00"); editRefusal = null }
+
+    /**
+     * Appends [from] -> [to] to the draft.
+     *
+     * The caller has already checked the game defines it; this only keeps the list consistent, so a stage is
+     * never followed by itself and the same connection is not appended twice in a row.
+     */
+    fun editAppend(from: String, to: String) {
+        val a = from.removeSuffix("_00")
+        val b = to.removeSuffix("_00")
+        if (a == b) return
+        if (draft.lastOrNull() == (a to b)) return
+        draft = draft + (a to b)
+        editFrom = b
+        editRefusal = null
+    }
+
+    fun editRefuse(reason: String) { editRefusal = reason }
+
+    fun editUndo() {
+        draft = draft.dropLast(1)
+        editFrom = draft.lastOrNull()?.second
+        editRefusal = null
+    }
+
+    fun editClear() { draft = emptyList(); editFrom = null; editRefusal = null }
+
+    /** Every stage the draft visits, in order, including the first. */
+    fun draftStops(): List<String> =
+        if (draft.isEmpty()) emptyList() else listOf(draft.first().first) + draft.map { it.second }
+
     fun configure(width: Float, height: Float, imageAspect: Float, padding: Float): MapTransform {
         this.width = width; this.height = height; this.aspect = imageAspect; this.padding = padding
         if (width > 0f && height > 0f) pendingFit?.let { points ->

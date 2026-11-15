@@ -36,6 +36,11 @@ EngineStatus bindEngineSourceInput(EngineHandle*,int assetIndex,const SourceOpen
 EngineStatus loadLinearSourceInput(EngineHandle*,const SourceOpenRequest&,
     std::unique_ptr<audio::EncodedSourceInput>,bool loop=false,SourcePreparation=SourcePreparation::Streamed) noexcept;
 EngineStatus submitEngineCommand(EngineHandle* engine,const EngineCommand& command) noexcept;
+// Master output trim for quiet sources: lift by `gainDb`, then hold the result under `ceilingDb`.
+// Applied after the mixer, so it affects every path equally and never feeds back into the stream clock.
+EngineStatus setEngineOutputGain(EngineHandle* engine,double gainDb,double ceilingDb) noexcept;
+// How many samples the ceiling has caught on this engine. A diagnostic, not a control.
+std::uint64_t engineLimitedSampleCount(const EngineHandle* engine) noexcept;
 // Device-rate rendering is the same runtime; no second clock or scheduling implementation.
 void renderEngineDevice(EngineHandle* engine,float* stereo,std::size_t frames,int deviceRate) noexcept;
 void renderEngine(EngineHandle* engine,float* stereo,std::size_t frames) noexcept;

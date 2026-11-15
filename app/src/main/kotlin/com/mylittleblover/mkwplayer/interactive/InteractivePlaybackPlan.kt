@@ -21,11 +21,14 @@ internal data class InteractivePlaybackPlan(
     val entryPreparedAssets: Map<Int,Set<String>> = emptyMap(),
     val entryAutomaticNext: Map<Int,Int> = emptyMap(),
     val advanceViaOutro: Set<Int> = emptySet(),
+    val customInitialSegments: List<Int> = emptyList(),
+    val overlayTrackIndices: List<Int> = emptyList(),
 ) {
     data class Version(val number: Int,val main: Int,val fast: Int?)
 
     /** Start choices are real independent sources; Bridge is an authored overlap, not an entry shortcut. */
     val initialSegments: List<Int> get() {
+        if (customInitialSegments.isNotEmpty()) return customInitialSegments
         val roles=standard?.segmentByRole
         if (roles == null) return (listOf(originalEntry ?: entry) + listOfNotNull(directBridge) +
             listOf("Area1", "Area2", "Area3_Pre", "Area3", "Final_Pre", "Final").mapNotNull { label -> labels.entries.singleOrNull { it.value == label }?.key }).distinct()
@@ -78,6 +81,9 @@ internal data class InteractivePlaybackPlan(
                 pairs.associate { p.segments.getValue(it.first) to p.segments.getValue(it.second) },
                 (0..4).associateWith { p.segments.getValue("Area2_Outro%02d".format(it)) },null,
                 p.segments.entries.associate { it.value to it.key },streamed=true,
+                // The waiting prelude repeats while the bridge and layered main arrange their next entry.
+                // Keep this loop resident so the decode worker cannot interrupt it at a page or loop boundary.
+                entryPreparedAssets=mapOf(p.segments.getValue("Area1_Pre") to setOf("BGM_Rainbow_Area1_Pre.bwav")),
                 advanceViaOutro=setOf(p.segments.getValue("Area2")))
             return DirectBridgeCompiler.rainbow(base, catalog)
         }

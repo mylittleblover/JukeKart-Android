@@ -30,4 +30,22 @@
     <string name="map_stop_separator">、</string>
     <string name="map_course">コース</string>
     <string name="map_close">閉じる</string>
+    <string name="map_course_connections">ゲーム定義の接続 %1$d 件：%2$s</string>
+    <string name="map_course_sink">ここがゴールです。ゲームは出口の接続を定義していません。</string>
+    <string name="map_course_no_connections">このコースには接続が定義されていません。</string>
+    <string name="map_edit_enter">接続を編集</string>
+    <string name="map_edit_exit">編集を終了</string>
+    <string name="map_edit_title">接続を編集中</string>
+    <string name="map_edit_hint">ゲームが定義した接続を選択します。向きは固定で、逆方向は自動補完しません。</string>
+    <string name="map_edit_undo">一つ戻す</string>
+    <string name="map_edit_clear">クリア</string>
+    <string name="map_edit_empty">接続がまだありません。</string>
+    <string name="map_edit_not_allowed">この接続はゲームに定義されていません。</string>
+    <string name="map_edit_reverse_only">ゲームは逆方向のみ定義しています。</string>
+    <string name="map_edit_sink">ここはゴールで、出口の接続はありません。</string>
+    <string name="map_edit_need_start">まず接続を選択してください。</string>
+    <string name="map_edit_save">ルートとして保存</string>
+    <string name="map_edit_saved">保存しました</string>
+    <string name="map_edit_source">接続表はゲームから書き出した Stage_Connections_Final です。</string>
+    <string name="map_course_connections_hidden">他に %1$d 件の接続が定義されていますが、この地図には表示されていません。</string>
 </resources>

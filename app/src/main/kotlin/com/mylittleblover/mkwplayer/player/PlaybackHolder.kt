@@ -16,14 +16,20 @@ import com.mylittleblover.mkwplayer.audio.AudioOutput
 internal object PlaybackHolder {
 
     private var instance: PlaybackSession? = null
+    private var coordinatorInstance: LinearPlaybackCoordinator? = null
 
     fun get(): PlaybackSession = instance ?: PlaybackSession(
         createEngine = { AudioEngine.create() },
         openOutput = { handle, rate -> AudioOutput.open(handle, rate) },
     ).also { instance = it }
 
+    fun linear(): LinearPlaybackCoordinator = coordinatorInstance ?: LinearPlaybackCoordinator(
+        sessionProvider = { get() },
+    ).also { coordinatorInstance = it }
+
     /** Replaces the session. Test-only; production never calls this. */
     fun overrideForTest(session: PlaybackSession?) {
+        coordinatorInstance?.clearSession()
         instance?.release()
         instance = session
     }

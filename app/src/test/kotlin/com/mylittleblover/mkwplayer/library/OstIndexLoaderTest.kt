@@ -5,6 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -58,13 +59,26 @@ class OstIndexLoaderTest {
     }
 
     @Test
-    fun kindTwoEntryLoadsAsBlockedRatherThanDropped() {
+    fun anUnsupportedCodecEntryLoadsAsBlockedRatherThanDropped() {
+        // The rule this test protects is that a blocked entry is still *listed* with its reason, never
+        // dropped. Kind 2 is no longer blocked (jukebox decodes now), so the case moves to kind 3.
         val json = index(item("bars:0@2", "Juke", "JUKEBOX"), entryCount = 1)
-        val loaded = OstIndexLoader.load(json) { 2 }
+        val loaded = OstIndexLoader.load(json) { 3 }
 
         assertEquals(1, loaded.entries.size, "a blocked entry must still be listed")
         assertFalse(loaded.entries[0].playable)
         assertEquals(Playability.REASON_UNSUPPORTED_CODEC, loaded.entries[0].blockedReason)
+    }
+
+    @Test
+    fun aJukeboxEntryWithCodecTwoIsPlayable() {
+        // Codec 2 is the jukebox codec and this build decodes it.
+        val json = index(item("bars:0@2", "Juke", "JUKEBOX"), entryCount = 1)
+        val loaded = OstIndexLoader.load(json) { 2 }
+
+        assertEquals(1, loaded.entries.size)
+        assertTrue(loaded.entries[0].playable)
+        assertNull(loaded.entries[0].blockedReason)
     }
 
     @Test
@@ -188,8 +202,9 @@ class OstIndexLoaderTest {
 
     @Test
     fun everyEntryKeepsItsOwnPlayability() {
-        // The mixed-category case from the real index: two entries, same class,
-        // different codecs. A per-category shortcut would give them one answer.
+        // The mixed-category case from the real index: two entries, same class, different codecs. A
+        // per-category shortcut would give them one answer. Kind 3 stands in for "not decodable" now that
+        // kinds 1 and 2 both are.
         val items = listOf(
             item("bars:0@11", "SeqPlay", "SEQUENCE", sha = "1".repeat(64)),
             item("bars:0@12", "SeqBlocked", "SEQUENCE", sha = "2".repeat(64)),
@@ -198,7 +213,7 @@ class OstIndexLoaderTest {
         val loaded = OstIndexLoader.load(json) {
             when (it.first()) {
                 '1' -> 1
-                '2' -> 2
+                '2' -> 3
                 else -> null
             }
         }

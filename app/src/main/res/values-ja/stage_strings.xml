@@ -21,4 +21,9 @@
     <string name="stage_start_label">開始パート</string>
     <string name="stage_start_choose">開始パートを選択</string>
     <string name="stage_start_stop_hint">開始パートを変更するには再生を停止してください。</string>
+    <string name="stage_title_extended">ロング版（ハーモニカ付き）</string>
+    <string name="stage_title_normal">通常版（プレフィックスなし）</string>
+    <string name="stage_title_brasscut">ショート版（Brasscut）</string>
+    <string name="stage_battle_fast">まもなく終了</string>
+    <string name="stage_outro_numbered">アウトロ %1$d</string>
 </resources>

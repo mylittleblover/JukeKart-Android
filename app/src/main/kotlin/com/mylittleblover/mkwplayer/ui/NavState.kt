@@ -64,6 +64,7 @@ internal class NavState(
         data object Flow : Detail
         data object Track : Detail
         data class Cup(val id: String) : Detail
+        data class JukeboxGame(val id: String) : Detail
         data class Interactive(val code: String) : Detail
         data class Playlist(val id: String) : Detail
 
@@ -92,6 +93,7 @@ internal class NavState(
             Detail.Flow -> listOf("flow", "")
             Detail.Track -> listOf("track", "")
             is Detail.Cup -> listOf("cup", page.id)
+            is Detail.JukeboxGame -> listOf("jukebox-game", page.id)
             is Detail.Interactive -> listOf("interactive", page.code)
             is Detail.Playlist -> listOf("playlist", page.id)
             Detail.Settings -> listOf("settings", "")
@@ -123,6 +125,7 @@ internal class NavState(
                 "flow" -> Detail.Flow
                 "track" -> Detail.Track
                 "cup" -> value?.takeIf { it.isNotBlank() }?.let(Detail::Cup)
+                "jukebox-game" -> value?.takeIf { it.isNotBlank() }?.let(Detail::JukeboxGame)
                 "interactive" -> value?.takeIf { it.isNotBlank() }?.let(Detail::Interactive)
                 "playlist" -> value?.takeIf { it.isNotBlank() }?.let(Detail::Playlist)
                 "settings" -> Detail.Settings

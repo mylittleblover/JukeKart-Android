@@ -159,6 +159,18 @@ EngineStatus submitEngineCommand(EngineHandle* engine,const EngineCommand& comma
     if(!engine || !engine->runtime || !validEngineCommandKind(static_cast<std::int32_t>(command.kind)) || command.at.value< -1 || !std::isfinite(command.number)) return EngineStatus::InvalidRequest;
     return engine->runtime->submit(command) ? EngineStatus::Ok : EngineStatus::QueueFull;
 }
+EngineStatus setEngineOutputGain(EngineHandle* engine,double gainDb,double ceilingDb) noexcept {
+    if(!engine || !engine->runtime || !std::isfinite(gainDb) || !std::isfinite(ceilingDb)) return EngineStatus::InvalidRequest;
+    if(gainDb< -60.0 || gainDb>24.0 || ceilingDb>0.0 || ceilingDb< -60.0) return EngineStatus::InvalidRequest;
+    // Queued as a command so it lands on the same control thread as everything else and cannot race a
+    // render in progress. Tenths of a decibel keep the wire integral without losing useful resolution.
+    EngineCommand command{EngineCommandKind::OutputGain,static_cast<int>(std::lround(gainDb*10.0)),
+        static_cast<int>(std::lround(ceilingDb*10.0)),0.0,{-1}};
+    return engine->runtime->submit(command) ? EngineStatus::Ok : EngineStatus::QueueFull;
+}
+std::uint64_t engineLimitedSampleCount(const EngineHandle* engine) noexcept {
+    return engine && engine->runtime ? engine->runtime->limitedSamples() : 0;
+}
 void renderEngineDevice(EngineHandle* engine,float* output,std::size_t frames,int rate) noexcept {
     if(!output || frames>65536) return;
     if(engine && engine->runtime) { engine->device.render(*engine->runtime,output,frames,rate);

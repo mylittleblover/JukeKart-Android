@@ -13,14 +13,15 @@ EngineStatus EngineRuntime::seek(audio::TransportFrame target,std::uint64_t maxi
         (actionDecisions_ && !actionDecisions_->complete())) return EngineStatus::ResourceLimit;
     if(journal_->size==0) return EngineStatus::InvalidRequest;
     // A decoded-linear source has no scheduled musical/DSP state. Reposition
-    // its one Voice analytically; the decoder still performs exact source replay
-    // on the stopped worker. Graphs retain their full deterministic rebuild.
+    // its one Voice analytically and prepare the target page on the stopped worker.
+    // Master output gain is independent of transport position.
     bool linearHistory=!graph_ && linear_ && !pendingCount_;
     for(std::size_t n=0;n<journal_->size && linearHistory;++n) {
         const auto& record=journal_->records[n];
         if(record.epoch!=journal_->epoch || record.result!=EngineStatus::Ok)continue;
         const auto kind=record.command.kind;
-        linearHistory=kind==api::EngineCommandKind::Play || kind==api::EngineCommandKind::Pause || kind==api::EngineCommandKind::Resume;
+        linearHistory=kind==api::EngineCommandKind::Play || kind==api::EngineCommandKind::Pause ||
+            kind==api::EngineCommandKind::Resume || kind==api::EngineCommandKind::OutputGain;
     }
     if(linearHistory) {
         const auto source=static_cast<long double>(target.value)*linear_->sampleRate/rate_;

@@ -5,7 +5,7 @@ import org.json.JSONObject
 /**
  * Where each stage sits on the world map.
  *
- * The positions were measured on a 2500x2400 render and stored as fractions rather than pixels. That
+ * The positions were measured on a 2857x2400 render and stored as fractions rather than pixels. That
  * is the whole point: the app draws the map at whatever size the screen allows, so a pixel coordinate
  * would be correct on exactly one device. A fraction is correct at every size.
  *

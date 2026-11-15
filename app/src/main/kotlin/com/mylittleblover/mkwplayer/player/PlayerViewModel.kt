@@ -99,6 +99,17 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val unlockTestMode: UnlockTestMode = UnlockTestMode.NORMAL,
         /** What the last pack import did, or null when none has run. */
         val pack: PackUi? = null,
+        /** Cached chronological jukebox catalog built from installed packs + bundled OST metadata. */
+        val jukebox: com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.Catalog =
+            com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.Catalog(emptyList(), emptyMap()),
+        /** True while the active playback session uses standalone linear decoding (Jukebox, etc.). */
+        val linearMode: Boolean = false,
+        val linearTrack: LinearQueue.Entry? = null,
+        val queue: LinearQueue.Snapshot = LinearQueue.Snapshot(),
+        val canSeek: Boolean = false,
+        val totalFrames: Long = 0L,
+        val sampleRate: Int = 0,
+        val artworkName: String? = null,
     )
 
     /**
@@ -187,6 +198,9 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val canAdvance: Boolean = false,
         /** The ending event is available: the main loop is playing, so an ending can be chosen. */
         val canEnd: Boolean = false,
+        val hasSpeakerOverlay: Boolean = false,
+        val speakerEnabled: Boolean = false,
+        val isBattleTrack: Boolean = false,
     )
 
     /**
@@ -343,6 +357,184 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     /** The installed pack, or null when the listener is using loose files. */
     private var pack: InstalledPack? = null
 
+    /**
+     * The jukebox the installed pack carries, grouped by source game.
+     *
+     * Computed from the verified manifest rather than from the file names on disk: a name states where a
+     * track came from, but only the manifest states that the pack actually carries it.
+     */
+    /**
+     * The jukebox every installed pack carries, grouped by source game.
+     *
+     * Read from all installed packs rather than only the active one: the active pack is whichever playback
+     * uses, and a listener with both a course pack and a jukebox pack must see the jukebox tracks.
+     *
+     * Recomputed on read, which is a handful of small JSON parses; the alternative is invalidating a cache at
+     * every install and restore path, and a stale cache here is a category that silently offers nothing.
+     */
+    private val jukeboxMetadata: com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.Metadata? by lazy {
+        runCatching {
+            getApplication<Application>().assets.open(JUKEBOX_CATALOG_ASSET)
+                .bufferedReader().use { it.readText() }
+                .let { com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.parseMetadata(it) }
+        }.getOrNull()
+    }
+
+    private val linearCoordinator: LinearPlaybackCoordinator
+        get() = PlaybackHolder.linear()
+
+    /** The jukebox, arranged by chronological source game and official OST track order. */
+    val jukebox: com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.Catalog
+        get() = _ui.value.jukebox
+
+    val extraCatalog: com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.Catalog by lazy {
+        com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.load(getApplication())
+    }
+
+    val packDirectory: java.io.File?
+        get() = pack?.directory
+
+    private var speakerEnabled: Boolean = false
+
+    private fun currentLayerGains(plan: InteractivePlaybackPlan?): Map<Int, Double> {
+        if (plan == null || plan.overlayTrackIndices.isEmpty()) return emptyMap()
+        val db = if (speakerEnabled) 0.0 else -96.0
+        return plan.overlayTrackIndices.associateWith { db }
+    }
+
+    private fun refreshJukeboxCatalog() {
+        val registry = com.mylittleblover.mkwplayer.pack.PackRegistry(
+            java.io.File(getApplication<Application>().filesDir, PACK_ROOT),
+        )
+        val loaded = com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.load(registry, jukeboxMetadata)
+        _ui.value = _ui.value.copy(jukebox = loaded)
+        linearCoordinator.attach(getApplication(), loaded)
+    }
+
+    /** Plays a single Jukebox track by its pack key, freezing its source game's list as the queue. */
+    fun openJukeboxTrack(key: String, languageTag: String = java.util.Locale.getDefault().toLanguageTag()) {
+        val catalog = jukebox
+        if (!catalog.tracksByKey.containsKey(key)) {
+            _ui.value = _ui.value.copy(
+                status = "Cannot open this track",
+                detail = "No installed pack carries this track.",
+            )
+            return
+        }
+        val game = catalog.gameForTrack(key) ?: run {
+            _ui.value = _ui.value.copy(
+                status = "Cannot open this track",
+                detail = "No installed pack carries this track.",
+            )
+            return
+        }
+        val startIndex = game.items.indexOfFirst { it.key == key }.coerceAtLeast(0)
+        playJukeboxQueue(game, startIndex, languageTag)
+    }
+
+    /** Plays a game's Jukebox tracks in OST order, freezing the queue at session start (#61). */
+    fun playJukeboxQueue(
+        game: com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.Game,
+        startIndex: Int,
+        languageTag: String,
+        shuffle: Boolean? = null,
+    ) {
+        if (nativePerformance?.isFading == true) return
+        val entries = game.items.map { item -> LinearPlaybackCoordinator.entryFor(item, game, languageTag) }
+        if (entries.isEmpty()) return
+        prepareForLinearPlayback()
+        linearCoordinator.startQueue(entries, startIndex, shuffleOverride = shuffle)
+    }
+
+    /** Plays all installed Jukebox arrangements chronologically across all games. */
+    fun playAllJukebox(languageTag: String, shuffle: Boolean = false) {
+        if (nativePerformance?.isFading == true) return
+        val catalog = jukebox
+        val entries = catalog.games.flatMap { game ->
+            game.items.map { item -> LinearPlaybackCoordinator.entryFor(item, game, languageTag) }
+        }
+        if (entries.isEmpty()) return
+        prepareForLinearPlayback()
+        linearCoordinator.startQueue(entries, 0, shuffleOverride = shuffle)
+    }
+
+    /** Inserts [item] at the front (LIFO) of the temporary "Play next" queue (#63, #64). */
+    fun playJukeboxNext(
+        item: com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.TrackItem,
+        game: com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.Game,
+        languageTag: String,
+    ) {
+        val entry = LinearPlaybackCoordinator.entryFor(item, game, languageTag)
+        val wasIdle = !_ui.value.canStop && _ui.value.queue.current == null
+        if (wasIdle) {
+            prepareForLinearPlayback()
+        }
+        linearCoordinator.enqueueNext(entry)
+    }
+
+    fun skipNext() {
+        linearCoordinator.skipNext()
+    }
+
+    fun skipPrevious() {
+        linearCoordinator.skipPrevious()
+    }
+
+    fun toggleShuffle() {
+        linearCoordinator.toggleShuffle()
+    }
+
+    fun cycleRepeatMode() {
+        linearCoordinator.cycleRepeatMode()
+    }
+
+    fun replayOrResumeLinear() {
+        if (_ui.value.canResume) {
+            resume()
+        } else {
+            linearCoordinator.replayCurrent()
+        }
+    }
+
+    fun removeTempQueueItem(index: Int) {
+        linearCoordinator.removeTempAt(index)
+    }
+
+    fun jumpToTempQueueItem(index: Int) {
+        linearCoordinator.jumpToTemp(index)
+    }
+
+    fun jumpToUpcomingQueueItem(index: Int) {
+        linearCoordinator.jumpToUpcoming(index)
+    }
+
+    private fun prepareForLinearPlayback() {
+        packPlaybackRequest++
+        nativePerformance = null
+        interactivePlan = null
+        performance = null
+        flow = null
+        flowCompiled = null
+        flowBytes = emptyMap()
+        _ui.value = _ui.value.copy(
+            flow = null,
+            linearMode = true,
+            artworkName = null,
+            detail = null,
+        )
+    }
+
+    /**
+     * Applies the master output trim to the running session.
+     *
+     * Idempotent on purpose: the screen calls this from a `LaunchedEffect` keyed on the chosen value, so it runs
+     * once at start-up and again on every change. Re-applying the same numbers costs a queued command and
+     * changes nothing audible, which is cheaper than tracking whether it was applied and getting that wrong.
+     */
+    fun applyOutputTrim(trim: com.mylittleblover.mkwplayer.audio.OutputTrim) {
+        PlaybackHolder.get().setOutputTrim(trim)
+    }
+
     /** A pack that has been installed and verified, kept together so a track can be prepared on demand. */
     private data class InstalledPack(val manifest: PackManifest, val directory: java.io.File)
 
@@ -494,6 +686,49 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         // The cup's eligibility depends on what the user actually has, so it is derived after the
         // library is restored. Reading the stored progress first means the offer survives a restart.
         establishCup(loaded.tracks)
+        refreshJukeboxCatalog()
+
+        viewModelScope.launch {
+            linearCoordinator.state.collect { linear ->
+                if (linear.active && linear.current != null) {
+                    flow = null
+                    flowCompiled = null
+                    flowBytes = emptyMap()
+                    interactivePlan = null
+                    nativePerformance = null
+                    performance = null
+                    if (linear.totalFrames > 0L && linear.sampleRate > 0) {
+                        totalFrames = linear.totalFrames
+                        rate = linear.sampleRate
+                    }
+                    _ui.value = _ui.value.copy(
+                        selectedKey = linear.current.key,
+                        flow = null,
+                        title = linear.current.title,
+                        status = if (linear.loading) "Loading..." else _ui.value.status,
+                        total = EngineSnapshot.formatPosition(totalFrames, rate),
+                        linearMode = true,
+                        linearTrack = linear.current,
+                        queue = linear.queue,
+                        canSeek = totalFrames > 0L,
+                        totalFrames = totalFrames,
+                        sampleRate = rate,
+                        detail = linear.error,
+                    )
+                    if (!linear.loading && linear.error == null) {
+                        requestNotificationPermissionIfNeeded()
+                        startPolling()
+                    }
+                } else {
+                    _ui.value = _ui.value.copy(
+                        linearTrack = linear.current,
+                        queue = linear.queue,
+                        detail = linear.error ?: _ui.value.detail,
+                        status = if (linear.error != null) "Cannot open this track" else _ui.value.status,
+                    )
+                }
+            }
+        }
     }
 
     /**
@@ -829,15 +1064,46 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         if(nativePerformance?.isFading==true) return false
         packPlaybackRequest++
         val bytes = try {
-            sourceBytes + (com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.ASSET to
+            val withFf = sourceBytes + (com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.ASSET to
                 getApplication<Application>().assets.open("audio/BGM_Seq_FinalLapFF.bwav").use { it.readBytes() })
+            val ks = extraCatalog.koopaSpeaker
+            val dir = pack?.directory
+            if (ks != null && dir != null && flow.name == "BGM_Stage_${ks.stageCode}") {
+                val normalFile = java.io.File(dir, "audio/${ks.normalAsset.sha256}")
+                val fastFile = java.io.File(dir, "audio/${ks.fastAsset.sha256}")
+                if (normalFile.isFile && fastFile.isFile) {
+                    withFf + mapOf(
+                        "${ks.normalAsset.stem}.bwav" to normalFile.readBytes(),
+                        "${ks.fastAsset.stem}.bwav" to fastFile.readBytes(),
+                    )
+                } else {
+                    withFf
+                }
+            } else {
+                withFf
+            }
         } catch(e: Exception) {
             _ui.value=_ui.value.copy(status="Cannot load FinalLapFF",detail=e.message)
             return false
         }
         val plan = try {
-            if(minfCatalog.part(flow.name.removePrefix("BGM_Stage_"),"Full")!=null)
-                InteractivePlaybackPlan.normal(flow,bytes,minfCatalog).startingAt(startingStage) else null
+            if(minfCatalog.part(flow.name.removePrefix("BGM_Stage_"),"Full")!=null) {
+                var built = InteractivePlaybackPlan.normal(flow, bytes, minfCatalog).startingAt(startingStage)
+                val ks = extraCatalog.koopaSpeaker
+                if (ks != null && flow.name == "BGM_Stage_${ks.stageCode}") {
+                    val normalBytes = bytes["${ks.normalAsset.stem}.bwav"]
+                    val fastBytes = bytes["${ks.fastAsset.stem}.bwav"]
+                    if (normalBytes != null && fastBytes != null) {
+                        built = com.mylittleblover.mkwplayer.interactive.SpeakerOverlayCompiler.extend(
+                            built,
+                            ks,
+                            normalBytes,
+                            fastBytes,
+                        )
+                    }
+                }
+                built
+            } else null
         } catch(e: Exception) {
             _ui.value=_ui.value.copy(status="Cannot prepare interactive playback",detail=e.message)
             return false
@@ -853,22 +1119,26 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         }
 
         val entry = plan?.entry ?: FlowPresentation.entrySection(compiled)
+        val packetBytes = plan?.packet ?: compiled.packet
+        val assetPaths = plan?.assetPaths ?: compiled.assetPaths
         val state = session.loadFlow(
             title = displayTitle,
-            packet = compiled.packet,
-            assets = compiled.assetPaths.map { path -> path to bytes[path]!! },
+            packet = packetBytes,
+            assets = assetPaths.map { path -> path to bytes[path]!! },
             frames = FlowPresentation.totalFrames(flow),
             startSegment = entry,
             autoAdvance = plan?.automaticNext ?: emptyMap(),
             streamed = plan?.streamed ?: false,
             preparedAssets = plan?.let { it.preparedAssets + it.entryPreparedAssets[it.entry].orEmpty() } ?: emptySet(),
             prequeueInitial = plan?.let { it.entry in it.entryAutomaticNext } ?: false,
+            initialLayerGains = currentLayerGains(plan),
         )
         if (state.detail != null) {
             _ui.value = _ui.value.copy(status = "Cannot play this flow", detail = state.detail)
             return false
         }
 
+        linearCoordinator.yieldToExternalTransport()
         this.flow = flow
         this.interactivePlan = plan
         this.nativePerformance = null
@@ -885,6 +1155,12 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             canPause = true,
             canStop = true,
             outputActive = session.hasOutput,
+            linearMode = false,
+            linearTrack = null,
+            canSeek = false,
+            totalFrames = totalFrames,
+            sampleRate = rate,
+            artworkName = extraCatalog.courseArtwork[flow.name.removePrefix("BGM_Stage_")],
             flow = FlowUi(
                 title = displayTitle,
                 sections = FlowPresentation.sections(flow, compiled),
@@ -898,6 +1174,8 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                 regionNumbers = plan?.regions?.keys?.sorted().orEmpty(),
                 availableStageKeys = plan?.let { current -> current.spec.segments.mapNotNull { current.labels[it.index] } }
                     ?: FlowPresentation.sections(flow, compiled).map { it.label },
+                hasSpeakerOverlay = plan?.overlayTrackIndices?.isNotEmpty() == true,
+                speakerEnabled = speakerEnabled,
             ),
             detail = buildList {
                 if (rejected.isNotEmpty()) add("Skipped: " + rejected.joinToString("; "))
@@ -925,11 +1203,13 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             preparedAssets=plan.preparedAssets + plan.entryPreparedAssets[plan.entry].orEmpty(),
             prequeueInitial=plan.entry in plan.entryAutomaticNext)
         if(state.detail!=null) { _ui.value=_ui.value.copy(status="Cannot play Rainbow",detail=state.detail);return false }
+        linearCoordinator.yieldToExternalTransport()
         interactivePlan=plan;nativePerformance=null;performance=null;flow=null;flowCompiled=null;flowBytes=bytes
         totalFrames=frames;rate=48000
         val sections=plan.spec.segments.map { FlowPresentation.Section(it.index,plan.labels.getValue(it.index),it.exit,48000) }
         _ui.value=_ui.value.copy(title=displayTitle,status="Playing",detail=notes.joinToString("; ").ifEmpty { null },
             canPause=true,canStop=true,outputActive=session.hasOutput,
+            linearMode=false,linearTrack=null,canSeek=false,totalFrames=frames,sampleRate=48000,artworkName=null,
             flow=FlowUi(displayTitle,sections,plan.entry,"Area1 → Area2 → Area3 → Final","MINF timing; bar exits confirmed",true,
                 outros=plan.outros.keys.sorted(), availableStageKeys=sections.map { it.label }))
         PlaybackService.start(getApplication());requestNotificationPermissionIfNeeded();startPolling()
@@ -1088,13 +1368,20 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                 progress = "",
             ),
         )
+        refreshJukeboxCatalog()
 
         // Open the first stage, so importing is immediately audible rather than leaving the listener to
         // find their way back to a list.
         val firstStage = manifest.stages.firstNotNullOfOrNull { stage ->
             manifest.tracksOf(stage).firstOrNull { track -> playable.any { it.key == track.key } }
         } ?: playable.firstOrNull()
-        if (firstStage != null) openPackTrack(firstStage)
+        if (firstStage != null) {
+            if (firstStage.kind == com.mylittleblover.mkwplayer.registry.ResourceKind.JUKEBOX) {
+                openJukeboxTrack(firstStage.key)
+            } else {
+                openPackTrack(firstStage)
+            }
+        }
     }
 
     private var packPlaybackRequest=0L
@@ -1200,7 +1487,8 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                     if(request!=packPlaybackRequest || interactivePlan!==plan) return@launch
                     val state=session.loadFlow(_ui.value.flow?.title ?: plan.name,plan.packet,plan.assetPaths.map { it to flowBytes.getValue(it) },
                         totalFrames,plan.entry,streamed=plan.streamed,autoAdvance=plan.automaticNext,preparedAssets=plan.preparedAssets + plan.entryPreparedAssets[plan.entry].orEmpty(),
-                        prequeueInitial=plan.entry in plan.entryAutomaticNext)
+                        prequeueInitial=plan.entry in plan.entryAutomaticNext,
+                        initialLayerGains=currentLayerGains(plan))
                     if(state.detail!=null) { _ui.value=_ui.value.copy(detail=state.detail);return@launch }
                     nativePerformance=null
                     startPerformance()
@@ -1256,6 +1544,234 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         apply(driver.takeOutro(), driver)
     }
 
+    /** Takes a specific Outro number (0-indexed, e.g. 0, 1, 2 for Title Outros). */
+    fun takeOutro(number: Int) {
+        nativePerformance?.let {
+            publishNativePerformance(it.takeOutro(number), true)
+            return
+        }
+    }
+
+    fun toggleSpeakerOverlay() {
+        val plan = interactivePlan ?: return
+        if (plan.overlayTrackIndices.isEmpty()) return
+        speakerEnabled = !speakerEnabled
+        val db = if (speakerEnabled) 0.0 else -96.0
+        if (session.state.value.loaded) {
+            plan.overlayTrackIndices.forEach { trackIdx ->
+                session.setLayerGain(trackIdx, db)
+            }
+        }
+        _ui.value = _ui.value.copy(
+            flow = _ui.value.flow?.copy(speakerEnabled = speakerEnabled),
+        )
+    }
+
+    fun openInteractiveTitle(
+        languageTag: String = java.util.Locale.getDefault().toLanguageTag(),
+        autoStart: Boolean = false,
+    ) {
+        if (nativePerformance?.isFading == true) return
+        val item = extraCatalog.otherMusic
+            .filterIsInstance<com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.InteractiveTitle>()
+            .firstOrNull()
+        val dir = pack?.directory
+        if (item == null || dir == null) {
+            _ui.value = _ui.value.copy(status = "Cannot open Title Theme", detail = "No installed pack carries this track.")
+            return
+        }
+        val request = ++packPlaybackRequest
+        viewModelScope.launch {
+            val loaded = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    val refs = listOf(item.harmonica, item.main, item.brassCut) + item.outros.map { it.asset }
+                    val byStem = mutableMapOf<String, ByteArray>()
+                    val byPath = mutableMapOf<String, ByteArray>()
+                    refs.forEach { ref ->
+                        if (ref.stem !in byStem) {
+                            val file = java.io.File(dir, "audio/${ref.sha256}")
+                            if (!file.isFile) error("Missing audio file ${ref.stem}")
+                            val bytes = file.readBytes()
+                            byStem[ref.stem] = bytes
+                            byPath["${ref.stem}.bwav"] = bytes
+                        }
+                    }
+                    val plan = com.mylittleblover.mkwplayer.interactive.ExtraInteractiveCompilers.compileTitlePlan(item, byStem)
+                    plan to byPath
+                }
+            }
+            if (request != packPlaybackRequest) return@launch
+            val (plan, bytesByPath) = loaded.getOrElse { err ->
+                _ui.value = _ui.value.copy(status = "Cannot prepare Title Theme", detail = err.message)
+                return@launch
+            }
+
+            linearCoordinator.yieldToExternalTransport()
+            session.stop()
+            this@PlayerViewModel.flow = null
+            this@PlayerViewModel.flowCompiled = null
+            this@PlayerViewModel.performance = null
+            this@PlayerViewModel.nativePerformance = null
+            this@PlayerViewModel.interactivePlan = plan
+            this@PlayerViewModel.flowBytes = bytesByPath
+            this@PlayerViewModel.totalFrames = item.main.frames
+            this@PlayerViewModel.rate = item.main.sampleRate
+
+            val localizedTitle = item.localizedName(languageTag)
+            _ui.value = _ui.value.copy(
+                title = localizedTitle,
+                status = "Stopped",
+                total = EngineSnapshot.formatPosition(item.main.frames, item.main.sampleRate),
+                position = "0:00",
+                progress = 0f,
+                canPause = false,
+                canResume = false,
+                canStop = false,
+                outputActive = session.hasOutput,
+                linearMode = false,
+                linearTrack = null,
+                canSeek = false,
+                totalFrames = item.main.frames,
+                sampleRate = item.main.sampleRate,
+                artworkName = item.artwork,
+                detail = null,
+                flow = FlowUi(
+                    title = localizedTitle,
+                    sections = emptyList(),
+                    activeSegment = null,
+                    summary = "",
+                    provenance = "",
+                    isProvisional = false,
+                    outros = plan.outros.keys.sorted(),
+                    hasFast = false,
+                    availableStageKeys = plan.customInitialSegments.mapNotNull { plan.labels[it] },
+                ),
+            )
+            if (autoStart) {
+                startPerformance()
+            }
+        }
+    }
+
+    fun openInteractiveTwoState(
+        track: com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.TwoStateTrack,
+        isBattle: Boolean,
+        languageTag: String = java.util.Locale.getDefault().toLanguageTag(),
+        autoStart: Boolean = true,
+    ) {
+        if (nativePerformance?.isFading == true) return
+        val dir = pack?.directory
+        if (dir == null) {
+            _ui.value = _ui.value.copy(status = "Cannot open track", detail = "No installed pack carries this track.")
+            return
+        }
+        val request = ++packPlaybackRequest
+        viewModelScope.launch {
+            val loaded = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    val mainFile = java.io.File(dir, "audio/${track.main.sha256}")
+                    val fastFile = java.io.File(dir, "audio/${track.fast.sha256}")
+                    if (!mainFile.isFile || !fastFile.isFile) error("Missing audio files for ${track.id}")
+                    val mainBytes = mainFile.readBytes()
+                    val fastBytes = fastFile.readBytes()
+                    val byStem = mapOf(track.main.stem to mainBytes, track.fast.stem to fastBytes)
+                    val byPath = mapOf("${track.main.stem}.bwav" to mainBytes, "${track.fast.stem}.bwav" to fastBytes)
+                    val plan = com.mylittleblover.mkwplayer.interactive.ExtraInteractiveCompilers.compileTwoStateLoopPlan(
+                        track = track,
+                        isBattle = isBattle,
+                        bytesByStem = byStem,
+                    )
+                    plan to byPath
+                }
+            }
+            if (request != packPlaybackRequest) return@launch
+            val (plan, bytesByPath) = loaded.getOrElse { err ->
+                _ui.value = _ui.value.copy(status = "Cannot prepare track", detail = err.message)
+                return@launch
+            }
+
+            linearCoordinator.yieldToExternalTransport()
+            session.stop()
+            this@PlayerViewModel.flow = null
+            this@PlayerViewModel.flowCompiled = null
+            this@PlayerViewModel.performance = null
+            this@PlayerViewModel.nativePerformance = null
+            this@PlayerViewModel.interactivePlan = plan
+            this@PlayerViewModel.flowBytes = bytesByPath
+            this@PlayerViewModel.totalFrames = track.main.frames
+            this@PlayerViewModel.rate = track.main.sampleRate
+
+            val localizedTitle = track.localizedName(languageTag)
+            _ui.value = _ui.value.copy(
+                title = localizedTitle,
+                status = "Stopped",
+                total = EngineSnapshot.formatPosition(track.main.frames, track.main.sampleRate),
+                position = "0:00",
+                progress = 0f,
+                canPause = false,
+                canResume = false,
+                canStop = false,
+                outputActive = session.hasOutput,
+                linearMode = false,
+                linearTrack = null,
+                canSeek = false,
+                totalFrames = track.main.frames,
+                sampleRate = track.main.sampleRate,
+                artworkName = track.artwork,
+                detail = null,
+                flow = FlowUi(
+                    title = localizedTitle,
+                    sections = emptyList(),
+                    activeSegment = null,
+                    summary = "",
+                    provenance = "",
+                    isProvisional = false,
+                    outros = emptyList(),
+                    hasFast = true,
+                    isBattleTrack = isBattle,
+                    availableStageKeys = plan.customInitialSegments.mapNotNull { plan.labels[it] },
+                ),
+            )
+            if (autoStart) {
+                startPerformance()
+            }
+        }
+    }
+
+    fun playExtraLinearQueue(
+        entries: List<LinearQueue.Entry>,
+        startIndex: Int,
+        repeatMode: LinearQueue.RepeatMode = LinearQueue.RepeatMode.LIST,
+        shuffle: Boolean = false,
+    ) {
+        val dir = pack?.directory
+        if (dir == null || entries.isEmpty()) return
+        if (nativePerformance?.isFading == true) return
+        packPlaybackRequest++
+        nativePerformance = null
+        performance = null
+        interactivePlan = null
+        flow = null
+        flowCompiled = null
+        val target = entries[startIndex.coerceIn(0, entries.lastIndex)]
+        _ui.value = _ui.value.copy(
+            title = target.title,
+            artworkName = target.artworkName,
+            flow = null,
+            linearMode = true,
+            canSeek = true,
+            detail = null,
+        )
+        linearCoordinator.startExtraQueue(
+            entries = entries,
+            startIndex = startIndex,
+            packDir = dir,
+            repeatMode = repeatMode,
+            shuffleOverride = shuffle,
+        )
+        startPolling()
+    }
+
     internal val initialEntryChoices: Map<Int,String>
         get() = interactivePlan?.let { plan -> plan.initialSegments.associateWith { plan.labels[it].orEmpty() } }.orEmpty()
     internal val selectedEntrySegment: Int? get() = interactivePlan?.entry
@@ -1266,7 +1782,10 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         packPlaybackRequest++
         publish(session.stop())
         nativePerformance = null
-        interactivePlan = plan.copy(entry = segment)
+        interactivePlan = plan.copy(
+            entry = segment,
+            preparedAssets = plan.entryPreparedAssets[segment] ?: plan.preparedAssets,
+        )
         _ui.value = _ui.value.copy(flow = _ui.value.flow?.copy(activeSegment=null, performanceStage="", stageKey=null, pendingStageKey=null, performing=false))
     }
 
@@ -1400,6 +1919,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             return
         }
 
+        linearCoordinator.yieldToExternalTransport()
         flow = null
         flowCompiled = null
         flowBytes = emptyMap()
@@ -1415,6 +1935,11 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             canPause = true,
             canResume = false,
             canStop = true,
+            linearMode = false,
+            linearTrack = null,
+            canSeek = true,
+            totalFrames = totalFrames,
+            sampleRate = rate,
             outputActive = session.hasOutput,
             detail = if (session.hasOutput) {
                 null
@@ -1564,6 +2089,8 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             timingVerdict = timing?.verdict ?: TimingDiagnosis.Verdict.NO_DATA,
             outputActive = session.hasOutput,
             detail = state.detail ?: _ui.value.detail,
+            totalFrames = state.totalFrames.takeIf { it > 0L } ?: totalFrames,
+            sampleRate = state.sampleRate.takeIf { it > 0 } ?: rate,
         )
     }
 
@@ -1595,8 +2122,10 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         nativePerformance=null
         performance?.stop()
         performance=null
+        if (cancelPendingOpen) linearCoordinator.clearSession()
         publish(session.stop())
         _ui.value = _ui.value.copy(progress = 0f, position = EngineSnapshot.formatPosition(0, rate),
+            linearMode = false, linearTrack = null, canSeek = false,
             flow=_ui.value.flow?.copy(performing=false,performanceStage="Stopped",stageKey="Stopped",pendingStageKey=null,canAdvance=false,canEnd=false,fastPlaying=false,
                 canFast=false,canCancelPending=false,fading=false,fadeRemainingFrames=null,voiceCount=0,sourceFrame=null,availableRegions=emptySet(),availableVersions=emptySet(),selectedRegion=null,selectedVersion=null))
         PlaybackService.stop(getApplication())
@@ -1605,12 +2134,13 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     private fun releaseTransport() {
         pollJob?.cancel()
         pollJob = null
+        linearCoordinator.clearSession()
         flow = null
         flowCompiled = null
         flowBytes = emptyMap()
         nativePerformance = null
         interactivePlan = null
-        _ui.value = _ui.value.copy(flow = null)
+        _ui.value = _ui.value.copy(flow = null, linearMode = false, linearTrack = null, canSeek = false)
         session.release()
         PlaybackService.stop(getApplication())
     }
@@ -1629,6 +2159,9 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
         /** Bundled compatibility manifest; see tools/gen_catalog.py. */
         const val CATALOG_ASSET = "catalog.json"
+
+        /** Bundled chronological OST-to-BWAV Jukebox catalog; see tools/gen_jukebox_catalog.py. */
+        const val JUKEBOX_CATALOG_ASSET = "jukebox_catalog.json"
 
         /** Folder inside app storage that [openFlowFromFolder] reads. */
         const val FLOW_FOLDER = "stages"

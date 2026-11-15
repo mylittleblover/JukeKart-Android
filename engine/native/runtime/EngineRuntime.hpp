@@ -128,6 +128,10 @@ class EngineRuntime {
     void completeAlbumFlow() noexcept;
     long double automaticBeats_{};Frame automaticFrame_{-1},automaticClockFrame_{-1};Tempo automaticTempo_;double automaticSpeed_{1};
     Frame globalFadeEnd_{-1};
+    // Master output trim applied after the mixer, for sources quieter than the device expects.
+    // Convert dB when the setting changes so rendering only applies the linear levels.
+    float outputGain_{1.0f},outputCeiling_{static_cast<float>(dbGain(-1.0))};
+    std::uint64_t limitedSamples_{};
     int rate_{48000},current_{-1}; std::uint32_t instance_{};
     std::uint64_t rejected_{},voiceNumericalCorrections_{};
     api::EngineStatus last_{api::EngineStatus::Ok};
@@ -207,6 +211,8 @@ public:
     explicit EngineRuntime(std::unique_ptr<Graph> graph);
     explicit EngineRuntime(int rate);
     int sampleRate() const noexcept { return rate_; }
+    /** Samples the output ceiling has caught since this engine was created. */
+    std::uint64_t limitedSamples() const noexcept { return limitedSamples_; }
     const Graph* graph() const noexcept { return graph_.get(); }
     // Control-only rebinding requires every execution owner and page reservation
     // to be idle, including silent timelines and not-yet-started plans.

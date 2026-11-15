@@ -145,4 +145,21 @@ class CupArtTest {
         assertFalse(notice.contains("licensed"), "this build has no licence: $notice")
         assertFalse(notice.contains("permission"), notice)
     }
+
+    @Test
+    fun allTwelveKnockoutRalliesHaveUniqueEmblemsAndHighlightMasks() {
+        assertEquals(12, CupArt.rallies.size)
+        assertEquals(12, CupArt.rallies.map { it.id }.toSet().size)
+        assertEquals(12, CupArt.rallies.map { it.drawable }.toSet().size)
+        for (rally in CupArt.rallies) {
+            assertEquals(rally.drawable, CupArt.routeEmblem(rally.id))
+            assertTrue(CupArt.routeHighlightMask(rally.id) != null, "missing highlight mask for ${rally.id}")
+        }
+        val gpRouteIds = CupArt.all().map { "${it.id}_cup" }
+        val allMasks = (gpRouteIds + CupArt.rallies.map { it.id }).mapNotNull { CupArt.routeHighlightMask(it) }
+        assertEquals(20, allMasks.size)
+        assertEquals(20, allMasks.toSet().size)
+        assertNull(CupArt.routeEmblem("unknown_route"))
+        assertNull(CupArt.routeHighlightMask("unknown_route"))
+    }
 }

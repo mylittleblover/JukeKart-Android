@@ -51,6 +51,8 @@ internal class PlaybackSession(
          * what the service needs; [playing] keeps meaning "the engine says it is playing".
          */
         val loaded: Boolean = false,
+        val linear: Boolean = false,
+        val naturalEnd: Boolean = false,
     ) {
         /** Something is loaded, so the transport is worth keeping alive and showing. */
         val active: Boolean get() = playing || paused || loaded
@@ -65,9 +67,42 @@ internal class PlaybackSession(
     private var automaticTransitions: Map<Int,Int> = emptyMap()
     private var automaticSource: Int? = null
     private var automaticPending: Triple<Int,Int,Long>? = null
+    private var linearSession: Boolean = false
+
+    /** Optional coordinator hooks shared with background service / ViewModel. */
+    var onLinearCompleted: (() -> Boolean)? = null
+    var onSkipNext: (() -> Boolean)? = null
+    var onSkipPrevious: (() -> Boolean)? = null
+    var canSkipQueue: (() -> Boolean)? = null
 
     /** True while a device stream is open. */
     val hasOutput: Boolean get() = output != null
+
+    /**
+     * The master trim every engine created from here on gets.
+     *
+     * Held on the session rather than passed to each open call so a setting chosen while a track is playing
+     * takes effect immediately and a track opened afterwards starts with it already applied.
+     */
+    private var outputTrim: com.mylittleblover.mkwplayer.audio.OutputTrim =
+        com.mylittleblover.mkwplayer.audio.OutputTrim.default
+
+    /**
+     * Applies [trim] to the current engine, and remembers it for engines created later.
+     *
+     * Returns the status the engine reported, or null when there is no engine yet -- in which case the value
+     * is still stored and will be applied when one is created. That distinction matters: "no engine" is not a
+     * failure, and reporting one would make the settings screen show an error for a perfectly normal state.
+     */
+    fun setOutputTrim(trim: com.mylittleblover.mkwplayer.audio.OutputTrim): Int? {
+        outputTrim = trim
+        val current = engine ?: return null
+        return current.setOutputGain(trim.gainDb, trim.ceilingDb)
+    }
+
+    /** Set dynamic gain (dB) on a track layer in the currently loaded flow engine. */
+    fun setLayerGain(trackIndex: Int, gainDb: Double): Int? =
+        engine?.setLayerGain(trackIndex, gainDb)
 
     /**
      * Callback timing packet from the open stream, or null when there is none.
@@ -117,6 +152,7 @@ internal class PlaybackSession(
         autoAdvance: Map<Int,Int> = emptyMap(),
         preparedAssets: Set<String> = emptySet(),
         prequeueInitial: Boolean = false,
+        initialLayerGains: Map<Int, Double> = emptyMap(),
     ): State {
         var current = engine
         if (current == null) {
@@ -127,6 +163,7 @@ internal class PlaybackSession(
         val active = controller ?: return fail("The audio engine is not initialised.")
 
         closeOutput()
+        linearSession = false
         val loaded = active.loadGraphOnly(packet)
         if (loaded is PlaybackController.State.Failed) return fail(loaded.reason)
 
@@ -152,6 +189,16 @@ internal class PlaybackSession(
             automaticSource = startSegment
         }
 
+        initialLayerGains.forEach { (trackIndex, db) ->
+            val status = current.setLayerGain(trackIndex, db)
+            if (status != AudioEngine.STATUS_OK) {
+                return fail("Could not set layer gain for track $trackIndex: ${AudioStatusText.engine(status)}")
+            }
+        }
+
+        // Apply master trim after loading the new runtime (loadGraphOnly replaces the native runtime)
+        // and before opening output so the first rendered sample already has the chosen gain.
+        current.setOutputGain(outputTrim.gainDb, outputTrim.ceilingDb)
         active.setDuration(frames)
         if (output == null) {
             output = openOutput(current.nativeHandle(), current.sampleRate)
@@ -193,10 +240,12 @@ internal class PlaybackSession(
 
         val active = controller ?: return fail("The audio engine is not initialised.")
         closeOutput()
+        linearSession = false
         val result = active.load(title, packet, audio, assetId)
         if (result is PlaybackController.State.Failed) {
             return fail(result.reason)
         }
+        current.setOutputGain(outputTrim.gainDb, outputTrim.ceilingDb)
         active.setDuration(frames)
 
         // The output must be leased after the graph is loaded and the transport is
@@ -210,6 +259,121 @@ internal class PlaybackSession(
         // has not been processed by the engine yet.
         _state.value = published.copy(loaded = true)
         return _state.value
+    }
+
+    /**
+     * Loads and starts a standalone linear track (e.g. a Jukebox recording) using native
+     * streamed decoding instead of compiling a graph or decoding full PCM into memory.
+     */
+    fun loadLinear(
+        title: String,
+        audio: ByteArray,
+        assetId: String,
+        frames: Long,
+        loop: Boolean = false,
+        streamed: Boolean = true,
+        loopStart: Long? = null,
+        loopEnd: Long? = null,
+    ): State {
+        var current = engine
+        if (current == null) {
+            current = createEngine()
+            if (current == null) {
+                return fail("Out of memory creating the audio engine.")
+            }
+            engine = current
+            controller = PlaybackController(current as PlaybackEngine)
+        }
+
+        val active = controller ?: return fail("The audio engine is not initialised.")
+        closeOutput()
+        linearSession = true
+        val result = active.loadLinear(title, audio, assetId, loop = loop, streamed = streamed)
+        if (result is PlaybackController.State.Failed) {
+            return fail(result.reason)
+        }
+        current.setOutputGain(outputTrim.gainDb, outputTrim.ceilingDb)
+        if (loop && loopStart != null && loopEnd != null && loopEnd > loopStart) {
+            val repeated = active.setLinearRepeat(true, loopStart, loopEnd)
+            if (repeated is PlaybackController.State.Failed) {
+                return fail(repeated.reason)
+            }
+        }
+        active.setDuration(frames)
+
+        if (output == null) {
+            output = openOutput(current.nativeHandle(), current.sampleRate)
+        }
+
+        val published = publish(active.poll(), title, frames, current.sampleRate)
+        _state.value = published.copy(loaded = true, linear = true, naturalEnd = false)
+        return _state.value
+    }
+
+    /**
+     * Loads and starts a multi-track linear graph (e.g., overlaid Opening + Telop or chained tracks).
+     */
+    fun loadLinearGraph(
+        title: String,
+        packet: ByteArray,
+        assets: List<Pair<String, ByteArray>>,
+        frames: Long,
+        streamed: Boolean = false,
+    ): State {
+        var current = engine
+        if (current == null) {
+            current = createEngine()
+            if (current == null) {
+                return fail("Out of memory creating the audio engine.")
+            }
+            engine = current
+            controller = PlaybackController(current as PlaybackEngine)
+        }
+
+        val active = controller ?: return fail("The audio engine is not initialised.")
+        closeOutput()
+        linearSession = true
+        val loaded = active.loadGraphOnly(packet)
+        if (loaded is PlaybackController.State.Failed) return fail(loaded.reason)
+
+        assets.forEachIndexed { index, (name, bytes) ->
+            val status = if (streamed) current.bindStreamedBwav(index, bytes, name) else current.bindBwav(index, bytes, name)
+            if (status != AudioEngine.STATUS_OK) {
+                return fail("Could not bind '$name': ${AudioStatusText.engineHint(status) ?: AudioStatusText.engine(status)}")
+            }
+        }
+
+        val started = active.playSegment(100)
+        if (started is PlaybackController.State.Failed) return fail(started.reason)
+        current.setOutputGain(outputTrim.gainDb, outputTrim.ceilingDb)
+        active.setDuration(frames)
+
+        if (output == null) {
+            output = openOutput(current.nativeHandle(), current.sampleRate)
+        }
+
+        val published = publish(started, title, frames, current.sampleRate)
+        _state.value = published.copy(loaded = true, linear = true, naturalEnd = false)
+        return _state.value
+    }
+
+    /** Updates linear single-track loop state cleanly across the native output lease boundary. */
+    fun setLinearRepeat(enabled: Boolean, begin: Long = -1L, end: Long = -1L): State {
+        val active = controller ?: return _state.value
+        if (!linearSession) return _state.value
+        val hadOutput = output != null
+        if (hadOutput) {
+            output?.close()
+            output = null
+        }
+        val updated = active.setLinearRepeat(enabled, begin, end)
+        if (hadOutput && updated !is PlaybackController.State.Failed) {
+            val current = engine
+            if (current != null && output == null) {
+                output = openOutput(current.nativeHandle(), current.sampleRate)
+            }
+        }
+        return publishState(updated)
     }
 
     /** Queue cancellation, preserving the current source and transport. Native owns the start boundary. */
@@ -240,13 +404,27 @@ internal class PlaybackSession(
     fun stop(): State {
         val active = controller ?: return _state.value
         val published = publishState(active.stop())
-        _state.value = published.copy(loaded = false)
+        _state.value = published.copy(loaded = false, naturalEnd = false)
         return _state.value
     }
 
     fun seek(frame: Long): State {
         val active = controller ?: return _state.value
-        return publishState(active.seek(frame))
+        // Native seekEngine refuses while an AudioOutput lease holds engine->outputActive; suspend
+        // the output stream across the seek without dropping interactive transition rules.
+        val hadOutput = output != null
+        if (hadOutput) {
+            output?.close()
+            output = null
+        }
+        val sought = active.seek(frame)
+        if (hadOutput && sought !is PlaybackController.State.Failed) {
+            val current = engine
+            if (current != null && output == null) {
+                output = openOutput(current.nativeHandle(), current.sampleRate)
+            }
+        }
+        return publishState(sought)
     }
 
     /**
@@ -258,7 +436,7 @@ internal class PlaybackSession(
     fun poll(): State {
         val active = controller ?: return _state.value
         val current=active.poll()
-        if(_state.value.loaded) {
+        if(_state.value.loaded && !linearSession) {
             val observation=interactiveObservation()
             if(observation?.segment!=automaticSource) { automaticSource=null;automaticPending=null }
             if(observation!=null && !observation.paused && !observation.transitioning && observation.sourceFrame!=null) {
@@ -273,12 +451,22 @@ internal class PlaybackSession(
                 }
             }
         }
+        if (_state.value.loaded && linearSession &&
+            current is PlaybackController.State.Stopped && current.naturalEnd) {
+            val published = publishState(current)
+            val handedOff = onLinearCompleted?.invoke() == true
+            if (!handedOff && _state.value.naturalEnd) {
+                _state.value = _state.value.copy(loaded = false)
+            }
+            return _state.value
+        }
         return publishState(current)
     }
 
     /** Releases the output and the engine. Safe to call more than once. */
     fun release() {
         closeOutput()
+        linearSession = false
         controller?.release()
         controller = null
         engine = null
@@ -351,12 +539,20 @@ internal class PlaybackSession(
             detail = detail,
             // Preserved across polls: only load, stop, release and failure change it.
             loaded = _state.value.loaded,
+            linear = linearSession,
+            naturalEnd = (controllerState as? PlaybackController.State.Stopped)?.naturalEnd == true,
         )
         return _state.value
     }
 
     private fun fail(reason: String): State {
-        _state.value = _state.value.copy(playing = false, paused = false, loaded = false, detail = reason)
+        _state.value = _state.value.copy(
+            playing = false,
+            paused = false,
+            loaded = false,
+            naturalEnd = false,
+            detail = reason,
+        )
         return _state.value
     }
 }

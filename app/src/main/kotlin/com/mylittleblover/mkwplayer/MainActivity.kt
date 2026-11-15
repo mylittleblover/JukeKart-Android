@@ -480,9 +480,9 @@ private fun LegacyPlayerScreen(modifier: Modifier = Modifier) {
         item {
             Spacer(Modifier.height(8.dp))
             Text(
-                "This build decodes Nintendo DSP-ADPCM BWAV, which covers every course " +
-                    "theme. JukeBox and cutscene entries use a different codec and are " +
-                    "listed as not playable rather than failing silently.",
+                "This build decodes both BWAV codecs: Nintendo DSP-ADPCM (course themes) and chunked " +
+                    "Opus (the jukebox and cutscenes). An entry this build cannot decode is listed as " +
+                    "not playable rather than failing silently.",
                 style = MaterialTheme.typography.bodySmall,
             )
         }

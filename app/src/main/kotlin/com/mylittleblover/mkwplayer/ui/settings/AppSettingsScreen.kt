@@ -30,6 +30,8 @@ internal fun AppSettingsScreen(
     testMode: UnlockTestMode = UnlockTestMode.NORMAL,
     testUnlockVisible: Boolean = false,
     onTestUnlock: (UnlockTestMode) -> Unit = {},
+    outputTrim: com.mylittleblover.mkwplayer.audio.OutputTrim = com.mylittleblover.mkwplayer.audio.OutputTrim.default,
+    onOutputTrim: (com.mylittleblover.mkwplayer.audio.OutputTrim) -> Unit = {},
     sourceCount: Int? = null, playableCount: Int? = null, importProgress: String = "", importDetail: String? = null,
 ) {
     var choosingLanguage by rememberSaveable { mutableStateOf(false) }
@@ -58,6 +60,28 @@ internal fun AppSettingsScreen(
                             Text(stringResource(language.labelResource))
                             Icon(Icons.Filled.ArrowDropDown, null)
                         }
+                    }
+                }
+            }
+        }
+        item("output-trim") {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                HorizontalDivider()
+                Text(stringResource(R.string.settings_output_title), style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.settings_output_hint), style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(Modifier.fillMaxWidth().selectableGroup()) {
+                    com.mylittleblover.mkwplayer.audio.OutputTrim.choices.forEach { choice ->
+                        ListItem(
+                            headlineContent = { Text(choice.summary) },
+                            supportingContent = {
+                                Text(stringResource(
+                                    if (choice.limits) R.string.settings_output_limited else R.string.settings_output_flat))
+                            },
+                            trailingContent = { RadioButton(selected = choice == outputTrim, onClick = null) },
+                            modifier = Modifier.selectable(selected = choice == outputTrim, role = Role.RadioButton,
+                                onClick = { if (choice != outputTrim) onOutputTrim(choice) }).heightIn(min = 56.dp),
+                        )
                     }
                 }
             }

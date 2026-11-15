@@ -21,4 +21,9 @@
     <string name="stage_start_label">起始階段</string>
     <string name="stage_start_choose">選擇起始階段</string>
     <string name="stage_start_stop_hint">停止播放後可更改起始階段。</string>
+    <string name="stage_title_extended">加長版（帶Harmonica）</string>
+    <string name="stage_title_normal">普通版（無前綴）</string>
+    <string name="stage_title_brasscut">短版（Brasscut）</string>
+    <string name="stage_battle_fast">即將結束</string>
+    <string name="stage_outro_numbered">尾奏 %1$d</string>
 </resources>

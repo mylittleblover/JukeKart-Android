@@ -117,6 +117,14 @@ Java_com_mylittleblover_player2_platform_audio_NativeAudioLibrary_command(JNIEnv
     return static_cast<jint>(player2::api::submitEngineCommand(handle(engine),command));
 }
 extern "C" JNIEXPORT jint JNICALL
+Java_com_mylittleblover_player2_platform_audio_NativeAudioLibrary_setOutputGain(JNIEnv*,jobject,jlong engine,jdouble gainDb,jdouble ceilingDb) {
+    return static_cast<jint>(player2::api::setEngineOutputGain(handle(engine),gainDb,ceilingDb));
+}
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_mylittleblover_player2_platform_audio_NativeAudioLibrary_limitedSampleCount(JNIEnv*,jobject,jlong engine) {
+    return static_cast<jlong>(player2::api::engineLimitedSampleCount(handle(engine)));
+}
+extern "C" JNIEXPORT jint JNICALL
 Java_com_mylittleblover_player2_platform_audio_NativeAudioLibrary_render(JNIEnv* env,jobject,jlong engine,jfloatArray array,jint frames) {
     using player2::api::EngineStatus;
     if(!engine || !array || frames<0 || frames>65536 || env->GetArrayLength(array)<frames*2) return static_cast<jint>(EngineStatus::InvalidRequest);
