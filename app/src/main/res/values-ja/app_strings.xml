@@ -25,4 +25,20 @@
     <string name="settings_output_limited">ピークを上限内に抑制</string>
     <string name="settings_output_default">デフォルト</string>
     <string name="settings_dev_title">開発者・テスト設定</string>
+    <string name="settings_import_cancel">インポートを中止</string>
+    <string name="settings_import_committing">ライブラリへ反映中（中止不可）…</string>
+    <string name="settings_import_resume">インポートを再開</string>
+    <string name="settings_import_discard">破棄</string>
+    <string name="settings_import_repick">.mkwpack を再選択</string>
+    <string name="settings_import_repick_hint">%1$s へのアクセス権限が失効しました（%2$d/%3$d 検証済み）。検証済みの音声を再利用して続行するには、同じ .mkwpack を再選択してください。</string>
+    <string name="settings_import_resumable_hint">中断されたインポートがあります：%1$s（%2$d/%3$d 検証済み）。</string>
+    <string name="settings_import_progress_members">%1$d / %2$d · %3$s</string>
+    <string name="settings_import_summary_title">更新完了：%1$s（v%2$d）</string>
+    <string name="settings_import_summary_body">+%1$d トラック · +%2$d 音声アセット · ライブラリ合計 %3$d/%4$d 再生可能（ジュークボックス %5$d 曲）</string>
+    <string name="settings_import_pool_replaced">ルート候補曲プールを v%1$d（%2$d ルート）へ一括更新しました。</string>
+    <string name="settings_import_invalidated_routes">データ更新により %1$d 件の保存済みルートが無効化されました（末尾修正用に編集内容は保持されます）。</string>
+    <string name="settings_import_stopped_playback">ライブラリ更新により現在の再生ソースが無効となったため、再生を停止しました。</string>
+    <string name="settings_import_cleared_continue">データ更新により「聴き続ける」の状態をリセットしました。</string>
+    <string name="settings_import_dismiss">閉じる</string>
+    <string name="settings_no_delete_hint">複数の .mkwpack は内部ライブラリへ追加・統合され、同時に1つのインポートのみ実行されます。</string>
 </resources>

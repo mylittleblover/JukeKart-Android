@@ -29,4 +29,20 @@
     <string name="settings_output_limited">Peaks held under the ceiling</string>
     <string name="settings_output_default">Default</string>
     <string name="settings_dev_title">Developer &amp; testing</string>
+    <string name="settings_import_cancel">Cancel import</string>
+    <string name="settings_import_committing">Applying to library (cannot cancel)…</string>
+    <string name="settings_import_resume">Resume import</string>
+    <string name="settings_import_discard">Discard</string>
+    <string name="settings_import_repick">Re-select .mkwpack</string>
+    <string name="settings_import_repick_hint">File access expired for %1$s (%2$d/%3$d verified). Re-select the exact same .mkwpack to continue without re-extracting completed audio.</string>
+    <string name="settings_import_resumable_hint">Interrupted import ready for %1$s (%2$d/%3$d verified).</string>
+    <string name="settings_import_progress_members">%1$d / %2$d · %3$s</string>
+    <string name="settings_import_summary_title">Imported %1$s (v%2$d)</string>
+    <string name="settings_import_summary_body">+%1$d tracks · +%2$d audio assets · Library total: %3$d playable / %4$d tracks (%5$d Jukebox)</string>
+    <string name="settings_import_pool_replaced">Road candidate pool updated to v%1$d (%2$d roads).</string>
+    <string name="settings_import_invalidated_routes">%1$d saved route(s) became invalid after update and remain kept for tail repair.</string>
+    <string name="settings_import_stopped_playback">Stopped active playback because its route or course data changed.</string>
+    <string name="settings_import_cleared_continue">Cleared saved Continue Listening because updated data invalidated it.</string>
+    <string name="settings_import_dismiss">Dismiss</string>
+    <string name="settings_no_delete_hint">Multiple .mkwpack files merge automatically into the internal library. Only one import runs at a time.</string>
 </resources>

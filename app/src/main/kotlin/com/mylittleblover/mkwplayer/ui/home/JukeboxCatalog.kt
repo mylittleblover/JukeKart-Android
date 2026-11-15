@@ -327,12 +327,24 @@ internal object JukeboxCatalog {
     fun load(registry: PackRegistry, metadata: Metadata? = null): Catalog {
         val tracks = linkedMapOf<String, PackManifest.Track>()
         val packs = linkedMapOf<String, File>()
-        for (entry in registry.load()) {
+        val parsed = registry.load().mapNotNull { entry ->
             val directory = File(entry.directory)
             val manifestFile = File(directory, PackManifest.MEMBER_NAME)
             val manifest = runCatching {
                 (PackManifest.parse(manifestFile.readText()) as? PackManifest.Result.Ok)?.manifest
-            }.getOrNull() ?: continue
+            }.getOrNull() ?: return@mapNotNull null
+            Triple(entry, manifest, directory)
+        }
+        // Per packId keep the highest FULL version and newer DELTAs (#84, #85); highest version wins.
+        val retained = parsed.groupBy { it.first.packId }.values.flatMap { group ->
+            val sorted = group.sortedBy { it.first.packVersion }
+            val latestFull = sorted.indexOfLast { !it.second.isDelta }
+            if (latestFull >= 0) sorted.drop(latestFull) else sorted
+        }.sortedWith(
+            compareByDescending<Triple<PackRegistry.Entry, PackManifest, File>> { it.first.packVersion }
+                .thenBy { it.first.packId },
+        )
+        for ((_, manifest, directory) in retained) {
             for (track in manifest.tracks) {
                 if (track.kind != ResourceKind.JUKEBOX) continue
                 tracks.putIfAbsent(track.key, track)
@@ -340,6 +352,13 @@ internal object JukeboxCatalog {
             }
         }
         return buildCatalog(tracks.values.toList(), packs, metadata)
+    }
+
+    /** Builds catalog directly from a single merged manifest directory. */
+    fun buildFromManifest(manifest: PackManifest, directory: File, metadata: Metadata? = null): Catalog {
+        val jukeboxTracks = manifest.tracks.filter { it.kind == ResourceKind.JUKEBOX }
+        val packByKey = jukeboxTracks.associate { it.key to directory }
+        return buildCatalog(jukeboxTracks, packByKey, metadata)
     }
 
     /** Pure catalog assembly over already-resolved JUKEBOX pack tracks, sorted chronologically and by OST order. */

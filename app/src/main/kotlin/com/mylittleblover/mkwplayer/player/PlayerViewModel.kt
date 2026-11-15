@@ -37,12 +37,18 @@ import com.mylittleblover.mkwplayer.unlock.UnlockStore
 import com.mylittleblover.mkwplayer.unlock.UnlockTestMode
 import com.mylittleblover.mkwplayer.unlock.UnlockTestStore
 import com.mylittleblover.mkwplayer.library.Playability
-import com.mylittleblover.mkwplayer.library.PackPicker
+import com.mylittleblover.mkwplayer.pack.InternalPackLibrary
+import com.mylittleblover.mkwplayer.pack.LibraryInvalidation
 import com.mylittleblover.mkwplayer.pack.PackCoverage
-import com.mylittleblover.mkwplayer.pack.PackInstaller
+import com.mylittleblover.mkwplayer.pack.PackImportChangelog
+import com.mylittleblover.mkwplayer.pack.PackImportCoordinator
+import com.mylittleblover.mkwplayer.pack.PackImportPhase
+import com.mylittleblover.mkwplayer.pack.PackImportUiState
 import com.mylittleblover.mkwplayer.pack.PackManifest
 import com.mylittleblover.mkwplayer.pack.PackPlayback
 import com.mylittleblover.mkwplayer.pack.PackRegistry
+import com.mylittleblover.mkwplayer.pack.PoolUpdateStatus
+import com.mylittleblover.mkwplayer.pack.StreamingPackInstaller
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -124,6 +130,10 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val allowSingleRepeat: Boolean = true,
         val allowRepeatToggle: Boolean = true,
         val continueListening: ContinueListeningUi? = null,
+        /** Monotonic counter incremented on every library commit to re-evaluate UI state (#84-#89). */
+        val libraryGeneration: Int = 0,
+        /** Live single-task streaming pack import state (#91-#97). */
+        val importState: PackImportUiState = PackImportUiState(),
     )
 
     data class ContinueListeningUi(
@@ -391,8 +401,9 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         getApplication<Application>().assets.open("audio/${com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.ASSET}").use { it.readBytes() }
     }
 
-    /** The installed pack, or null when the listener is using loose files. */
+    /** The unified merged internal pack library, or null when using loose files. */
     private var pack: InstalledPack? = null
+    private var mergedFingerprints: List<String> = emptyList()
 
     /**
      * The jukebox the installed pack carries, grouped by source game.
@@ -756,40 +767,70 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         }
         loaded.problem?.let { _ui.value = _ui.value.copy(detail = it) }
 
-        // Restore the installed source without opening audio. Browsing after a process restart
-        // must offer the same courses as immediately after import.
+        // Restore the unified multi-pack internal library without opening audio (#84, #85).
         val packRoot = java.io.File(getApplication<Application>().filesDir, PACK_ROOT)
-        val restored = PackRegistry(packRoot).load()
-            .sortedWith(compareByDescending<PackRegistry.Entry> { it.packVersion }.thenBy { it.packId })
-            .firstNotNullOfOrNull { entry ->
-                runCatching {
-                    val expected = java.io.File(java.io.File(java.io.File(packRoot, "packs"), entry.packId), entry.packVersion.toString()).canonicalFile
-                    val directory = java.io.File(entry.directory).canonicalFile
-                    if (directory != expected || !directory.toPath().startsWith(packRoot.canonicalFile.toPath())) return@runCatching null
-                    val manifest = PackManifest.parse(java.io.File(directory, PackManifest.MEMBER_NAME).readText()).manifestOrNull()
-                        ?: return@runCatching null
-                    if (manifest.packId != entry.packId || manifest.packVersion != entry.packVersion ||
-                        com.mylittleblover.mkwplayer.pack.PackValidation.validate(manifest).failures.isNotEmpty()) return@runCatching null
-                    if (!manifest.assets.all { asset ->
-                        val file = java.io.File(directory, "audio/${asset.digest.sha256}")
-                        file.isFile && file.length() == asset.byteSize
-                    }) return@runCatching null
-                    InstalledPack(manifest, directory)
-                }.getOrNull()
-            }
-        if (restored != null) {
-            pack = restored
+        val merged = InternalPackLibrary(packRoot).loadOrMaterialize()
+        if (merged != null) {
+            pack = InstalledPack(merged.manifest, merged.directory)
+            mergedFingerprints = merged.activePackFingerprints
             _ui.value = _ui.value.copy(pack = PackUi(
-                name = restored.manifest.name,
-                trackCount = restored.manifest.tracks.size,
-                playableCount = PackPlayback.playableTracks(restored.manifest).size,
+                name = merged.manifest.name,
+                trackCount = merged.manifest.tracks.size,
+                playableCount = PackPlayback.playableTracks(merged.manifest).size,
             ))
         }
+
+        // Check for interrupted checkpoint from prior launch and wire single-task coordinator (#91-#97).
+        PackImportCoordinator.configureCommitHandler { installed ->
+            withContext(Dispatchers.Main.immediate) {
+                applyCommittedPackUpdate(installed)
+            }
+        }
+        PackImportCoordinator.checkPendingCheckpoint(getApplication(), packRoot)
 
         // The cup's eligibility depends on what the user actually has, so it is derived after the
         // library is restored. Reading the stored progress first means the offer survives a restart.
         establishCup(loaded.tracks)
         refreshJukeboxCatalog()
+
+        viewModelScope.launch {
+            PackImportCoordinator.state.collect { imp ->
+                val importingNow = imp.isActive
+                val progressText = when {
+                    imp.phase == PackImportPhase.COMMITTING -> "Applying library update..."
+                    imp.totalMembers > 0 -> "${imp.processedMembers}/${imp.totalMembers} · ${imp.currentMember}"
+                    imp.isActive -> "Reading ${imp.displayName}..."
+                    else -> ""
+                }
+                val currentPack = _ui.value.pack
+                _ui.value = _ui.value.copy(
+                    busy = importingNow,
+                    status = when (imp.phase) {
+                        PackImportPhase.FAILED -> "This pack was not installed"
+                        PackImportPhase.CANCELLED -> "Import cancelled"
+                        PackImportPhase.COMPLETED -> "Library updated"
+                        else -> _ui.value.status
+                    },
+                    detail = when (imp.phase) {
+                        PackImportPhase.FAILED,
+                        PackImportPhase.PAUSED_NEEDS_REPICK -> imp.errorReason
+                        PackImportPhase.CANCELLED -> imp.errorReason ?: _ui.value.detail
+                        else -> _ui.value.detail
+                    },
+                    importState = imp,
+                    pack = currentPack?.copy(importing = importingNow, progress = progressText)
+                        ?: if (importingNow) {
+                            PackUi(
+                                name = imp.displayName,
+                                trackCount = 0,
+                                playableCount = 0,
+                                importing = true,
+                                progress = progressText,
+                            )
+                        } else null,
+                )
+            }
+        }
 
         viewModelScope.launch {
             linearCoordinator.state.collect { linear ->
@@ -1496,119 +1537,220 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     }
 
     /**
-     * Imports a soundtrack pack.
+     * Imports a `.mkwpack` directly via persistable SAF FileChannel streaming (#91-#97).
      *
-     * This is the only import path a normal listener needs: one file carries the audio, the stage
-     * structures, the timings and the cue data, so there is nothing to pick one at a time.
-     *
-     * The import runs off the main thread because it hashes every asset, and the screen is told what it is
-     * doing rather than appearing frozen. A refusal is shown verbatim: the importer names the member or rule
-     * that failed, and "could not import" tells a user nothing they can act on.
+     * Enforces strictly one active import at a time (#94), never copies the archive into cache
+     * storage (#96), supports pre-commit cancellation (#91, #93), crash-safe checkpoint resume
+     * (#95, #97), and automatic commit without confirmation dialogs (#92).
      */
     fun importPack(uri: Uri) {
-        if(nativePerformance?.isFading==true) return
-        _ui.value = _ui.value.copy(
-            busy = true,
-            status = "Copying the pack...",
-            detail = null,
-            pack = _ui.value.pack?.copy(importing = true, progress = "copying"),
+        if (nativePerformance?.isFading == true) return
+        requestNotificationPermissionIfNeeded()
+        val app = getApplication<Application>()
+        val result = PackImportCoordinator.startUriImport(
+            context = app,
+            uri = uri,
+            libraryRoot = java.io.File(app.filesDir, PACK_ROOT),
+            appFilesDir = app.filesDir,
+            startForeground = true,
         )
-        viewModelScope.launch {
-            val context = getApplication<Application>()
-            val copied = withContext(Dispatchers.IO) { PackPicker.copy(context, uri) }
-            val picked = when (copied) {
-                is PackPicker.Result.Rejected -> {
-                    _ui.value = _ui.value.copy(
-                        busy = false,
-                        status = "Could not read the pack",
-                        detail = copied.reason,
-                        pack = _ui.value.pack?.copy(importing = false, progress = ""),
-                    )
-                    return@launch
-                }
-                is PackPicker.Result.Ok -> copied
+        when (result) {
+            is PackImportCoordinator.StartResult.Started -> Unit
+            is PackImportCoordinator.StartResult.RejectedBusy -> {
+                _ui.value = _ui.value.copy(detail = result.reason)
             }
-
-            _ui.value = _ui.value.copy(status = "Installing ${picked.displayName}...")
-
-            val result = withContext(Dispatchers.IO) {
-                try {
-                    PackInstaller.install(
-                        archive = picked.file,
-                        libraryRoot = java.io.File(context.filesDir, PACK_ROOT),
-                        progress = object : PackInstaller.Progress {
-                            override fun onMember(index: Int, total: Int, name: String) = Unit
-                        },
-                    )
-                } finally {
-                    picked.file.delete()
-                }
-            }
-
-            when (result) {
-                is PackInstaller.Result.Refused -> {
-                    _ui.value = _ui.value.copy(
-                        busy = false,
-                        status = "This pack was not installed",
-                        detail = result.reason,
-                        pack = _ui.value.pack?.copy(importing = false, progress = ""),
-                    )
-                }
-                is PackInstaller.Result.Installed -> {
-                    onPackInstalled(result.manifest, result.directory, result.coverage, picked.displayName)
-                }
+            is PackImportCoordinator.StartResult.RejectedInvalid -> {
+                _ui.value = _ui.value.copy(detail = result.reason)
             }
         }
     }
 
-    /** Records an installed pack and opens the first stage it can play. */
-    private fun onPackInstalled(
-        manifest: PackManifest,
-        directory: java.io.File,
-        coverage: PackCoverage.Coverage,
-        displayName: String,
-    ) {
-        this.pack = InstalledPack(manifest, directory)
+    fun cancelPackImport(): Boolean {
+        val packRoot = java.io.File(getApplication<Application>().filesDir, PACK_ROOT)
+        return PackImportCoordinator.requestCancel(packRoot)
+    }
+
+    fun resumePackImport() {
+        requestNotificationPermissionIfNeeded()
+        val app = getApplication<Application>()
+        val result = PackImportCoordinator.resumePending(
+            context = app,
+            libraryRoot = java.io.File(app.filesDir, PACK_ROOT),
+            appFilesDir = app.filesDir,
+            startForeground = true,
+        )
+        if (result is PackImportCoordinator.StartResult.RejectedInvalid) {
+            _ui.value = _ui.value.copy(detail = result.reason)
+        } else if (result is PackImportCoordinator.StartResult.RejectedBusy) {
+            _ui.value = _ui.value.copy(detail = result.reason)
+        }
+    }
+
+    fun resumePackImportWithRepick(uri: Uri) {
+        requestNotificationPermissionIfNeeded()
+        val app = getApplication<Application>()
+        val result = PackImportCoordinator.resumeWithRepickedUri(
+            context = app,
+            newUri = uri,
+            libraryRoot = java.io.File(app.filesDir, PACK_ROOT),
+            appFilesDir = app.filesDir,
+            startForeground = true,
+        )
+        if (result is PackImportCoordinator.StartResult.RejectedInvalid) {
+            _ui.value = _ui.value.copy(detail = result.reason)
+        } else if (result is PackImportCoordinator.StartResult.RejectedBusy) {
+            _ui.value = _ui.value.copy(detail = result.reason)
+        }
+    }
+
+    fun dismissImportChangelog() {
+        PackImportCoordinator.dismissCompletedOrError()
+    }
+
+    /**
+     * Applies committed pack + candidate pool updates to active library state, stops any
+     * invalidated active playback (#88), clears invalidated Continue Listening (#89), and counts
+     * saved custom routes flagged invalid without mutating user edits (#87).
+     */
+    private fun applyCommittedPackUpdate(
+        installed: StreamingPackInstaller.Result.Installed,
+    ): PackImportChangelog {
+        val merged = installed.mergedLibrary
+        val effectiveManifest = merged?.manifest ?: installed.manifest
+        val effectiveDir = merged?.directory ?: installed.directory
+        this.pack = InstalledPack(effectiveManifest, effectiveDir)
+        this.mergedFingerprints = merged?.activePackFingerprints
+            ?: listOf("${installed.manifest.packId}:${installed.manifest.packVersion}")
+
         com.mylittleblover.mkwplayer.ui.art.PackArtwork.evictAll()
+        reloadRoadJukeboxPool()
         establishCup()
 
-        val playable = PackPlayback.playableTracks(manifest)
-        val notes = buildList {
-            if (coverage.unsupportedCodecs.isNotEmpty()) {
-                add(
-                    "${coverage.unsupportedCodecs.sumOf { it.affectedTracks }} track(s) use a codec this " +
-                        "build cannot decode.",
-                )
+        val registry = PackRegistry(java.io.File(getApplication<Application>().filesDir, PACK_ROOT))
+        val updatedJukebox = com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.load(registry, jukeboxMetadata)
+        _ui.value = _ui.value.copy(jukebox = updatedJukebox)
+        linearCoordinator.configureSessionStore(linearSessionStore)
+        linearCoordinator.attach(getApplication(), updatedJukebox)
+
+        val customRoutes = com.mylittleblover.mkwplayer.routes.CustomRouteStore(customRoutesFile())
+            .read().getOrDefault(emptyList())
+
+        val invalidEnv = buildInvalidationEnvironment(
+            manifest = effectiveManifest,
+            directory = effectiveDir,
+            jukeboxCatalog = updatedJukebox,
+            customRoutes = customRoutes,
+        )
+
+        // #88: Stop active playback immediately if updated data made its route, stage, or assets invalid.
+        var stoppedActivePlayback = false
+        var stopDetail: String? = null
+        val linearNow = linearCoordinator.state.value
+        if (linearNow.active && linearNow.current != null) {
+            val allQueue = linearCoordinator.queue.snapshot().let { snap ->
+                buildList {
+                    snap.current?.let { add(it) }
+                    addAll(snap.upNext)
+                }
+            }
+            val decision = LibraryInvalidation.shouldStopActiveLinear(
+                contextKind = linearNow.contextKind,
+                contextId = linearNow.contextId,
+                currentEntry = linearNow.current,
+                allQueueEntries = allQueue,
+                env = invalidEnv,
+            )
+            if (decision.shouldStop) {
+                releaseTransport()
+                stoppedActivePlayback = true
+                stopDetail = decision.reason
+            }
+        } else {
+            val stageDecision = LibraryInvalidation.shouldStopInteractiveStage(currentStageCode, invalidEnv)
+            if (stageDecision.shouldStop) {
+                releaseTransport()
+                stoppedActivePlayback = true
+                stopDetail = stageDecision.reason
             }
         }
 
+        // #89: Clear Continue Listening immediately if updated data invalidated saved route/pool/tracks.
+        var clearedContinueListening = false
+        val saved = linearSessionStore.read().getOrNull()
+        if (saved != null && !LibraryInvalidation.isSavedSessionStillValid(saved, invalidEnv)) {
+            linearSessionStore.clear()
+            clearedContinueListening = true
+            _ui.value = _ui.value.copy(continueListening = null)
+        } else {
+            refreshContinueListening()
+        }
+
+        // #87: Identify invalidated custom routes without mutating/deleting user route edits.
+        val invalidRoutesCount = LibraryInvalidation.findInvalidCustomRoutes(invalidEnv).size
+
+        val playable = PackPlayback.playableTracks(effectiveManifest)
+        val notes = buildList {
+            if (installed.coverage.unsupportedCodecs.isNotEmpty()) {
+                add(
+                    "${installed.coverage.unsupportedCodecs.sumOf { it.affectedTracks }} track(s) use a codec this " +
+                        "build cannot decode.",
+                )
+            }
+            if (stopDetail != null) add(stopDetail)
+        }
+
+        val previousGeneration = _ui.value.libraryGeneration
+        val hadNothingActiveBefore = session.state.value.active.not() &&
+            !linearCoordinator.state.value.active &&
+            interactivePlan == null &&
+            flow == null
+
         _ui.value = _ui.value.copy(
             busy = false,
-            status = if (playable.isEmpty()) "Pack installed, but nothing in it is playable" else "Pack installed",
+            status = if (playable.isEmpty()) "Pack installed, but nothing in it is playable" else "Library updated",
             detail = notes.firstOrNull(),
+            libraryGeneration = previousGeneration + 1,
             pack = PackUi(
-                name = manifest.name.ifBlank { displayName },
-                trackCount = manifest.tracks.size,
+                name = effectiveManifest.name.ifBlank { installed.manifest.name },
+                trackCount = effectiveManifest.tracks.size,
                 playableCount = playable.size,
                 notes = notes,
                 importing = false,
                 progress = "",
             ),
         )
-        refreshJukeboxCatalog()
 
-        // Open the first stage, so importing is immediately audible rather than leaving the listener to
-        // find their way back to a list.
-        val firstStage = manifest.stages.firstNotNullOfOrNull { stage ->
-            manifest.tracksOf(stage).firstOrNull { track -> playable.any { it.key == track.key } }
-        } ?: playable.firstOrNull()
-        if (firstStage != null) {
-            if (firstStage.kind == com.mylittleblover.mkwplayer.registry.ResourceKind.JUKEBOX) {
-                openJukeboxTrack(firstStage.key)
-            } else {
-                openPackTrack(firstStage)
+        // Open first stage only on initial empty library import so active playback isn't disrupted (#92).
+        if (hadNothingActiveBefore && !stoppedActivePlayback) {
+            val firstStage = installed.manifest.stages.firstNotNullOfOrNull { stage ->
+                effectiveManifest.tracksOf(stage).firstOrNull { track -> playable.any { it.key == track.key } }
+            } ?: playable.firstOrNull { track -> installed.manifest.tracks.any { it.key == track.key } }
+            if (firstStage != null) {
+                if (firstStage.kind == com.mylittleblover.mkwplayer.registry.ResourceKind.JUKEBOX) {
+                    openJukeboxTrack(firstStage.key)
+                } else {
+                    openPackTrack(firstStage)
+                }
             }
         }
+
+        return PackImportChangelog(
+            packId = installed.manifest.packId,
+            packVersion = installed.manifest.packVersion,
+            packName = installed.manifest.name.ifBlank { installed.manifest.packId },
+            isDelta = installed.manifest.isDelta,
+            addedOrUpdatedAssets = installed.addedOrUpdatedAssets,
+            addedOrUpdatedTracks = installed.addedOrUpdatedTracks,
+            totalLibraryTracks = effectiveManifest.tracks.size,
+            playableLibraryTracks = playable.size,
+            jukeboxTrackCount = updatedJukebox.itemsByKey.size,
+            poolStatus = installed.poolStatus,
+            poolDataVersion = installed.poolDataVersion,
+            poolEdgeCount = installed.poolEdgeCount,
+            stoppedActivePlayback = stoppedActivePlayback,
+            clearedContinueListening = clearedContinueListening,
+            invalidatedCustomRoutesCount = invalidRoutesCount,
+        )
     }
 
     private var packPlaybackRequest=0L
@@ -2301,7 +2443,10 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             sessionOverrides = sessionOverrides,
             isStagePlayable = ::canStartStage,
             isStageHidden = ::isSpecialStageLocked,
-            isJukeboxReadable = { item -> dir != null && java.io.File(dir, "audio/${item.track.primary.sha256}").isFile },
+            isJukeboxReadable = { item ->
+                val resolvedDir = jukebox.packByKey[item.track.key] ?: dir
+                resolvedDir != null && java.io.File(resolvedDir, "audio/${item.track.primary.sha256}").isFile
+            },
         )
     }
 
@@ -2317,7 +2462,10 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             installedJukebox = items,
             isStagePlayable = ::canStartStage,
             isStageHidden = ::isSpecialStageLocked,
-            isJukeboxReadable = { item -> dir != null && java.io.File(dir, "audio/${item.track.primary.sha256}").isFile },
+            isJukeboxReadable = { item ->
+                val resolvedDir = jukebox.packByKey[item.track.key] ?: dir
+                resolvedDir != null && java.io.File(resolvedDir, "audio/${item.track.primary.sha256}").isFile
+            },
         )
     }
 
@@ -2644,26 +2792,47 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
-    private fun currentPackFingerprints(): List<String> = listOfNotNull(
-        pack?.manifest?.let { "${it.packId}:${it.packVersion}" },
+    private fun customRoutesFile(): java.io.File =
+        java.io.File(getApplication<Application>().filesDir, "routes/custom_routes.json")
+
+    private fun buildInvalidationEnvironment(
+        manifest: com.mylittleblover.mkwplayer.pack.PackManifest?,
+        directory: java.io.File?,
+        jukeboxCatalog: com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.Catalog,
+        customRoutes: List<com.mylittleblover.mkwplayer.routes.CustomRoute>,
+    ): LibraryInvalidation.Environment = LibraryInvalidation.Environment(
+        mergedManifest = manifest,
+        mergedDirectory = directory,
+        jukeboxCatalog = jukeboxCatalog,
+        roadPool = roadJukeboxPool,
+        stageConnections = stageConnections,
+        officialRoutes = officialRouteCatalog,
+        customRoutes = customRoutes,
+        extraCatalog = extraCatalog,
+        isStageHidden = ::isSpecialStageLocked,
     )
+
+    private fun currentPackFingerprints(): List<String> = if (mergedFingerprints.isNotEmpty()) {
+        mergedFingerprints
+    } else {
+        listOfNotNull(pack?.manifest?.let { "${it.packId}:${it.packVersion}" })
+    }
 
     private fun verifySavedSessionAvailable(
         saved: LinearSessionStore.Snapshot,
         packDir: java.io.File?,
         userPresets: List<com.mylittleblover.mkwplayer.library.CoursePreset>,
     ): Boolean {
-        if (saved.contextKind == LinearSessionStore.ContextKind.OFFICIAL_ROUTE) {
-            val route = saved.contextId?.let { officialRouteCatalog?.route(it) } ?: return false
-            if (!inspectOfficialRoute(route).canPlay) return false
-        } else if (saved.contextKind == LinearSessionStore.ContextKind.CUSTOM_ROUTE) {
-            val customFile = java.io.File(getApplication<Application>().filesDir, "custom-routes.json")
-            val route = saved.contextId?.let { id ->
-                com.mylittleblover.mkwplayer.routes.CustomRouteStore(customFile).find(id).getOrNull()
-            } ?: return false
-            if (!inspectCustomRoute(route).canPlay) return false
-        }
         val juke = jukebox
+        val customRoutes = com.mylittleblover.mkwplayer.routes.CustomRouteStore(customRoutesFile())
+            .read().getOrDefault(emptyList())
+        val invalidEnv = buildInvalidationEnvironment(
+            manifest = pack?.manifest,
+            directory = packDir,
+            jukeboxCatalog = juke,
+            customRoutes = customRoutes,
+        )
+        if (!LibraryInvalidation.isSavedSessionStillValid(saved, invalidEnv)) return false
         val resolver = packDir?.let {
             CourseFlowRecipeBuilder.packSourceResolver(pack?.manifest, interactiveIdentities, it)
         }

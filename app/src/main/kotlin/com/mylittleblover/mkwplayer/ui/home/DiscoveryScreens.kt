@@ -1260,6 +1260,7 @@ internal fun DiscoveryPlaylists(
     onJukeboxGame: (String) -> Unit = {},
     onCustomRoute: (String) -> Unit = {},
     onPlanRouteOnMap: () -> Unit = {},
+    inspectCustomRoute: (CustomRoute) -> RoadJukeboxCatalog.RouteValidationReport? = { null },
 ) {
     val rallies = catalog?.routes(OfficialRouteKind.RALLY, unlocked).orEmpty()
     val gpRoutes = catalog?.routes(OfficialRouteKind.GRAND_PRIX, unlocked).orEmpty()
@@ -1376,6 +1377,8 @@ internal fun DiscoveryPlaylists(
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(state.customRoutes.take(5), key = { "my-route:${it.id}" }) { customRoute ->
+                        val report = inspectCustomRoute(customRoute)
+                        val isInvalid = report?.canPlay == false
                         val firstCode = customRoute.stops.firstOrNull()?.stageCode?.removeSuffix("_00")
                         val artwork = firstCode?.let { extraCatalog.courseArtwork[it] ?: extraCatalog.courseArtwork["${it}_00"] }
                         Card(onClick = { onCustomRoute(customRoute.id) }, modifier = Modifier.width(164.dp)) {
@@ -1391,9 +1394,15 @@ internal fun DiscoveryPlaylists(
                                 }
                                 Text(customRoute.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text(
-                                    stringResource(R.string.route_stops_count, customRoute.stops.size),
+                                    if (isInvalid) {
+                                        report?.blockingReason ?: stringResource(R.string.route_invalid_topology)
+                                    } else {
+                                        stringResource(R.string.route_stops_count, customRoute.stops.size)
+                                    },
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = if (isInvalid) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
                         }

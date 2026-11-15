@@ -25,4 +25,20 @@
     <string name="settings_output_limited">将峰值限制在上限之内</string>
     <string name="settings_output_default">默认</string>
     <string name="settings_dev_title">开发者与测试选项</string>
+    <string name="settings_import_cancel">取消导入</string>
+    <string name="settings_import_committing">正在原子写入曲库（当前不可取消）…</string>
+    <string name="settings_import_resume">继续导入</string>
+    <string name="settings_import_discard">放弃</string>
+    <string name="settings_import_repick">重新选择 .mkwpack</string>
+    <string name="settings_import_repick_hint">%1$s 的文件访问授权已失效（已校验 %2$d/%3$d 项）。请重新选择同一 .mkwpack 文件，以跳过已完成音频并继续导入。</string>
+    <string name="settings_import_resumable_hint">检测到未完成的导入：%1$s（已校验 %2$d/%3$d 项）。</string>
+    <string name="settings_import_progress_members">%1$d / %2$d · %3$s</string>
+    <string name="settings_import_summary_title">已应用更新：%1$s（v%2$d）</string>
+    <string name="settings_import_summary_body">新增/更新 %1$d 首曲目 · %2$d 个音频资源 · 当前曲库共 %3$d/%4$d 首可播（含 %5$d 首点唱机曲目）</string>
+    <string name="settings_import_pool_replaced">道路候补曲库已整池更新为 v%1$d（%2$d 条路线候选）。</string>
+    <string name="settings_import_invalidated_routes">有 %1$d 条已保存路线因数据变更失效，已保留原有编辑等待尾部修复。</string>
+    <string name="settings_import_stopped_playback">因曲库更新使当前内容失效，已立即停止对应播放。</string>
+    <string name="settings_import_cleared_continue">因数据变更使进度失效，已清理"继续收听"。</string>
+    <string name="settings_import_dismiss">知道了</string>
+    <string name="settings_no_delete_hint">多次导入的 .mkwpack 将增量合并至内部曲库，同时仅运行单个导入任务。</string>
 </resources>

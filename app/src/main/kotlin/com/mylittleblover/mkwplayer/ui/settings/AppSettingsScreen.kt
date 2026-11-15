@@ -40,6 +40,11 @@ internal fun AppSettingsScreen(
     outputTrim: com.mylittleblover.mkwplayer.audio.OutputTrim = com.mylittleblover.mkwplayer.audio.OutputTrim.default,
     onOutputTrim: (com.mylittleblover.mkwplayer.audio.OutputTrim) -> Unit = {},
     sourceCount: Int? = null, playableCount: Int? = null, importProgress: String = "", importDetail: String? = null,
+    importState: com.mylittleblover.mkwplayer.pack.PackImportUiState = com.mylittleblover.mkwplayer.pack.PackImportUiState(),
+    onCancelImport: () -> Unit = {},
+    onResumeImport: () -> Unit = {},
+    onRepickImport: () -> Unit = {},
+    onDismissChangelog: () -> Unit = {},
 ) {
     var choosingLanguage by rememberSaveable { mutableStateOf(false) }
     var devExpanded by rememberSaveable { mutableStateOf(testMode != UnlockTestMode.NORMAL) }
@@ -71,6 +76,7 @@ internal fun AppSettingsScreen(
                 Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(stringResource(R.string.settings_library), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(stringResource(R.string.settings_library_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.settings_no_delete_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     sourceName?.let { Text(it, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold) }
                     if (sourceCount != null && playableCount != null) {
                         Text(
@@ -79,7 +85,19 @@ internal fun AppSettingsScreen(
                             color = MaterialTheme.colorScheme.primary,
                         )
                     }
-                    if (busy && importProgress.isNotBlank()) Text(importProgress, style = MaterialTheme.typography.bodySmall)
+                    if (busy && importState.totalMembers > 0) {
+                        Text(
+                            stringResource(
+                                R.string.settings_import_progress_members,
+                                importState.processedMembers,
+                                importState.totalMembers,
+                                importState.currentMember.ifBlank { importState.displayName },
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    } else if (busy && importProgress.isNotBlank()) {
+                        Text(importProgress, style = MaterialTheme.typography.bodySmall)
+                    }
                     importDetail?.let { detail ->
                         var expanded by rememberSaveable(detail) { mutableStateOf(false) }
                         TextButton(onClick = { expanded = !expanded }, contentPadding = PaddingValues(horizontal = 0.dp)) {
@@ -90,8 +108,135 @@ internal fun AppSettingsScreen(
                         }
                     }
                     if (busy) {
-                        com.mylittleblover.mkwplayer.ui.SmoothProgressIndicator(0.5f, Modifier.fillMaxWidth())
-                        Text(stringResource(R.string.settings_importing), style = MaterialTheme.typography.bodySmall)
+                        val progress = if (importState.phase == com.mylittleblover.mkwplayer.pack.PackImportPhase.PROBING) {
+                            0.15f
+                        } else {
+                            importState.fraction
+                        }
+                        com.mylittleblover.mkwplayer.ui.SmoothProgressIndicator(progress, Modifier.fillMaxWidth())
+                        if (importState.canCancel) {
+                            Text(stringResource(R.string.settings_importing), style = MaterialTheme.typography.bodySmall)
+                            OutlinedButton(onClick = onCancelImport, modifier = Modifier.fillMaxWidth()) {
+                                Text(stringResource(R.string.settings_import_cancel), maxLines = 1)
+                            }
+                        } else {
+                            Text(
+                                stringResource(R.string.settings_import_committing),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    } else if (importState.phase == com.mylittleblover.mkwplayer.pack.PackImportPhase.RESUMABLE && importState.checkpoint != null) {
+                        val cp = importState.checkpoint
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    stringResource(
+                                        R.string.settings_import_resumable_hint,
+                                        cp.displayName,
+                                        cp.completedMembers.size,
+                                        cp.totalMembers,
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(onClick = onResumeImport, modifier = Modifier.weight(1f)) {
+                                        Text(stringResource(R.string.settings_import_resume), maxLines = 1)
+                                    }
+                                    OutlinedButton(onClick = onCancelImport, modifier = Modifier.weight(1f)) {
+                                        Text(stringResource(R.string.settings_import_discard), maxLines = 1)
+                                    }
+                                }
+                            }
+                        }
+                    } else if (importState.phase == com.mylittleblover.mkwplayer.pack.PackImportPhase.PAUSED_NEEDS_REPICK && importState.checkpoint != null) {
+                        val cp = importState.checkpoint
+                        Surface(
+                            color = MaterialTheme.colorScheme.tertiaryContainer,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    stringResource(
+                                        R.string.settings_import_repick_hint,
+                                        cp.displayName,
+                                        cp.completedMembers.size,
+                                        cp.totalMembers,
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(onClick = onRepickImport, modifier = Modifier.weight(1f)) {
+                                        Text(stringResource(R.string.settings_import_repick), maxLines = 1)
+                                    }
+                                    OutlinedButton(onClick = onCancelImport, modifier = Modifier.weight(1f)) {
+                                        Text(stringResource(R.string.settings_import_discard), maxLines = 1)
+                                    }
+                                }
+                            }
+                        }
+                    } else if (importState.phase == com.mylittleblover.mkwplayer.pack.PackImportPhase.COMPLETED && importState.changelog != null) {
+                        val cl = importState.changelog
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    stringResource(R.string.settings_import_summary_title, cl.packName, cl.packVersion),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Text(
+                                    stringResource(
+                                        R.string.settings_import_summary_body,
+                                        cl.addedOrUpdatedTracks,
+                                        cl.addedOrUpdatedAssets,
+                                        cl.playableLibraryTracks,
+                                        cl.totalLibraryTracks,
+                                        cl.jukeboxTrackCount,
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                                if (cl.poolStatus == com.mylittleblover.mkwplayer.pack.PoolUpdateStatus.REPLACED && cl.poolDataVersion != null) {
+                                    Text(
+                                        stringResource(R.string.settings_import_pool_replaced, cl.poolDataVersion, cl.poolEdgeCount),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                                if (cl.invalidatedCustomRoutesCount > 0) {
+                                    Text(
+                                        stringResource(R.string.settings_import_invalidated_routes, cl.invalidatedCustomRoutesCount),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.error,
+                                    )
+                                }
+                                if (cl.stoppedActivePlayback) {
+                                    Text(
+                                        stringResource(R.string.settings_import_stopped_playback),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                if (cl.clearedContinueListening) {
+                                    Text(
+                                        stringResource(R.string.settings_import_cleared_continue),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                TextButton(onClick = onDismissChangelog, contentPadding = PaddingValues(horizontal = 0.dp)) {
+                                    Text(stringResource(R.string.settings_import_dismiss))
+                                }
+                            }
+                        }
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Button(onClick = onOpenPack, enabled = !busy, modifier = Modifier.weight(1f)) {

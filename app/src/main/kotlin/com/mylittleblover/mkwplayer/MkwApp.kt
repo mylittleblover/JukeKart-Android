@@ -195,6 +195,13 @@ internal fun MkwApp(
     }
     val openPack = { packPicker.launch(arrayOf("*/*")) }
 
+    val repickPackPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) model.resumePackImportWithRepick(uri)
+    }
+    val openRepickPack = { repickPackPicker.launch(arrayOf("*/*")) }
+
     // The single-file picker, kept because a listener who has a handful of .bwav files should not have to
     // build a pack to hear them.
     val filePicker = rememberLauncherForActivityResult(
@@ -237,7 +244,7 @@ internal fun MkwApp(
         }.getOrNull()
     }
     val unlocked = com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(ui.unlock)
-    val eligible = remember(browse, unlocked, ui.pack, ui.flow?.title) {
+    val eligible = remember(browse, unlocked, ui.pack, ui.flow?.title, ui.libraryGeneration) {
         browse?.courses(unlocked).orEmpty().map { id ->
             com.mylittleblover.mkwplayer.library.RecommendationCandidate(id,
                 com.mylittleblover.mkwplayer.library.RecommendationKind.COURSE, model.canStartStage(id))
@@ -426,6 +433,11 @@ internal fun MkwApp(
                     },
                     sourceCount = ui.pack?.trackCount, playableCount = ui.pack?.playableCount,
                     importProgress = ui.pack?.progress.orEmpty(), importDetail = ui.detail,
+                    importState = ui.importState,
+                    onCancelImport = { model.cancelPackImport() },
+                    onResumeImport = model::resumePackImport,
+                    onRepickImport = openRepickPack,
+                    onDismissChangelog = model::dismissImportChangelog,
                 )
                 detail is NavState.Detail.Course -> {
                     if (browse == null || detail.code.removeSuffix("_00") !in browse.courses(unlocked)) {
@@ -816,6 +828,7 @@ internal fun MkwApp(
                             mapState.enterEdit()
                             nav = nav.select(Tab.WORLD_MAP)
                         },
+                        inspectCustomRoute = remember(ui.libraryGeneration) { model::inspectCustomRoute },
                     )
                 }
             }
@@ -1154,7 +1167,7 @@ private fun MapPage(
         }
         return
     }
-    val playable = remember(ui.pack, ui.flow?.title, data) { data.routes.stageCodes(true).filter(model::canStartStage).toSet() }
+    val playable = remember(ui.pack, ui.flow?.title, ui.libraryGeneration, data) { data.routes.stageCodes(true).filter(model::canStartStage).toSet() }
     OfficialMapScreen(
         image = data.image, anchors = data.anchors, routes = data.routes, names = data.names,
         languageTag = languageTag, specialUnlocked = com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(ui.unlock),
