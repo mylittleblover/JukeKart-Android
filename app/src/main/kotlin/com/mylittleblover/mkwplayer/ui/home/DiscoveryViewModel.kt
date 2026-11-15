@@ -38,15 +38,18 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
         val dailyIds: List<String> = emptyList(), val favoritesReady: Boolean = false, val dailyReady: Boolean = false,
         val favoritesError: Error? = null, val dailyError: Error? = null,
         val playlists: List<com.mylittleblover.mkwplayer.library.UserPlaylist> = emptyList(), val playlistError: Error? = null,
+        val presets: List<com.mylittleblover.mkwplayer.library.CoursePreset> = emptyList(), val presetError: Error? = null,
         val recentIds: List<String> = emptyList(), val recentError: Error? = null,
     ) {
-        val error: Error? get() = favoritesError ?: dailyError ?: playlistError ?: recentError
+        val error: Error? get() = favoritesError ?: dailyError ?: playlistError ?: presetError ?: recentError
     }
     private val favorites = FavoriteStore(File(application.filesDir, "user-favorites.json"))
     private val recent = com.mylittleblover.mkwplayer.library.RecentCourseStore(File(application.filesDir, "recent-courses.json"))
     private val recentOperations = Mutex()
     private val playlists = com.mylittleblover.mkwplayer.library.PlaylistStore(File(application.filesDir, "user-playlists.json"))
     private val playlistOperations = Mutex()
+    private val presetStore = com.mylittleblover.mkwplayer.library.CoursePresetStore(File(application.filesDir, "course-presets.json"))
+    private val presetOperations = Mutex()
     private val daily = DailySelectionStore(File(application.filesDir, "daily-selection.json"))
     private val candidates = MutableStateFlow<List<RecommendationCandidate>?>(null)
     private val favoriteOperations = Mutex()
@@ -65,6 +68,7 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
         reloadFavorites()
         updatePlaylists { playlists.read() }
         updateRecent { recent.read() }
+        reloadPresets()
         viewModelScope.launch {
             while (isActive) {
                 refreshDate()
@@ -129,7 +133,97 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
     fun removeFromPlaylist(id: String, index: Int) = updatePlaylists { playlists.removeCourse(id, index) }
     fun renamePlaylist(id: String, name: String) = updatePlaylists { playlists.rename(id, name) }
     fun moveInPlaylist(id: String, from: Int, to: Int) = updatePlaylists { playlists.moveCourse(id, from, to) }
+    fun setPlaylistNativeTransitionDefault(id: String, enabled: Boolean) = updatePlaylists {
+        playlists.setNativeTransitionDefault(id, enabled)
+    }
+    fun setPlaylistEntryPreset(id: String, index: Int, presetId: String?) = updatePlaylists {
+        playlists.setEntryPreset(id, index, presetId)
+    }
+    fun setPlaylistEntryNativeTransition(id: String, index: Int, enabled: Boolean?) = updatePlaylists {
+        playlists.setEntryNativeTransition(id, index, enabled)
+    }
     fun deletePlaylist(id: String) = updatePlaylists { playlists.delete(id) }
+
+    fun reloadPresets() {
+        viewModelScope.launch {
+            val loaded = presetOperations.withLock {
+                withContext(Dispatchers.IO) { presetStore.read() }
+            }
+            _state.value = loaded.fold(
+                onSuccess = { _state.value.copy(presets = it, presetError = null) },
+                onFailure = { _state.value.copy(presetError = Error.PLAYLISTS) },
+            )
+        }
+    }
+
+    fun playlistsReferencingPreset(presetId: String): List<com.mylittleblover.mkwplayer.library.UserPlaylist> =
+        _state.value.playlists.filter { playlist -> playlist.entryConfigs.any { it.presetId == presetId } }
+
+    fun savePreset(
+        preset: com.mylittleblover.mkwplayer.library.CoursePreset,
+        onComplete: (Result<com.mylittleblover.mkwplayer.library.CoursePreset>) -> Unit = {},
+    ) {
+        viewModelScope.launch {
+            val result = presetOperations.withLock {
+                withContext(Dispatchers.IO) {
+                    presetStore.save(preset).map { list ->
+                        val cleanId = if (preset.id.startsWith(com.mylittleblover.mkwplayer.library.PresetRefs.USER_PREFIX)) {
+                            preset.id
+                        } else {
+                            "${com.mylittleblover.mkwplayer.library.PresetRefs.USER_PREFIX}${preset.id}"
+                        }
+                        list to list.first { it.id == cleanId }
+                    }
+                }
+            }
+            result.fold(
+                onSuccess = { (list, saved) ->
+                    _state.value = _state.value.copy(presets = list, presetError = null)
+                    onComplete(Result.success(saved))
+                },
+                onFailure = { err ->
+                    _state.value = _state.value.copy(presetError = Error.PLAYLISTS)
+                    onComplete(Result.failure(err))
+                },
+            )
+        }
+    }
+
+    fun deletePreset(id: String) {
+        viewModelScope.launch {
+            val (presetResult, playlistResult) = presetOperations.withLock {
+                playlistOperations.withLock {
+                    withContext(Dispatchers.IO) {
+                        val cleanedPlaylists = playlists.clearPresetReferences(id)
+                        val updatedPresets = presetStore.delete(id)
+                        updatedPresets to cleanedPlaylists
+                    }
+                }
+            }
+            _state.value = _state.value.copy(
+                presets = presetResult.getOrElse { _state.value.presets },
+                presetError = if (presetResult.isFailure) Error.PLAYLISTS else null,
+                playlists = playlistResult.getOrElse { _state.value.playlists },
+                playlistError = if (playlistResult.isFailure) Error.PLAYLISTS else _state.value.playlistError,
+            )
+        }
+    }
+
+    fun duplicatePreset(id: String, newName: String) {
+        viewModelScope.launch {
+            val res: Result<List<com.mylittleblover.mkwplayer.library.CoursePreset>> = presetOperations.withLock {
+                withContext(Dispatchers.IO) {
+                    presetStore.duplicate(id, newName).mapCatching {
+                        presetStore.read().getOrThrow()
+                    }
+                }
+            }
+            res.fold(
+                onSuccess = { _state.value = _state.value.copy(presets = it, presetError = null) },
+                onFailure = { _state.value = _state.value.copy(presetError = Error.PLAYLISTS) },
+            )
+        }
+    }
     override fun onCleared() {
         getApplication<Application>().unregisterReceiver(dateReceiver)
         super.onCleared()

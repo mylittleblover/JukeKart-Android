@@ -14,11 +14,17 @@ import com.mylittleblover.mkwplayer.library.AudioPicker
 import com.mylittleblover.mkwplayer.library.CatalogLoader
 import com.mylittleblover.mkwplayer.library.CatalogMatcher
 import com.mylittleblover.mkwplayer.graph.StageFlowCompiler
+import com.mylittleblover.mkwplayer.interactive.CourseFlowRecipeBuilder
+import com.mylittleblover.mkwplayer.interactive.CourseMedleyCatalog
 import com.mylittleblover.mkwplayer.interactive.MinfCatalog
 import com.mylittleblover.mkwplayer.interactive.InteractivePlaybackPlan
 import com.mylittleblover.mkwplayer.interactive.NativeInteractiveDriver
 import com.mylittleblover.mkwplayer.interactive.InteractiveAudioIdentities
 import com.mylittleblover.mkwplayer.interactive.PackInteractiveSources
+import com.mylittleblover.mkwplayer.library.CoursePreset
+import com.mylittleblover.mkwplayer.library.CoursePresetStore
+import com.mylittleblover.mkwplayer.library.PresetRefs
+import com.mylittleblover.mkwplayer.library.UserPlaylist
 import com.mylittleblover.mkwplayer.library.LibraryStore
 import com.mylittleblover.mkwplayer.library.StageFlow
 import com.mylittleblover.mkwplayer.library.StageFlowDiscovery
@@ -110,6 +116,30 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val totalFrames: Long = 0L,
         val sampleRate: Int = 0,
         val artworkName: String? = null,
+        val linearContextKind: LinearSessionStore.ContextKind = LinearSessionStore.ContextKind.NONE,
+        val linearContextId: String? = null,
+        val linearContextTitle: String? = null,
+        val allowPlayNext: Boolean = true,
+        val allowShuffle: Boolean = true,
+        val allowSingleRepeat: Boolean = true,
+        val allowRepeatToggle: Boolean = true,
+        val continueListening: ContinueListeningUi? = null,
+    )
+
+    data class ContinueListeningUi(
+        val key: String,
+        val title: String,
+        val subtitle: String,
+        val artworkName: String?,
+        val positionText: String,
+        val totalText: String,
+        val progress: Float,
+        val positionFrames: Long,
+        val totalFrames: Long,
+        val sampleRate: Int,
+        val contextKind: LinearSessionStore.ContextKind,
+        val contextId: String?,
+        val contextTitle: String?,
     )
 
     /**
@@ -386,6 +416,12 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     private val linearCoordinator: LinearPlaybackCoordinator
         get() = PlaybackHolder.linear()
 
+    private val linearSessionStore: LinearSessionStore by lazy {
+        LinearSessionStore(java.io.File(getApplication<Application>().filesDir, "linear-session.json"))
+    }
+
+    private var lastPersistedLinearProgressMs: Long = 0L
+
     /** The jukebox, arranged by chronological source game and official OST track order. */
     val jukebox: com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.Catalog
         get() = _ui.value.jukebox
@@ -423,7 +459,9 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         )
         val loaded = com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.load(registry, jukeboxMetadata)
         _ui.value = _ui.value.copy(jukebox = loaded)
+        linearCoordinator.configureSessionStore(linearSessionStore)
         linearCoordinator.attach(getApplication(), loaded)
+        refreshContinueListening()
     }
 
     /** Plays a single Jukebox track by its pack key, freezing its source game's list as the queue. */
@@ -458,7 +496,17 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val entries = game.items.map { item -> LinearPlaybackCoordinator.entryFor(item, game, languageTag) }
         if (entries.isEmpty()) return
         prepareForLinearPlayback()
-        linearCoordinator.startQueue(entries, startIndex, shuffleOverride = shuffle)
+        linearCoordinator.startQueue(
+            entries = entries,
+            startIndex = startIndex,
+            shuffleOverride = shuffle,
+            context = LinearPlaybackCoordinator.SessionContext(
+                contextKind = LinearSessionStore.ContextKind.JUKEBOX_GAME,
+                contextId = game.id,
+                contextTitle = game.localizedName(languageTag),
+                packFingerprints = currentPackFingerprints(),
+            ),
+        )
     }
 
     /** Plays all installed Jukebox arrangements chronologically across all games. */
@@ -470,7 +518,16 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         }
         if (entries.isEmpty()) return
         prepareForLinearPlayback()
-        linearCoordinator.startQueue(entries, 0, shuffleOverride = shuffle)
+        linearCoordinator.startQueue(
+            entries = entries,
+            startIndex = 0,
+            shuffleOverride = shuffle,
+            context = LinearPlaybackCoordinator.SessionContext(
+                contextKind = LinearSessionStore.ContextKind.JUKEBOX_ALL,
+                contextId = "all",
+                packFingerprints = currentPackFingerprints(),
+            ),
+        )
     }
 
     /** Inserts [item] at the front (LIFO) of the temporary "Play next" queue (#63, #64). */
@@ -728,6 +785,15 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                         canSeek = totalFrames > 0L,
                         totalFrames = totalFrames,
                         sampleRate = rate,
+                        artworkName = linear.current.artworkName ?: _ui.value.artworkName,
+                        linearContextKind = linear.contextKind,
+                        linearContextId = linear.contextId,
+                        linearContextTitle = linear.contextTitle,
+                        allowPlayNext = linear.allowPlayNext,
+                        allowShuffle = linear.allowShuffle,
+                        allowSingleRepeat = linear.allowSingleRepeat,
+                        allowRepeatToggle = linear.allowRepeatToggle,
+                        continueListening = null,
                         detail = linear.error,
                     )
                     if (!linear.loading && linear.error == null) {
@@ -738,6 +804,13 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                     _ui.value = _ui.value.copy(
                         linearTrack = linear.current,
                         queue = linear.queue,
+                        linearContextKind = linear.contextKind,
+                        linearContextId = linear.contextId,
+                        linearContextTitle = linear.contextTitle,
+                        allowPlayNext = linear.allowPlayNext,
+                        allowShuffle = linear.allowShuffle,
+                        allowSingleRepeat = linear.allowSingleRepeat,
+                        allowRepeatToggle = linear.allowRepeatToggle,
                         detail = linear.error ?: _ui.value.detail,
                         status = if (linear.error != null) "Cannot open this track" else _ui.value.status,
                     )
@@ -1936,6 +2009,10 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         startIndex: Int,
         repeatMode: LinearQueue.RepeatMode = LinearQueue.RepeatMode.LIST,
         shuffle: Boolean = false,
+        context: LinearPlaybackCoordinator.SessionContext = LinearPlaybackCoordinator.SessionContext(
+            contextKind = LinearSessionStore.ContextKind.EXTRA,
+            packFingerprints = currentPackFingerprints(),
+        ),
     ) {
         val dir = pack?.directory
         if (dir == null || entries.isEmpty()) return
@@ -1961,11 +2038,12 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             packDir = dir,
             repeatMode = repeatMode,
             shuffleOverride = shuffle,
+            context = context,
         )
         startPolling()
     }
 
-    internal fun courseMedleysForCourse(code: String): List<Pair<com.mylittleblover.mkwplayer.interactive.CourseMedleyCatalog.Medley, Boolean>> {
+    internal fun courseMedleysForCourse(code: String): List<Pair<CourseMedleyCatalog.Medley, Boolean>> {
         if (isSpecialStageLocked(code)) return emptyList()
         val dir = pack?.directory
         val catalog = courseMedleyCatalog
@@ -2006,6 +2084,9 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                 key = "medley:${medley.id}",
                 title = title,
                 subtitle = subtitle,
+                sourceType = LinearSessionStore.SourceType.MEDLEY,
+                courseCode = medley.courseCode,
+                medleyId = medley.id,
                 durationMs = medley.durationMs,
                 artworkName = extraCatalog.courseArtwork[medley.courseCode],
                 courseMedley = resolved,
@@ -2013,9 +2094,421 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         }
         val startIndex = entries.indexOfFirst { it.key == "medley:$medleyId" }
         if (startIndex < 0) return false
-        playExtraLinearQueue(entries, startIndex, LinearQueue.RepeatMode.LIST, shuffle = false)
+        playExtraLinearQueue(
+            entries = entries,
+            startIndex = startIndex,
+            repeatMode = LinearQueue.RepeatMode.LIST,
+            shuffle = false,
+            context = LinearPlaybackCoordinator.SessionContext(
+                contextKind = LinearSessionStore.ContextKind.COURSE_MEDLEY,
+                contextId = medleyId,
+                contextTitle = suiteLabel,
+                packFingerprints = currentPackFingerprints(),
+            ),
+        )
         requestNotificationPermissionIfNeeded()
         return true
+    }
+
+    internal fun inspectCourseForEditor(code: String): CourseFlowRecipeBuilder.CourseInventory? {
+        val dir = pack?.directory ?: return null
+        if (isSpecialStageLocked(code)) return null
+        val resolver = CourseFlowRecipeBuilder.packSourceResolver(pack?.manifest, interactiveIdentities, dir)
+        return CourseFlowRecipeBuilder.inspectCourse(code, minfCatalog, courseMedleyCatalog, resolver)
+    }
+
+    internal fun previewCustomPreset(
+        preset: CoursePreset,
+        courseTitle: String,
+        suiteLabel: String,
+    ): Boolean {
+        val dir = pack?.directory ?: return false
+        if (isSpecialStageLocked(preset.courseCode)) return false
+        val resolver = CourseFlowRecipeBuilder.packSourceResolver(pack?.manifest, interactiveIdentities, dir)
+        val inventory = CourseFlowRecipeBuilder.inspectCourse(preset.courseCode, minfCatalog, courseMedleyCatalog, resolver)
+        val resolved = CourseFlowRecipeBuilder.compileUserPreset(preset, inventory, minfCatalog, resolver)
+            ?: return false
+        val logical = preset.courseCode.removeSuffix("_00")
+        val entry = LinearQueue.Entry(
+            key = "preset:${preset.id}",
+            title = courseTitle,
+            subtitle = "$suiteLabel · ${preset.name}",
+            sourceType = LinearSessionStore.SourceType.PRESET,
+            courseCode = logical,
+            presetId = preset.id,
+            durationMs = resolved.medley.durationMs,
+            artworkName = extraCatalog.courseArtwork[logical],
+            courseMedley = resolved,
+        )
+        playExtraLinearQueue(
+            entries = listOf(entry),
+            startIndex = 0,
+            repeatMode = LinearQueue.RepeatMode.OFF,
+            shuffle = false,
+            context = LinearPlaybackCoordinator.SessionContext(
+                contextKind = LinearSessionStore.ContextKind.COURSE_MEDLEY,
+                contextId = preset.id,
+                contextTitle = preset.name,
+                packFingerprints = currentPackFingerprints(),
+            ),
+        )
+        requestNotificationPermissionIfNeeded()
+        return true
+    }
+
+    /**
+     * Launches linear playback of a user playlist (#50-#53, #61) with frozen queue state,
+     * per-entry preset compilation, and opt-in native cross-track handover where verified.
+     */
+    fun playUserPlaylist(
+        playlist: UserPlaylist,
+        presets: List<CoursePreset>,
+        startIndex: Int,
+        shuffle: Boolean?,
+        languageTag: String,
+        suiteLabel: String,
+        rallyLabel: String,
+        nativeTransitionPrefix: String,
+    ): Boolean {
+        val dir = pack?.directory ?: return false
+        if (playlist.courseIds.isEmpty()) return false
+        val resolver = CourseFlowRecipeBuilder.packSourceResolver(pack?.manifest, interactiveIdentities, dir)
+        val rawEntries = playlist.courseIds.mapIndexedNotNull { idx, rawCourseId ->
+            val logical = rawCourseId.removeSuffix("_00")
+            if (isSpecialStageLocked(logical)) return@mapIndexedNotNull null
+            val config = playlist.configAt(idx)
+            val resolved = CourseFlowRecipeBuilder.resolvePresetRef(
+                courseCode = logical,
+                presetRef = config.presetId,
+                userPresets = presets,
+                minf = minfCatalog,
+                medleyCatalog = courseMedleyCatalog,
+                resolver = resolver,
+            ) ?: return@mapIndexedNotNull null
+
+            val matchingUserPreset = if (PresetRefs.isUser(config.presetId)) {
+                presets.firstOrNull { it.id == config.presetId && it.courseCode.equals(logical, ignoreCase = true) }
+            } else {
+                null
+            }
+            val effectiveRef = matchingUserPreset?.id
+                ?: if (config.presetId == PresetRefs.SYSTEM_KNOCKOUT && resolved.medley.isKnockoutVariant) {
+                    PresetRefs.SYSTEM_KNOCKOUT
+                } else {
+                    PresetRefs.SYSTEM_DEFAULT
+                }
+            val presetDisplayName = when {
+                matchingUserPreset != null -> matchingUserPreset.name
+                effectiveRef == PresetRefs.SYSTEM_KNOCKOUT -> rallyLabel
+                else -> suiteLabel
+            }
+            val courseName = localizedNames?.name(logical, languageTag) ?: logical
+            val nativeEnabled = config.nativeTransitionEnabled ?: playlist.nativeTransitionDefault
+            LinearQueue.Entry(
+                key = "pl:${playlist.id}:$idx:$logical:$effectiveRef",
+                title = courseName,
+                subtitle = "${playlist.name} · $presetDisplayName",
+                sourceType = if (matchingUserPreset != null) {
+                    LinearSessionStore.SourceType.PRESET
+                } else {
+                    LinearSessionStore.SourceType.MEDLEY
+                },
+                courseCode = logical,
+                presetId = effectiveRef,
+                medleyId = resolved.medley.id.takeIf { matchingUserPreset == null },
+                nativeTransitionEnabled = nativeEnabled,
+                nativeTransitionOverride = config.nativeTransitionEnabled,
+                nativeTransitionSourceLabel = if (nativeEnabled && resolved.outroHandoverFrame != null) {
+                    "$nativeTransitionPrefix · $presetDisplayName"
+                } else {
+                    null
+                },
+                arrangement = presetDisplayName,
+                durationMs = resolved.medley.durationMs,
+                artworkName = extraCatalog.courseArtwork[logical],
+                courseMedley = resolved,
+            )
+        }
+        if (rawEntries.isEmpty()) return false
+        val clampedStart = startIndex.coerceIn(0, rawEntries.lastIndex)
+        playExtraLinearQueue(
+            entries = rawEntries,
+            startIndex = clampedStart,
+            repeatMode = LinearQueue.RepeatMode.LIST,
+            shuffle = shuffle == true,
+            context = LinearPlaybackCoordinator.SessionContext(
+                contextKind = LinearSessionStore.ContextKind.PLAYLIST,
+                contextId = playlist.id,
+                contextTitle = playlist.name,
+                nativeTransitionDefault = playlist.nativeTransitionDefault,
+                packFingerprints = currentPackFingerprints(),
+            ),
+        )
+        requestNotificationPermissionIfNeeded()
+        return true
+    }
+
+    /** Inspects any saved linear session on cold start and exposes "Continue listening" if still valid (#62, #89). */
+    fun refreshContinueListening() {
+        val currentState = _ui.value
+        if (linearCoordinator.state.value.active || session.state.value.active) {
+            if (currentState.continueListening != null) {
+                _ui.value = currentState.copy(continueListening = null)
+            }
+            return
+        }
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                val saved = linearSessionStore.read().getOrNull() ?: return@withContext null
+                val presetFile = java.io.File(getApplication<Application>().filesDir, "course-presets.json")
+                val userPresets = CoursePresetStore(presetFile).read().getOrDefault(emptyList())
+                if (!verifySavedSessionAvailable(saved, pack?.directory, userPresets)) {
+                    linearSessionStore.clear()
+                    return@withContext null
+                }
+                val rateHz = saved.sampleRate.coerceAtLeast(1)
+                val progress = if (saved.totalFrames > 0L) {
+                    (saved.positionFrames.toDouble() / saved.totalFrames).coerceIn(0.0, 1.0).toFloat()
+                } else {
+                    0f
+                }
+                ContinueListeningUi(
+                    key = saved.current.key,
+                    title = saved.current.title,
+                    subtitle = saved.contextTitle?.takeIf { it.isNotBlank() } ?: saved.current.subtitle,
+                    artworkName = saved.current.artworkName,
+                    positionText = EngineSnapshot.formatPosition(saved.positionFrames, rateHz),
+                    totalText = EngineSnapshot.formatPosition(saved.totalFrames, rateHz),
+                    progress = progress,
+                    positionFrames = saved.positionFrames,
+                    totalFrames = saved.totalFrames,
+                    sampleRate = rateHz,
+                    contextKind = saved.contextKind,
+                    contextId = saved.contextId,
+                    contextTitle = saved.contextTitle,
+                )
+            }
+            if (!linearCoordinator.state.value.active && !session.state.value.active) {
+                _ui.value = _ui.value.copy(continueListening = result)
+            }
+        }
+    }
+
+    fun dismissContinueListening() {
+        linearCoordinator.clearSavedSession()
+        _ui.value = _ui.value.copy(continueListening = null)
+    }
+
+    /** Restores a paused linear queue snapshot from disk and resumes at the exact frame (#62, #89). */
+    fun resumeContinueListening(onReady: () -> Unit = {}) {
+        if (nativePerformance?.isFading == true) return
+        viewModelScope.launch {
+            val restored = withContext(Dispatchers.IO) {
+                val saved = linearSessionStore.read().getOrNull() ?: return@withContext null
+                val presetFile = java.io.File(getApplication<Application>().filesDir, "course-presets.json")
+                val userPresets = CoursePresetStore(presetFile).read().getOrDefault(emptyList())
+                val dir = pack?.directory
+                val juke = jukebox
+                val resolver = dir?.let {
+                    CourseFlowRecipeBuilder.packSourceResolver(pack?.manifest, interactiveIdentities, it)
+                }
+                fun toEntry(se: LinearSessionStore.SavedEntry): LinearQueue.Entry? =
+                    resolveSavedEntry(se, dir, juke, userPresets, resolver, saved.nativeTransitionDefault)
+
+                val frozen = saved.frozenBase.mapNotNull(::toEntry)
+                val current = toEntry(saved.current) ?: return@withContext null
+                if (frozen.isEmpty() && saved.frozenBase.isNotEmpty()) return@withContext null
+                val past = saved.pastHistory.mapNotNull { item -> toEntry(item.entry)?.let { it to item.baseIndex } }
+                val forward = saved.forwardHistory.mapNotNull { item -> toEntry(item.entry)?.let { it to item.baseIndex } }
+                val temp = saved.tempQueue.mapNotNull(::toEntry)
+                val upcoming = saved.upcomingBase.mapNotNull { item -> toEntry(item.entry)?.let { it to item.baseIndex } }
+                val exported = LinearQueue.ExportedState(
+                    frozenBase = frozen,
+                    current = current,
+                    currentBaseIndex = saved.currentBaseIndex,
+                    pastHistory = past,
+                    forwardHistory = forward,
+                    tempQueue = temp,
+                    upcomingBase = upcoming,
+                    repeatMode = saved.repeatMode,
+                    shuffle = saved.shuffle,
+                )
+                val isFixedRoute = saved.contextKind == LinearSessionStore.ContextKind.OFFICIAL_ROUTE ||
+                    saved.contextKind == LinearSessionStore.ContextKind.CUSTOM_ROUTE
+                val context = LinearPlaybackCoordinator.SessionContext(
+                    contextKind = saved.contextKind,
+                    contextId = saved.contextId,
+                    contextTitle = saved.contextTitle,
+                    nativeTransitionDefault = saved.nativeTransitionDefault,
+                    packFingerprints = currentPackFingerprints(),
+                    allowPlayNext = !isFixedRoute,
+                    allowShuffle = !isFixedRoute,
+                    allowSingleRepeat = !isFixedRoute,
+                )
+                Triple(exported, context, saved.positionFrames)
+            }
+            if (restored == null) {
+                linearCoordinator.clearSavedSession()
+                _ui.value = _ui.value.copy(continueListening = null)
+                return@launch
+            }
+            prepareForLinearPlayback()
+            val (exported, context, posFrames) = restored
+            linearCoordinator.restoreAndPlay(
+                state = exported,
+                context = context,
+                packDir = pack?.directory,
+                resumePositionFrames = posFrames,
+            )
+            startPolling()
+            onReady()
+        }
+    }
+
+    private fun currentPackFingerprints(): List<String> = listOfNotNull(
+        pack?.manifest?.let { "${it.packId}:${it.packVersion}" },
+    )
+
+    private fun verifySavedSessionAvailable(
+        saved: LinearSessionStore.Snapshot,
+        packDir: java.io.File?,
+        userPresets: List<CoursePreset>,
+    ): Boolean {
+        val juke = jukebox
+        val resolver = packDir?.let {
+            CourseFlowRecipeBuilder.packSourceResolver(pack?.manifest, interactiveIdentities, it)
+        }
+        val toCheck = buildList {
+            add(saved.current)
+            addAll(saved.frozenBase)
+            addAll(saved.tempQueue)
+        }
+        return toCheck.all { se ->
+            resolveSavedEntry(se, packDir, juke, userPresets, resolver, saved.nativeTransitionDefault) != null
+        }
+    }
+
+    private fun resolveSavedEntry(
+        se: LinearSessionStore.SavedEntry,
+        packDir: java.io.File?,
+        juke: com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.Catalog,
+        userPresets: List<CoursePreset>,
+        resolver: CourseFlowRecipeBuilder.SourceResolver?,
+        defaultNative: Boolean,
+    ): LinearQueue.Entry? {
+        val nativeEnabled = se.nativeTransitionOverride ?: defaultNative
+        return when (se.sourceType) {
+            LinearSessionStore.SourceType.JUKEBOX -> {
+                if (!juke.tracksByKey.containsKey(se.key) || juke.packByKey[se.key] == null) return null
+                LinearQueue.Entry(
+                    key = se.key,
+                    title = se.title,
+                    subtitle = se.subtitle,
+                    sourceType = se.sourceType,
+                    gameId = se.gameId,
+                    gameTitle = se.gameTitle,
+                    yearLabel = se.yearLabel,
+                    arrangement = se.arrangement,
+                    ostIndex = se.ostIndex,
+                    durationMs = se.durationMs,
+                    artworkName = se.artworkName,
+                    assetSha256 = se.assetSha256,
+                    loop = se.loop,
+                    loopStart = se.loopStart,
+                    loopEnd = se.loopEnd,
+                )
+            }
+            LinearSessionStore.SourceType.EXTRA -> {
+                val dir = packDir ?: return null
+                val extraId = se.key.removePrefix("extra:")
+                val extraItem = extraCatalog.otherMusic.firstOrNull { it.id == extraId }
+                when (extraItem) {
+                    is com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.OverlaidOpening -> {
+                        if (!java.io.File(dir, "audio/${extraItem.op.sha256}").isFile ||
+                            !java.io.File(dir, "audio/${extraItem.telop.sha256}").isFile
+                        ) return null
+                        LinearQueue.Entry(
+                            key = se.key,
+                            title = se.title,
+                            subtitle = se.subtitle,
+                            sourceType = se.sourceType,
+                            ostIndex = se.ostIndex,
+                            durationMs = se.durationMs,
+                            artworkName = se.artworkName,
+                            overlaidOpening = extraItem,
+                        )
+                    }
+                    is com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.ChainedSequence -> {
+                        if (extraItem.parts.any { !java.io.File(dir, "audio/${it.asset.sha256}").isFile }) return null
+                        LinearQueue.Entry(
+                            key = se.key,
+                            title = se.title,
+                            subtitle = se.subtitle,
+                            sourceType = se.sourceType,
+                            ostIndex = se.ostIndex,
+                            durationMs = se.durationMs,
+                            artworkName = se.artworkName,
+                            chainedSequence = extraItem,
+                        )
+                    }
+                    else -> {
+                        val sha = se.assetSha256 ?: return null
+                        if (!java.io.File(dir, "audio/$sha").isFile) return null
+                        LinearQueue.Entry(
+                            key = se.key,
+                            title = se.title,
+                            subtitle = se.subtitle,
+                            sourceType = se.sourceType,
+                            ostIndex = se.ostIndex,
+                            durationMs = se.durationMs,
+                            artworkName = se.artworkName,
+                            assetSha256 = sha,
+                            loop = se.loop,
+                            loopStart = se.loopStart,
+                            loopEnd = se.loopEnd,
+                        )
+                    }
+                }
+            }
+            LinearSessionStore.SourceType.MEDLEY,
+            LinearSessionStore.SourceType.PRESET -> {
+                val res = resolver ?: return null
+                val code = se.courseCode ?: return null
+                if (isSpecialStageLocked(code)) return null
+                val presetRef = se.presetId ?: if (se.medleyId != null &&
+                    courseMedleyCatalog.medleys.firstOrNull { it.id == se.medleyId }?.isKnockoutVariant == true
+                ) PresetRefs.SYSTEM_KNOCKOUT else PresetRefs.SYSTEM_DEFAULT
+                if (se.sourceType == LinearSessionStore.SourceType.PRESET &&
+                    PresetRefs.isUser(presetRef) &&
+                    userPresets.none { it.id == presetRef }
+                ) {
+                    // User preset was deleted; verify fallback still compiles or clear if requested.
+                }
+                val resolved = CourseFlowRecipeBuilder.resolvePresetRef(
+                    courseCode = code,
+                    presetRef = presetRef,
+                    userPresets = userPresets,
+                    minf = minfCatalog,
+                    medleyCatalog = courseMedleyCatalog,
+                    resolver = res,
+                ) ?: return null
+                LinearQueue.Entry(
+                    key = se.key,
+                    title = se.title,
+                    subtitle = se.subtitle,
+                    sourceType = se.sourceType,
+                    courseCode = code,
+                    presetId = se.presetId,
+                    medleyId = se.medleyId,
+                    nativeTransitionEnabled = nativeEnabled,
+                    nativeTransitionOverride = se.nativeTransitionOverride,
+                    arrangement = se.arrangement,
+                    durationMs = se.durationMs,
+                    artworkName = se.artworkName,
+                    courseMedley = resolved,
+                )
+            }
+        }
     }
 
     internal val initialEntryChoices: Map<Int,String>
@@ -2339,11 +2832,20 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             totalFrames = state.totalFrames.takeIf { it > 0L } ?: totalFrames,
             sampleRate = state.sampleRate.takeIf { it > 0 } ?: rate,
         )
-        if (updated != _ui.value) _ui.value = updated
+            val elapsed = android.os.SystemClock.elapsedRealtime()
+            if (_ui.value.linearMode && state.playing && elapsed - lastPersistedLinearProgressMs >= 2_000L) {
+                lastPersistedLinearProgressMs = elapsed
+                linearCoordinator.saveCurrentProgress(state.positionFrames, _ui.value.totalFrames, _ui.value.sampleRate)
+            }
+            if (updated != _ui.value) _ui.value = updated
     }
 
     fun pause() {
-        publish(session.pause())
+        val st = session.pause()
+        publish(st)
+        if (_ui.value.linearMode) {
+            linearCoordinator.saveCurrentProgress(st.positionFrames, _ui.value.totalFrames, _ui.value.sampleRate)
+        }
     }
 
     fun resume() {
@@ -2354,7 +2856,12 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     fun seekTo(fraction: Float) {
         val frame = SeekTarget.fractionToFrame(fraction, totalFrames)
         if (!SeekTarget.isAddressable(frame, totalFrames)) return
-        publish(session.seek(frame))
+        if (_ui.value.linearMode) {
+            linearCoordinator.seekToFrame(frame)
+            publish(session.state.value)
+        } else {
+            publish(session.seek(frame))
+        }
     }
 
     private fun markPerformanceFinished() {
@@ -2370,10 +2877,14 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         nativePerformance=null
         performance?.stop()
         performance=null
-        if (cancelPendingOpen) linearCoordinator.clearSession()
+        if (cancelPendingOpen) {
+            linearCoordinator.clearSession()
+            linearCoordinator.clearSavedSession()
+        }
         publish(session.stop())
         _ui.value = _ui.value.copy(progress = 0f, position = EngineSnapshot.formatPosition(0, rate),
             linearMode = false, linearTrack = null, canSeek = false,
+            continueListening = if (cancelPendingOpen) null else _ui.value.continueListening,
             flow=_ui.value.flow?.copy(performing=false,performanceStage="Stopped",stageKey="Stopped",pendingStageKey=null,canAdvance=false,canEnd=false,fastPlaying=false,
                 canFast=false,canCancelPending=false,fading=false,fadeRemainingFrames=null,voiceCount=0,sourceFrame=null,availableRegions=emptySet(),availableVersions=emptySet(),selectedRegion=null,selectedVersion=null))
         PlaybackService.stop(getApplication())

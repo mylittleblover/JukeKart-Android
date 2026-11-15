@@ -2,7 +2,11 @@ package com.mylittleblover.mkwplayer
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Favorite
@@ -288,6 +292,8 @@ internal fun MkwApp(
                 NavState.Detail.Track -> androidx.compose.ui.res.stringResource(R.string.discovery_media)
                 is NavState.Detail.Interactive -> androidx.compose.ui.res.stringResource(R.string.discovery_interactive)
                 is NavState.Detail.Playlist -> androidx.compose.ui.res.stringResource(R.string.discovery_playlists)
+                is NavState.Detail.AllPlaylists -> androidx.compose.ui.res.stringResource(R.string.discovery_all_lists_title)
+                is NavState.Detail.FlowEditor -> androidx.compose.ui.res.stringResource(R.string.flow_editor_title)
                 is NavState.Detail.JukeboxGame -> ui.jukebox.gameById(detail.id)?.localizedName(languageTag)
                     ?: androidx.compose.ui.res.stringResource(R.string.discovery_free)
                 else -> tabTitle(nav.tab)
@@ -395,6 +401,20 @@ internal fun MkwApp(
                         model = model,
                         ui = ui,
                         code = detail.code,
+                        presets = discoveryState.presets,
+                        playlistsReferencingPreset = discovery::playlistsReferencingPreset,
+                        onOpenFlowEditor = { courseCode, presetId ->
+                            nav = nav.open(NavState.Detail.FlowEditor(courseCode, presetId))
+                        },
+                        onPlayCustomPreset = { preset, courseTitle, suiteLabel ->
+                            if (model.previewCustomPreset(preset, courseTitle, suiteLabel)) {
+                                nav = nav.open(NavState.Detail.Track)
+                            }
+                        },
+                        onDuplicatePreset = { preset ->
+                            discovery.duplicatePreset(preset.id, "${preset.name} Copy")
+                        },
+                        onDeletePreset = { preset -> discovery.deletePreset(preset.id) },
                         onPlayMedley = { medleyId, suiteLabel, rallyLabel ->
                             val courses = browse.courses(unlocked)
                             if (model.playCourseMedley(medleyId, languageTag, courses, suiteLabel, rallyLabel)) {
@@ -403,6 +423,35 @@ internal fun MkwApp(
                         },
                         onInteractive = { nav = nav.open(NavState.Detail.Interactive(detail.code)) },
                     )
+                }
+                detail is NavState.Detail.FlowEditor -> {
+                    val inventory = remember(detail.courseCode, ui.pack) {
+                        model.inspectCourseForEditor(detail.courseCode)
+                    }
+                    val existing = remember(discoveryState.presets, detail.presetId) {
+                        discoveryState.presets.firstOrNull { it.id == detail.presetId }
+                    }
+                    val courseTitle = browse?.displayName(detail.courseCode, languageTag) ?: detail.courseCode
+                    val suiteLabel = androidx.compose.ui.res.stringResource(R.string.discovery_suite)
+                    if (inventory == null) {
+                        Text(androidx.compose.ui.res.stringResource(R.string.discovery_empty), Modifier.padding(24.dp))
+                    } else {
+                        com.mylittleblover.mkwplayer.ui.interactive.FlowEditorScreen(
+                            courseTitle = courseTitle,
+                            inventory = inventory,
+                            existingPreset = existing,
+                            onAudition = { draft ->
+                                if (model.previewCustomPreset(draft, courseTitle, suiteLabel)) {
+                                    nav = nav.open(NavState.Detail.Track)
+                                }
+                            },
+                            onSave = { savedPreset ->
+                                discovery.savePreset(savedPreset) {
+                                    nav = nav.back() ?: nav
+                                }
+                            },
+                        )
+                    }
                 }
                 detail is NavState.Detail.Interactive -> {
                     if (browse == null || detail.code.removeSuffix("_00") !in browse.courses(unlocked)) {
@@ -451,13 +500,84 @@ internal fun MkwApp(
                         }
                     }
                 }
-                detail is NavState.Detail.Playlist -> com.mylittleblover.mkwplayer.ui.home.DiscoveryPlaylist(
-                    discoveryState.playlists.firstOrNull { it.id == detail.id }, browse, unlocked, languageTag,
-                    discoveryState.playlistError != null,
-                    onAdd = { discovery.addToPlaylist(detail.id, it) }, onRemove = { discovery.removeFromPlaylist(detail.id, it) },
-                    onRename = { discovery.renamePlaylist(detail.id, it) }, onMove = { from, to -> discovery.moveInPlaylist(detail.id, from, to) },
-                    onDelete = { discovery.deletePlaylist(detail.id); nav = nav.back() ?: nav },
-                    onCourse = { nav = nav.open(NavState.Detail.Course(it)) })
+                detail is NavState.Detail.AllPlaylists -> com.mylittleblover.mkwplayer.ui.home.DiscoveryAllPlaylists(
+                    initialSection = detail.section,
+                    catalog = browse,
+                    unlocked = unlocked,
+                    language = languageTag,
+                    state = discoveryState,
+                    jukeboxGames = ui.jukebox.games,
+                    extraCatalog = model.extraCatalog,
+                    packDirectory = model.packDirectory,
+                    onCreate = discovery::createPlaylist,
+                    onPlaylist = { nav = nav.open(NavState.Detail.Playlist(it)) },
+                    onCup = { nav = nav.open(NavState.Detail.Cup(it)) },
+                    onJukeboxGame = { nav = nav.open(NavState.Detail.JukeboxGame(it)) },
+                )
+                detail is NavState.Detail.Playlist -> {
+                    val activePlaylist = discoveryState.playlists.firstOrNull { it.id == detail.id }
+                    val suiteLabel = androidx.compose.ui.res.stringResource(R.string.discovery_suite)
+                    val rallyLabel = androidx.compose.ui.res.stringResource(R.string.discovery_rally)
+                    val nativePrefix = androidx.compose.ui.res.stringResource(R.string.discovery_native_transition_prefix)
+                    com.mylittleblover.mkwplayer.ui.home.DiscoveryPlaylist(
+                        playlist = activePlaylist,
+                        catalog = browse,
+                        unlocked = unlocked,
+                        language = languageTag,
+                        error = discoveryState.playlistError != null,
+                        onAdd = { discovery.addToPlaylist(detail.id, it) },
+                        onRemove = { discovery.removeFromPlaylist(detail.id, it) },
+                        onRename = { discovery.renamePlaylist(detail.id, it) },
+                        onMove = { from, to -> discovery.moveInPlaylist(detail.id, from, to) },
+                        onDelete = { discovery.deletePlaylist(detail.id); nav = nav.back() ?: nav },
+                        onCourse = { nav = nav.open(NavState.Detail.Course(it)) },
+                        presets = discoveryState.presets,
+                        packDirectory = model.packDirectory,
+                        courseArtwork = model.extraCatalog.courseArtwork,
+                        isThisPlaylistPlaying = ui.linearMode &&
+                            ui.linearContextKind == com.mylittleblover.mkwplayer.player.LinearSessionStore.ContextKind.PLAYLIST &&
+                            ui.linearContextId == detail.id,
+                        onPlayAll = {
+                            if (activePlaylist != null && model.playUserPlaylist(
+                                    activePlaylist, discoveryState.presets, 0, false,
+                                    languageTag, suiteLabel, rallyLabel, nativePrefix,
+                                )
+                            ) {
+                                nav = nav.open(NavState.Detail.Track)
+                            }
+                        },
+                        onShuffle = {
+                            if (activePlaylist != null && model.playUserPlaylist(
+                                    activePlaylist, discoveryState.presets, 0, true,
+                                    languageTag, suiteLabel, rallyLabel, nativePrefix,
+                                )
+                            ) {
+                                nav = nav.open(NavState.Detail.Track)
+                            }
+                        },
+                        onPlayFrom = { idx ->
+                            if (activePlaylist != null && model.playUserPlaylist(
+                                    activePlaylist, discoveryState.presets, idx, false,
+                                    languageTag, suiteLabel, rallyLabel, nativePrefix,
+                                )
+                            ) {
+                                nav = nav.open(NavState.Detail.Track)
+                            }
+                        },
+                        onToggleNativeDefault = { enabled ->
+                            discovery.setPlaylistNativeTransitionDefault(detail.id, enabled)
+                        },
+                        onUpdateEntryPreset = { idx, presetId ->
+                            discovery.setPlaylistEntryPreset(detail.id, idx, presetId)
+                        },
+                        onUpdateEntryNative = { idx, override ->
+                            discovery.setPlaylistEntryNativeTransition(detail.id, idx, override)
+                        },
+                        onOpenFlowEditor = { courseCode, presetId ->
+                            nav = nav.open(NavState.Detail.FlowEditor(courseCode, presetId))
+                        },
+                    )
+                }
                 detail is NavState.Detail.Cup -> com.mylittleblover.mkwplayer.ui.home.DiscoveryCup(
                     browse?.route(detail.id, unlocked), browse, languageTag,
                     onMap = { id ->
@@ -494,7 +614,9 @@ internal fun MkwApp(
                         session = ui, currentCode = model.currentStageCode,
                         packDirectory = model.packDirectory, artworkNames = playbackArtworkNames(model, ui),
                         courseArtwork = model.extraCatalog.courseArtwork,
-                        onQuickPlay = { id -> model.startStagePerformance(id); nav = nav.open(NavState.Detail.Flow) })
+                        onQuickPlay = { id -> model.startStagePerformance(id); nav = nav.open(NavState.Detail.Flow) },
+                        onResumeSaved = { model.resumeContinueListening { nav = nav.open(NavState.Detail.Track) } },
+                        onDismissSaved = model::dismissContinueListening)
                     Tab.MEDIA -> com.mylittleblover.mkwplayer.ui.home.DiscoveryMedia(browse, unlocked, languageTag,
                         category = mediaCategory, onCategory = { mediaCategory = it }, query = mediaQuery, onQuery = { mediaQuery = it },
                         onCourse = { nav = nav.open(NavState.Detail.Course(it)) }, onCup = { nav = nav.open(NavState.Detail.Cup(it)) },
@@ -541,10 +663,20 @@ internal fun MkwApp(
                             model.playExtraLinearQueue(listOf(entry), 0, LinearQueue.RepeatMode.OFF, false)
                         })
                     Tab.WORLD_MAP -> MapPage(model, ui, mapState) { code -> nav = nav.open(NavState.Detail.Course(code)) }
-                    Tab.PLAYLISTS -> com.mylittleblover.mkwplayer.ui.home.DiscoveryPlaylists(browse, unlocked, languageTag,
-                        discoveryState, onCreate = discovery::createPlaylist,
+                    Tab.PLAYLISTS -> com.mylittleblover.mkwplayer.ui.home.DiscoveryPlaylists(
+                        catalog = browse,
+                        unlocked = unlocked,
+                        language = languageTag,
+                        state = discoveryState,
+                        onCreate = discovery::createPlaylist,
                         onPlaylist = { nav = nav.open(NavState.Detail.Playlist(it)) },
-                        onCup = { nav = nav.open(NavState.Detail.Cup(it)) })
+                        onCup = { nav = nav.open(NavState.Detail.Cup(it)) },
+                        jukeboxGames = ui.jukebox.games,
+                        extraCatalog = model.extraCatalog,
+                        packDirectory = model.packDirectory,
+                        onViewAll = { section -> nav = nav.open(NavState.Detail.AllPlaylists(section)) },
+                        onJukeboxGame = { gameId -> nav = nav.open(NavState.Detail.JukeboxGame(gameId)) },
+                    )
                 }
             }
             }
@@ -628,6 +760,12 @@ private fun CoursePage(
     model: PlayerViewModel,
     ui: PlayerViewModel.Ui,
     code: String,
+    presets: List<com.mylittleblover.mkwplayer.library.CoursePreset> = emptyList(),
+    playlistsReferencingPreset: (String) -> List<com.mylittleblover.mkwplayer.library.UserPlaylist> = { emptyList() },
+    onOpenFlowEditor: (courseCode: String, presetId: String?) -> Unit = { _, _ -> },
+    onPlayCustomPreset: (com.mylittleblover.mkwplayer.library.CoursePreset, courseTitle: String, suiteLabel: String) -> Unit = { _, _, _ -> },
+    onDuplicatePreset: (com.mylittleblover.mkwplayer.library.CoursePreset) -> Unit = {},
+    onDeletePreset: (com.mylittleblover.mkwplayer.library.CoursePreset) -> Unit = {},
     onPlayMedley: (medleyId: String, suiteLabel: String, rallyLabel: String) -> Unit = { _, _, _ -> },
     onInteractive: () -> Unit,
 ) {
@@ -638,6 +776,41 @@ private fun CoursePage(
     val discovery: com.mylittleblover.mkwplayer.ui.home.DiscoveryViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val saved by discovery.state.collectAsStateWithLifecycle()
     val stableCode = code.removeSuffix("_00")
+    val coursePresets = remember(presets, stableCode) {
+        presets.filter { it.courseCode.equals(stableCode, ignoreCase = true) }
+    }
+    var pendingDeletePreset by remember { mutableStateOf<com.mylittleblover.mkwplayer.library.CoursePreset?>(null) }
+
+    pendingDeletePreset?.let { preset ->
+        val refs = remember(preset.id, saved.playlists) { playlistsReferencingPreset(preset.id) }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pendingDeletePreset = null },
+            title = { Text(androidx.compose.ui.res.stringResource(R.string.preset_delete_warning_title)) },
+            text = {
+                Text(
+                    if (refs.isEmpty()) preset.name
+                    else androidx.compose.ui.res.stringResource(
+                        R.string.preset_delete_warning_body,
+                        refs.joinToString(", ") { it.name },
+                    ),
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    onDeletePreset(preset)
+                    pendingDeletePreset = null
+                }) {
+                    Text(androidx.compose.ui.res.stringResource(R.string.preset_delete))
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { pendingDeletePreset = null }) {
+                    Text(androidx.compose.ui.res.stringResource(R.string.discovery_cancel))
+                }
+            },
+        )
+    }
+
     LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
@@ -730,6 +903,56 @@ private fun CoursePage(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
+                    }
+
+                    androidx.compose.material3.HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                    )
+                    Text(
+                        androidx.compose.ui.res.stringResource(R.string.preset_user_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    coursePresets.forEach { preset ->
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            androidx.compose.material3.FilledTonalButton(
+                                onClick = {
+                                    discovery.recordRecent(stableCode)
+                                    onPlayCustomPreset(preset, title, suiteLabel)
+                                },
+                                enabled = model.canStartStage(code),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+                            ) {
+                                androidx.compose.material3.Icon(Icons.Filled.PlayArrow, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(preset.name, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                            }
+                            androidx.compose.material3.IconButton(onClick = { onOpenFlowEditor(stableCode, preset.id) }) {
+                                androidx.compose.material3.Icon(Icons.Filled.Edit, contentDescription = androidx.compose.ui.res.stringResource(R.string.preset_edit))
+                            }
+                            androidx.compose.material3.IconButton(onClick = { onDuplicatePreset(preset) }) {
+                                androidx.compose.material3.Icon(Icons.Filled.ContentCopy, contentDescription = androidx.compose.ui.res.stringResource(R.string.preset_duplicate))
+                            }
+                            androidx.compose.material3.IconButton(onClick = { pendingDeletePreset = preset }) {
+                                androidx.compose.material3.Icon(Icons.Filled.DeleteOutline, contentDescription = androidx.compose.ui.res.stringResource(R.string.preset_delete))
+                            }
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = { onOpenFlowEditor(stableCode, null) },
+                        enabled = model.canStartStage(code),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 46.dp),
+                    ) {
+                        androidx.compose.material3.Icon(Icons.Filled.Add, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text(androidx.compose.ui.res.stringResource(R.string.preset_new))
                     }
                 }
             }
@@ -1376,6 +1599,20 @@ private fun SingleTrackPlayer(model: PlayerViewModel, ui: PlayerViewModel.Ui) {
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
+                    linearTrack.nativeTransitionSourceLabel?.let { transitionLabel ->
+                        androidx.compose.material3.Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            modifier = Modifier.padding(top = 4.dp),
+                        ) {
+                            Text(
+                                text = transitionLabel,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            )
+                        }
+                    }
                 }
             }
 
@@ -1563,6 +1800,7 @@ private fun SingleTrackPlayer(model: PlayerViewModel, ui: PlayerViewModel.Ui) {
                             icon = Icons.Filled.Shuffle,
                             label = shuffleLabel,
                             active = ui.queue.shuffle,
+                            enabled = ui.allowShuffle,
                             onClick = model::toggleShuffle,
                             modifier = Modifier.weight(1f),
                         )
@@ -1570,6 +1808,7 @@ private fun SingleTrackPlayer(model: PlayerViewModel, ui: PlayerViewModel.Ui) {
                             icon = repeatIcon,
                             label = repeatLabel,
                             active = ui.queue.repeatMode != LinearQueue.RepeatMode.OFF,
+                            enabled = ui.allowRepeatToggle,
                             onClick = model::cycleRepeatMode,
                             modifier = Modifier.weight(1f),
                         )

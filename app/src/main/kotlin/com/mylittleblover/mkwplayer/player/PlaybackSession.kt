@@ -68,10 +68,30 @@ internal class PlaybackSession(
     private var automaticSource: Int? = null
     private var automaticPending: Triple<Int,Int,Long>? = null
     private var linearSession: Boolean = false
+    private var linearActiveSegment: Int = -1
+    private var linearDisplayOffsetFrames: Long = 0L
 
     /** Optional coordinator hooks shared with background service / ViewModel. */
     var onLinearCompleted: (() -> Boolean)? = null
+    var onLinearSegmentAdvanced: ((Int, Long?) -> Unit)? = null
     var onSkipNext: (() -> Boolean)? = null
+
+    fun updateLinearWindow(title: String, totalFrames: Long, transportOriginFrames: Long) {
+        if (!linearSession) return
+        linearDisplayOffsetFrames = transportOriginFrames.coerceAtLeast(0L)
+        val rawPos = controller?.poll()?.let {
+            when (it) {
+                is PlaybackController.State.Playing -> it.positionFrames
+                is PlaybackController.State.Paused -> it.positionFrames
+                else -> _state.value.positionFrames + linearDisplayOffsetFrames
+            }
+        } ?: _state.value.positionFrames
+        _state.value = _state.value.copy(
+            title = title,
+            totalFrames = totalFrames,
+            positionFrames = (rawPos - linearDisplayOffsetFrames).coerceAtLeast(0L),
+        )
+    }
     var onSkipPrevious: (() -> Boolean)? = null
     var canSkipQueue: (() -> Boolean)? = null
 
@@ -191,7 +211,7 @@ internal class PlaybackSession(
         if (started is PlaybackController.State.Failed) return abort(started.reason)
 
         var autoSource: Int? = null
-        if (!linear) {
+        if (!linear || autoAdvance.isNotEmpty()) {
             (if (prequeueInitial) autoAdvance[startSegment] else null)?.let { target ->
                 val queued = stagedController.playSegment(target)
                 if (queued is PlaybackController.State.Failed) return abort(queued.reason)
@@ -216,7 +236,7 @@ internal class PlaybackSession(
                 title = title,
                 frames = frames,
                 linear = linear,
-                autoAdvance = if (linear) emptyMap() else autoAdvance.toMap(),
+                autoAdvance = autoAdvance.toMap(),
                 initialAutoSource = autoSource,
             ),
         )
@@ -273,6 +293,12 @@ internal class PlaybackSession(
         automaticTransitions = prepared.autoAdvance
         automaticSource = prepared.initialAutoSource
         automaticPending = null
+        linearDisplayOffsetFrames = 0L
+        linearActiveSegment = if (prepared.linear && prepared.autoAdvance.isNotEmpty()) {
+            interactiveObservation()?.segment ?: -1
+        } else {
+            -1
+        }
         prepared.engine.setOutputGain(outputTrim.gainDb, outputTrim.ceilingDb)
         output = openOutput(prepared.engine.nativeHandle(), prepared.engine.sampleRate)
         val published = publish(prepared.started, prepared.title, prepared.frames, prepared.engine.sampleRate)
@@ -583,10 +609,18 @@ internal class PlaybackSession(
     fun poll(): State {
         val active = controller ?: return _state.value
         val current=active.poll()
-        if(_state.value.loaded && !linearSession) {
+        if(_state.value.loaded && (!linearSession || automaticTransitions.isNotEmpty())) {
             val observation=interactiveObservation()
+            if (linearSession && observation != null && observation.segment >= 0) {
+                if (linearActiveSegment >= 0 && observation.segment != linearActiveSegment) {
+                    linearActiveSegment = observation.segment
+                    onLinearSegmentAdvanced?.invoke(observation.segment, observation.transportFrame)
+                } else if (linearActiveSegment < 0) {
+                    linearActiveSegment = observation.segment
+                }
+            }
             if(observation?.segment!=automaticSource) { automaticSource=null;automaticPending=null }
-            if(observation!=null && !observation.paused && !observation.transitioning && observation.sourceFrame!=null) {
+            if(observation!=null && !observation.paused && !observation.transitioning && (linearSession || observation.sourceFrame!=null)) {
                 val target=automaticTransitions[observation.segment]
                 if(target!=null && automaticSource!=observation.segment) {
                     val queued=active.playSegment(target)
@@ -614,6 +648,8 @@ internal class PlaybackSession(
     fun release() {
         closeOutput()
         linearSession = false
+        linearActiveSegment = -1
+        linearDisplayOffsetFrames = 0L
         controller?.release()
         controller = null
         engine = null
@@ -643,7 +679,7 @@ internal class PlaybackSession(
         totalFrames: Long,
         sampleRate: Int,
     ): State {
-        val (position, detail) = when (controllerState) {
+        val (rawPosition, detail) = when (controllerState) {
             is PlaybackController.State.Playing -> controllerState.positionFrames to null
             is PlaybackController.State.Paused -> controllerState.positionFrames to null
             is PlaybackController.State.Ready -> 0L to null
@@ -651,20 +687,28 @@ internal class PlaybackSession(
             is PlaybackController.State.Idle -> 0L to null
             is PlaybackController.State.Failed -> 0L to controllerState.reason
         }
+        val position = if (linearSession && linearDisplayOffsetFrames > 0L) {
+            (rawPosition - linearDisplayOffsetFrames).coerceAtLeast(0L)
+        } else {
+            rawPosition
+        }
+        val prevState = _state.value
 
-        val resolvedTitle = when (controllerState) {
-            is PlaybackController.State.Playing -> controllerState.title
-            is PlaybackController.State.Paused -> controllerState.title
-            is PlaybackController.State.Ready -> controllerState.title
-            is PlaybackController.State.Stopped -> controllerState.title
+        val resolvedTitle = when {
+            linearSession && linearDisplayOffsetFrames > 0L && prevState.title.isNotBlank() -> prevState.title
+            controllerState is PlaybackController.State.Playing -> controllerState.title
+            controllerState is PlaybackController.State.Paused -> controllerState.title
+            controllerState is PlaybackController.State.Ready -> controllerState.title
+            controllerState is PlaybackController.State.Stopped -> controllerState.title
             else -> title
         }
 
-        val resolvedTotal = when (controllerState) {
-            is PlaybackController.State.Playing -> controllerState.totalFrames
-            is PlaybackController.State.Paused -> controllerState.totalFrames
-            is PlaybackController.State.Stopped -> controllerState.totalFrames
-            is PlaybackController.State.Ready -> controllerState.totalFrames
+        val resolvedTotal = when {
+            linearSession && linearDisplayOffsetFrames > 0L && prevState.totalFrames > 0L -> prevState.totalFrames
+            controllerState is PlaybackController.State.Playing -> controllerState.totalFrames
+            controllerState is PlaybackController.State.Paused -> controllerState.totalFrames
+            controllerState is PlaybackController.State.Stopped -> controllerState.totalFrames
+            controllerState is PlaybackController.State.Ready -> controllerState.totalFrames
             else -> totalFrames
         }
 

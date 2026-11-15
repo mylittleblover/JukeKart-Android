@@ -118,4 +118,23 @@ class NavStateTest {
         assertEquals(NavState.Detail.Course("Rainbow"), state.detail)
         assertEquals(NavState.Detail.Course("Coaster"), state.back()!!.detail)
     }
+
+    @Test
+    fun snapshotAndRestoreRoundTripAllPlaylistsAndFlowEditor() {
+        val allLists = NavState(tab = Tab.PLAYLISTS).open(NavState.Detail.AllPlaylists(section = 2))
+        val restoredAll = NavState.restore(allLists.snapshot())
+        assertEquals(allLists.tab, restoredAll.tab)
+        assertEquals(allLists.detail, restoredAll.detail)
+        assertEquals(Tab.PLAYLISTS, restoredAll.back()?.tab)
+        assertNull(restoredAll.back()?.detail)
+
+        val editor = NavState(tab = Tab.HOME)
+            .open(NavState.Detail.Course("FirstCircuit"))
+            .open(NavState.Detail.FlowEditor("FirstCircuit", "user:abc"))
+        val restoredEditor = NavState.restore(editor.snapshot())
+        assertEquals(editor.tab, restoredEditor.tab)
+        assertEquals(editor.detail, restoredEditor.detail)
+        assertEquals(NavState.Detail.FlowEditor("FirstCircuit", "user:abc"), restoredEditor.detail)
+        assertEquals(NavState.Detail.Course("FirstCircuit"), restoredEditor.back()?.detail)
+    }
 }

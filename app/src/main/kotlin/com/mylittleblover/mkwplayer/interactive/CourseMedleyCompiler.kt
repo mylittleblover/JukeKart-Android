@@ -11,6 +11,8 @@ internal object CourseMedleyCompiler {
         val medley: CourseMedleyCatalog.Medley,
         val sampleRate: Int,
         val stemDigests: Map<String, String>,
+        val outroHandoverFrame: Long? = null,
+        val incomingPrePhase: Long = 0L,
     )
 
     fun resolveMedley(

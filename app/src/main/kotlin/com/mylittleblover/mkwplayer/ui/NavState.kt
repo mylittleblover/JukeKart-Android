@@ -67,6 +67,8 @@ internal class NavState(
         data class JukeboxGame(val id: String) : Detail
         data class Interactive(val code: String) : Detail
         data class Playlist(val id: String) : Detail
+        data class AllPlaylists(val section: Int = 0) : Detail
+        data class FlowEditor(val courseCode: String, val presetId: String? = null) : Detail
 
         data object Settings : Detail
     }
@@ -96,6 +98,8 @@ internal class NavState(
             is Detail.JukeboxGame -> listOf("jukebox-game", page.id)
             is Detail.Interactive -> listOf("interactive", page.code)
             is Detail.Playlist -> listOf("playlist", page.id)
+            is Detail.AllPlaylists -> listOf("all-playlists", page.section.toString())
+            is Detail.FlowEditor -> listOf("flow-editor", "${page.courseCode}|${page.presetId.orEmpty()}")
             Detail.Settings -> listOf("settings", "")
         }
     }
@@ -128,6 +132,16 @@ internal class NavState(
                 "jukebox-game" -> value?.takeIf { it.isNotBlank() }?.let(Detail::JukeboxGame)
                 "interactive" -> value?.takeIf { it.isNotBlank() }?.let(Detail::Interactive)
                 "playlist" -> value?.takeIf { it.isNotBlank() }?.let(Detail::Playlist)
+                "all-playlists" -> Detail.AllPlaylists(value?.toIntOrNull() ?: 0)
+                "flow-editor" -> value?.takeIf { it.isNotBlank() }?.let { encoded ->
+                    val sep = encoded.indexOf('|')
+                    if (sep < 0) Detail.FlowEditor(encoded, null)
+                    else {
+                        val code = encoded.substring(0, sep).takeIf { it.isNotBlank() } ?: return@let null
+                        val preset = encoded.substring(sep + 1).ifEmpty { null }
+                        Detail.FlowEditor(code, preset)
+                    }
+                }
                 "settings" -> Detail.Settings
                 else -> null
             }

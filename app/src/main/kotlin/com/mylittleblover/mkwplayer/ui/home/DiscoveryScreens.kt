@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
@@ -143,7 +144,9 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
                            session: com.mylittleblover.mkwplayer.player.PlayerViewModel.Ui, currentCode: String?,
                            packDirectory: java.io.File? = null, artworkNames: List<String> = emptyList(),
                            courseArtwork: Map<String, String> = emptyMap(),
-                           onQuickPlay: (String) -> Unit = {}) {
+                           onQuickPlay: (String) -> Unit = {},
+                           onResumeSaved: () -> Unit = {},
+                           onDismissSaved: () -> Unit = {}) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -218,7 +221,50 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
             }
         }
         if (visibleDaily.isEmpty()) item { OutlinedButton(onClick = onImport, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.discovery_import)) } }
-        if (session.canStop) {
+        if (!session.canStop && session.continueListening != null) {
+            val saved = session.continueListening
+            item { Text(stringResource(R.string.discovery_continue_listening), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+            item {
+                Card(
+                    onClick = onResumeSaved,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                ) {
+                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        PackArtwork.Thumbnail(
+                            packDirectory,
+                            listOfNotNull(saved.artworkName),
+                            Modifier.size(72.dp).clip(RoundedCornerShape(16.dp)),
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.primaryContainer),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(Icons.Outlined.MusicNote, null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(30.dp))
+                            }
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Text(saved.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            val meta = listOfNotNull(
+                                saved.subtitle.takeIf { it.isNotBlank() },
+                                "${stringResource(R.string.discovery_continue_paused)} · ${saved.positionText} / ${saved.totalText}",
+                            ).joinToString(" · ")
+                            Text(meta, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            com.mylittleblover.mkwplayer.ui.SmoothProgressIndicator(saved.progress.coerceIn(0f, 1f), modifier = Modifier.fillMaxWidth())
+                        }
+                        FilledIconButton(
+                            onClick = onResumeSaved,
+                            modifier = Modifier.semantics { contentDescription = "" },
+                        ) {
+                            Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.discovery_continue_resume))
+                        }
+                        IconButton(onClick = onDismissSaved) {
+                            Icon(Icons.Filled.Clear, contentDescription = stringResource(R.string.discovery_continue_dismiss))
+                        }
+                    }
+                }
+            }
+        } else if (session.canStop) {
             item { Text(stringResource(R.string.discovery_continue), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
             item {
                 Card(onClick = onPlayer, modifier = Modifier.fillMaxWidth(),
@@ -949,14 +995,26 @@ internal fun DiscoveryCup(route: OfficialRoute?, catalog: BrowseCatalog?, langua
 }
 
 @Composable
-internal fun DiscoveryPlaylists(catalog: BrowseCatalog?, unlocked: Boolean, language: String,
-    state: DiscoveryViewModel.State, onCreate: (String) -> Unit,
-    onPlaylist: (String) -> Unit, onCup: (String) -> Unit) {
-    val routes = catalog?.routes(OfficialRouteKind.GRAND_PRIX, unlocked).orEmpty() + catalog?.routes(OfficialRouteKind.RALLY, unlocked).orEmpty()
+internal fun DiscoveryPlaylists(
+    catalog: BrowseCatalog?,
+    unlocked: Boolean,
+    language: String,
+    state: DiscoveryViewModel.State,
+    onCreate: (String) -> Unit,
+    onPlaylist: (String) -> Unit,
+    onCup: (String) -> Unit,
+    jukeboxGames: List<JukeboxCatalog.Game> = emptyList(),
+    extraCatalog: ExtraMusicCatalog.Catalog = ExtraMusicCatalog.Catalog(),
+    packDirectory: java.io.File? = null,
+    onViewAll: (Int) -> Unit = {},
+    onJukeboxGame: (String) -> Unit = {},
+) {
+    val rallies = catalog?.routes(OfficialRouteKind.RALLY, unlocked).orEmpty()
+    val gpRoutes = catalog?.routes(OfficialRouteKind.GRAND_PRIX, unlocked).orEmpty()
     var creating by rememberSaveable { mutableStateOf(false) }
     var name by rememberSaveable { mutableStateOf("") }
-    var showAll by rememberSaveable { mutableStateOf(false) }
-    if (creating) AlertDialog(onDismissRequest = { creating = false },
+    if (creating) AlertDialog(
+        onDismissRequest = { creating = false },
         title = { Text(stringResource(R.string.discovery_create_playlist)) },
         text = {
             OutlinedTextField(
@@ -969,18 +1027,27 @@ internal fun DiscoveryPlaylists(catalog: BrowseCatalog?, unlocked: Boolean, lang
                 singleLine = true,
             )
         },
-        confirmButton = { TextButton(onClick = { onCreate(name); name = ""; creating = false }, enabled = name.isNotBlank()) { Text(stringResource(R.string.discovery_create)) } },
-        dismissButton = { TextButton(onClick = { creating = false }) { Text(stringResource(R.string.discovery_cancel)) } })
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(stringResource(R.string.discovery_ordinary_lists), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                OutlinedButton(onClick = { creating = true }) {
-                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.discovery_create_playlist))
-                }
+        confirmButton = {
+            TextButton(onClick = { onCreate(name); name = ""; creating = false }, enabled = name.isNotBlank()) {
+                Text(stringResource(R.string.discovery_create))
             }
+        },
+        dismissButton = { TextButton(onClick = { creating = false }) { Text(stringResource(R.string.discovery_cancel)) } },
+    )
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        item {
+            PlaylistGroupHeader(
+                title = stringResource(R.string.discovery_playlists_group_user),
+                count = state.playlists.size,
+                onViewAll = { onViewAll(0) },
+                action = {
+                    OutlinedButton(onClick = { creating = true }) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.discovery_create_playlist))
+                    }
+                },
+            )
         }
         if (state.playlistError != null) item { Text(stringResource(R.string.discovery_save_failed), color = MaterialTheme.colorScheme.error) }
         if (state.playlists.isEmpty()) {
@@ -1001,39 +1068,249 @@ internal fun DiscoveryPlaylists(catalog: BrowseCatalog?, unlocked: Boolean, lang
         } else {
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(if (showAll) state.playlists else state.playlists.take(5), key = { "playlist:${it.id}" }) { playlist ->
+                    items(state.playlists.take(5), key = { "playlist:${it.id}" }) { playlist ->
                         Card(onClick = { onPlaylist(playlist.id) }, modifier = Modifier.width(164.dp)) {
                             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Box(Modifier.fillMaxWidth().height(112.dp), contentAlignment = Alignment.Center) {
                                     val first = playlist.courseIds.firstOrNull { it in catalog?.courses(unlocked).orEmpty() }
-                                    val art = first?.let { StageArt.resolve(it) }
-                                    if (art != null) ResourceArtwork(art, Modifier.size(90.dp))
-                                    else Icon(Icons.Outlined.MusicNote, null, Modifier.size(40.dp))
+                                    val artworkName = first?.let { extraCatalog.courseArtwork[it] ?: extraCatalog.courseArtwork[it.removeSuffix("_00")] }
+                                    if (artworkName != null && packDirectory != null) {
+                                        PackArtwork.Thumbnail(packDirectory, listOf(artworkName), Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp))) {
+                                            Icon(Icons.Outlined.MusicNote, null, Modifier.size(40.dp))
+                                        }
+                                    } else {
+                                        val art = first?.let { StageArt.resolve(it) }
+                                        if (art != null) ResourceArtwork(art, Modifier.size(90.dp))
+                                        else Icon(Icons.Outlined.MusicNote, null, Modifier.size(40.dp))
+                                    }
                                 }
                                 Text(playlist.name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                Text(playlist.courseIds.size.toString(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    stringResource(R.string.jukebox_tracks_count, playlist.courseIds.size),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
                         }
                     }
                 }
             }
-            if (!showAll && state.playlists.size > 5) item { TextButton(onClick = { showAll = true }) { Text(stringResource(R.string.discovery_show_all)) } }
         }
+
+        item { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)) }
         item {
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-        }
-        item {
-            Text(
-                stringResource(R.string.discovery_official_quick),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
+            PlaylistGroupHeader(
+                title = stringResource(R.string.discovery_playlists_group_rallies),
+                count = rallies.size,
+                onViewAll = { onViewAll(2) },
             )
         }
-        item { Text(stringResource(R.string.discovery_gp), style = MaterialTheme.typography.titleLarge) }
-        item { OfficialRouteStrip(routes.filter { it.kind == OfficialRouteKind.GRAND_PRIX }, language, onCup) }
-        item { Text(stringResource(R.string.discovery_rally), style = MaterialTheme.typography.titleLarge) }
-        item { OfficialRouteStrip(routes.filter { it.kind == OfficialRouteKind.RALLY }, language, onCup) }
+        if (rallies.isNotEmpty()) {
+            item { OfficialRouteStrip(rallies.take(5), language, onCup) }
+        }
+        if (gpRoutes.isNotEmpty()) {
+            item { Text(stringResource(R.string.discovery_gp), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
+            item { OfficialRouteStrip(gpRoutes.take(5), language, onCup) }
+        }
+
+        if (jukeboxGames.isNotEmpty()) {
+            item { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)) }
+            item {
+                PlaylistGroupHeader(
+                    title = stringResource(R.string.discovery_playlists_group_jukebox),
+                    count = jukeboxGames.size,
+                    onViewAll = { onViewAll(3) },
+                )
+            }
+            item {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(jukeboxGames.take(5), key = { "jb-group:${it.id}" }) { game ->
+                        Card(onClick = { onJukeboxGame(game.id) }, modifier = Modifier.width(164.dp)) {
+                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                PackArtwork.Thumbnail(
+                                    packDirectory,
+                                    listOfNotNull(extraCatalog.jukeboxGameArtwork[game.id]),
+                                    Modifier.fillMaxWidth().height(112.dp).clip(RoundedCornerShape(12.dp))
+                                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
+                                ) {
+                                    Text(
+                                        game.yearLabel.ifBlank { "OST" },
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                }
+                                Text(game.localizedName(language), style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text(stringResource(R.string.jukebox_tracks_count, game.items.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaylistGroupHeader(
+    title: String,
+    count: Int,
+    onViewAll: () -> Unit,
+    action: (@Composable () -> Unit)? = null,
+) {
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (count > 0) {
+                TextButton(onClick = onViewAll) {
+                    Text(stringResource(R.string.discovery_view_all_count, count))
+                }
+            }
+            action?.invoke()
+        }
+    }
+}
+
+@Composable
+internal fun DiscoveryAllPlaylists(
+    initialSection: Int,
+    catalog: BrowseCatalog?,
+    unlocked: Boolean,
+    language: String,
+    state: DiscoveryViewModel.State,
+    jukeboxGames: List<JukeboxCatalog.Game>,
+    extraCatalog: ExtraMusicCatalog.Catalog,
+    packDirectory: java.io.File?,
+    onCreate: (String) -> Unit,
+    onPlaylist: (String) -> Unit,
+    onCup: (String) -> Unit,
+    onJukeboxGame: (String) -> Unit,
+) {
+    var section by rememberSaveable(initialSection) { mutableIntStateOf(initialSection.coerceIn(0, 3)) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var creating by rememberSaveable { mutableStateOf(false) }
+    var newName by rememberSaveable { mutableStateOf("") }
+    val sectionTitles = listOf(
+        stringResource(R.string.discovery_playlists_group_user),
+        stringResource(R.string.discovery_playlists_group_routes),
+        stringResource(R.string.discovery_playlists_group_rallies),
+        stringResource(R.string.discovery_playlists_group_jukebox),
+    )
+    if (creating) AlertDialog(
+        onDismissRequest = { creating = false },
+        title = { Text(stringResource(R.string.discovery_create_playlist)) },
+        text = {
+            OutlinedTextField(
+                value = newName,
+                onValueChange = { newName = it.take(120) },
+                label = { Text(stringResource(R.string.discovery_playlist_name)) },
+                singleLine = true,
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onCreate(newName); newName = ""; creating = false }, enabled = newName.isNotBlank()) {
+                Text(stringResource(R.string.discovery_create))
+            }
+        },
+        dismissButton = { TextButton(onClick = { creating = false }) { Text(stringResource(R.string.discovery_cancel)) } },
+    )
+    Column(Modifier.fillMaxSize()) {
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            itemsIndexed(sectionTitles) { idx, label ->
+                FilterChip(
+                    selected = section == idx,
+                    onClick = { section = idx },
+                    label = { Text(label) },
+                )
+            }
+        }
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            placeholder = { Text(stringResource(R.string.discovery_search)) },
+            leadingIcon = { Icon(Icons.Filled.Search, null) },
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Clear, null) }
+                }
+            },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            val trimmed = query.trim()
+            when (section) {
+                0 -> {
+                    item {
+                        OutlinedButton(onClick = { creating = true }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Filled.Add, null)
+                            Spacer(Modifier.width(6.dp))
+                            Text(stringResource(R.string.discovery_create_playlist))
+                        }
+                    }
+                    val list = state.playlists.filter { trimmed.isEmpty() || it.name.contains(trimmed, ignoreCase = true) }
+                    if (list.isEmpty()) item { Text(stringResource(R.string.discovery_no_saved)) }
+                    items(list, key = { "all-pl:${it.id}" }) { playlist ->
+                        val first = playlist.courseIds.firstOrNull { it in catalog?.courses(unlocked).orEmpty() }
+                        ExtraSquareRow(
+                            title = playlist.name,
+                            subtitle = stringResource(R.string.jukebox_tracks_count, playlist.courseIds.size),
+                            packDirectory = packDirectory,
+                            artworkName = first?.let { extraCatalog.courseArtwork[it] ?: extraCatalog.courseArtwork[it.removeSuffix("_00")] },
+                            fallbackCourseCode = first,
+                            onClick = { onPlaylist(playlist.id) },
+                        )
+                    }
+                }
+                1 -> {
+                    item {
+                        Surface(
+                            Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        ) {
+                            Text(
+                                stringResource(R.string.discovery_no_saved),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(16.dp),
+                            )
+                        }
+                    }
+                }
+                2 -> {
+                    val rallies = (catalog?.routes(OfficialRouteKind.RALLY, unlocked).orEmpty() +
+                        catalog?.routes(OfficialRouteKind.GRAND_PRIX, unlocked).orEmpty())
+                        .filter { trimmed.isEmpty() || it.displayName(language).contains(trimmed, ignoreCase = true) }
+                    items(rallies, key = { "all-rally:${it.id}" }) { route ->
+                        RouteRow(route, catalog, language) { onCup(route.id) }
+                    }
+                }
+                3 -> {
+                    val games = jukeboxGames.filter {
+                        trimmed.isEmpty() || it.localizedName(language).contains(trimmed, ignoreCase = true) || it.yearLabel.contains(trimmed, ignoreCase = true)
+                    }
+                    items(games, key = { "all-jb:${it.id}" }) { game ->
+                        JukeboxGameRow(
+                            game = game,
+                            language = language,
+                            packDirectory = packDirectory,
+                            artworkName = extraCatalog.jukeboxGameArtwork[game.id],
+                        ) { onJukeboxGame(game.id) }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1058,18 +1335,44 @@ private fun OfficialRouteStrip(routes: List<OfficialRoute>, language: String, on
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun DiscoveryPlaylist(playlist: com.mylittleblover.mkwplayer.library.UserPlaylist?, catalog: BrowseCatalog?,
-    unlocked: Boolean, language: String, error: Boolean, onAdd: (String) -> Unit, onRemove: (Int) -> Unit,
-    onRename: (String) -> Unit, onMove: (Int, Int) -> Unit, onDelete: () -> Unit, onCourse: (String) -> Unit) {
+internal fun DiscoveryPlaylist(
+    playlist: com.mylittleblover.mkwplayer.library.UserPlaylist?,
+    catalog: BrowseCatalog?,
+    unlocked: Boolean,
+    language: String,
+    error: Boolean,
+    onAdd: (String) -> Unit,
+    onRemove: (Int) -> Unit,
+    onRename: (String) -> Unit,
+    onMove: (Int, Int) -> Unit,
+    onDelete: () -> Unit,
+    onCourse: (String) -> Unit,
+    presets: List<com.mylittleblover.mkwplayer.library.CoursePreset> = emptyList(),
+    packDirectory: java.io.File? = null,
+    courseArtwork: Map<String, String> = emptyMap(),
+    isThisPlaylistPlaying: Boolean = false,
+    onPlayAll: () -> Unit = {},
+    onShuffle: () -> Unit = {},
+    onPlayFrom: (Int) -> Unit = {},
+    onToggleNativeDefault: (Boolean) -> Unit = {},
+    onUpdateEntryPreset: (Int, String?) -> Unit = { _, _ -> },
+    onUpdateEntryNative: (Int, Boolean?) -> Unit = { _, _ -> },
+    onOpenFlowEditor: (String, String?) -> Unit = { _, _ -> },
+) {
     var choosing by rememberSaveable { mutableStateOf(false) }
     var deleting by rememberSaveable { mutableStateOf(false) }
     var renaming by rememberSaveable { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
+    var editingEntryIndex by rememberSaveable { mutableStateOf<Int?>(null) }
     var newName by rememberSaveable { mutableStateOf("") }
     val visible = catalog?.courses(unlocked).orEmpty()
     var courseQuery by rememberSaveable { mutableStateOf("") }
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val configSheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
+    val systemDefaultLabel = stringResource(R.string.preset_system_default)
+    val systemKnockoutLabel = stringResource(R.string.preset_system_knockout)
+
     if (choosing) ModalBottomSheet(sheetState = sheet, onDismissRequest = { choosing = false; courseQuery = "" }) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.discovery_choose_course), style = MaterialTheme.typography.headlineSmall)
@@ -1081,14 +1384,84 @@ internal fun DiscoveryPlaylist(playlist: com.mylittleblover.mkwplayer.library.Us
                 if (matches.isEmpty()) item { Text(stringResource(R.string.discovery_empty), Modifier.padding(vertical = 16.dp)) }
                 items(matches, key = { it }) { code ->
                     ListItem(headlineContent = { Text(catalog?.displayName(code, language) ?: code) },
-                        trailingContent = { IconButton(onClick = { onAdd(code); scope.launch { sheet.hide(); choosing = false; courseQuery = "" } }) {
-                            Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.discovery_add_course))
-                        } })
+                        trailingContent = {
+                            IconButton(onClick = { onAdd(code); scope.launch { sheet.hide(); choosing = false; courseQuery = "" } }) {
+                                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.discovery_add_course))
+                            }
+                        })
                 }
             }
         }
     }
-    if (renaming) AlertDialog(onDismissRequest = { renaming = false },
+
+    val entryIdx = editingEntryIndex
+    if (playlist != null && entryIdx != null && entryIdx in playlist.courseIds.indices) {
+        val rawCode = playlist.courseIds[entryIdx]
+        val logicalCode = rawCode.removeSuffix("_00")
+        val cfg = playlist.configAt(entryIdx)
+        val matchingPresets = presets.filter { it.courseCode.equals(logicalCode, ignoreCase = true) }
+        val courseTitle = if (rawCode in visible) catalog?.displayName(rawCode, language) ?: rawCode else rawCode
+        ModalBottomSheet(sheetState = configSheet, onDismissRequest = { editingEntryIndex = null }) {
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("$courseTitle · ${stringResource(R.string.discovery_playlist_entry_config)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.discovery_playlist_entry_preset), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    val isDefaultSelected = cfg.presetId == null || cfg.presetId == com.mylittleblover.mkwplayer.library.PresetRefs.SYSTEM_DEFAULT
+                    FilterChip(
+                        selected = isDefaultSelected,
+                        onClick = { onUpdateEntryPreset(entryIdx, null) },
+                        label = { Text(systemDefaultLabel) },
+                    )
+                    FilterChip(
+                        selected = cfg.presetId == com.mylittleblover.mkwplayer.library.PresetRefs.SYSTEM_KNOCKOUT,
+                        onClick = { onUpdateEntryPreset(entryIdx, com.mylittleblover.mkwplayer.library.PresetRefs.SYSTEM_KNOCKOUT) },
+                        label = { Text(systemKnockoutLabel) },
+                    )
+                    matchingPresets.forEach { preset ->
+                        FilterChip(
+                            selected = cfg.presetId == preset.id,
+                            onClick = { onUpdateEntryPreset(entryIdx, preset.id) },
+                            label = { Text(preset.name) },
+                        )
+                    }
+                    OutlinedButton(onClick = {
+                        editingEntryIndex = null
+                        onOpenFlowEditor(logicalCode, cfg.presetId)
+                    }) {
+                        Icon(Icons.Filled.Edit, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.preset_new))
+                    }
+                }
+                HorizontalDivider()
+                Text(stringResource(R.string.discovery_playlist_native_transition), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = cfg.nativeTransitionEnabled == null,
+                        onClick = { onUpdateEntryNative(entryIdx, null) },
+                        label = { Text(stringResource(R.string.discovery_playlist_entry_native_inherit)) },
+                    )
+                    FilterChip(
+                        selected = cfg.nativeTransitionEnabled == true,
+                        onClick = { onUpdateEntryNative(entryIdx, true) },
+                        label = { Text(stringResource(R.string.discovery_playlist_entry_native_on)) },
+                    )
+                    FilterChip(
+                        selected = cfg.nativeTransitionEnabled == false,
+                        onClick = { onUpdateEntryNative(entryIdx, false) },
+                        label = { Text(stringResource(R.string.discovery_playlist_entry_native_off)) },
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+            }
+        }
+    }
+
+    if (renaming) AlertDialog(
+        onDismissRequest = { renaming = false },
         title = { Text(stringResource(R.string.discovery_rename)) },
         text = {
             OutlinedTextField(
@@ -1102,44 +1475,119 @@ internal fun DiscoveryPlaylist(playlist: com.mylittleblover.mkwplayer.library.Us
             )
         },
         confirmButton = { TextButton(onClick = { onRename(newName); renaming = false }, enabled = newName.isNotBlank()) { Text(stringResource(R.string.discovery_rename)) } },
-        dismissButton = { TextButton(onClick = { renaming = false }) { Text(stringResource(R.string.discovery_cancel)) } })
-    if (deleting) AlertDialog(onDismissRequest = { deleting = false },
-        title = { Text(stringResource(R.string.discovery_delete_playlist)) }, text = { Text(playlist?.name.orEmpty()) },
+        dismissButton = { TextButton(onClick = { renaming = false }) { Text(stringResource(R.string.discovery_cancel)) } },
+    )
+    if (deleting) AlertDialog(
+        onDismissRequest = { deleting = false },
+        title = { Text(stringResource(R.string.discovery_delete_playlist)) },
+        text = { Text(playlist?.name.orEmpty()) },
         confirmButton = { TextButton(onClick = { deleting = false; onDelete() }) { Text(stringResource(R.string.discovery_delete_playlist)) } },
-        dismissButton = { TextButton(onClick = { deleting = false }) { Text(stringResource(R.string.discovery_cancel)) } })
+        dismissButton = { TextButton(onClick = { deleting = false }) { Text(stringResource(R.string.discovery_cancel)) } },
+    )
+
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (playlist == null) item { Text(stringResource(R.string.discovery_empty)) }
         else {
-            item { Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(playlist.name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Box {
-                    IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.jukebox_more_actions))
-                    }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.discovery_rename)) },
-                            leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
-                            onClick = {
-                                menuOpen = false
-                                newName = playlist.name
-                                renaming = true
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.discovery_delete_playlist), color = MaterialTheme.colorScheme.error) },
-                            leadingIcon = { Icon(Icons.Filled.DeleteOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-                            onClick = {
-                                menuOpen = false
-                                deleting = true
-                            },
-                        )
+            item {
+                val firstVisible = playlist.courseIds.firstOrNull { it in visible }
+                val heroArt = firstVisible?.let { courseArtwork[it] ?: courseArtwork[it.removeSuffix("_00")] }
+                ElevatedCard(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                            PackArtwork.Thumbnail(
+                                packDirectory,
+                                listOfNotNull(heroArt),
+                                Modifier.size(72.dp).clip(RoundedCornerShape(16.dp))
+                                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)),
+                            ) {
+                                Icon(Icons.Outlined.MusicNote, null, modifier = Modifier.size(32.dp))
+                            }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(playlist.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                                Text(
+                                    stringResource(R.string.jukebox_tracks_count, playlist.courseIds.size),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Box {
+                                IconButton(onClick = { menuOpen = true }) {
+                                    Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.jukebox_more_actions))
+                                }
+                                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.discovery_rename)) },
+                                        leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                                        onClick = {
+                                            menuOpen = false
+                                            newName = playlist.name
+                                            renaming = true
+                                        },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.discovery_delete_playlist), color = MaterialTheme.colorScheme.error) },
+                                        leadingIcon = { Icon(Icons.Filled.DeleteOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                                        onClick = {
+                                            menuOpen = false
+                                            deleting = true
+                                        },
+                                    )
+                                }
+                            }
+                        }
+
+                        val playableCount = playlist.courseIds.count { it in visible }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = onPlayAll, enabled = playableCount > 0, modifier = Modifier.weight(1f)) {
+                                Icon(Icons.Filled.PlayArrow, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(stringResource(R.string.discovery_playlist_play_all))
+                            }
+                            OutlinedButton(onClick = onShuffle, enabled = playableCount > 0, modifier = Modifier.weight(1f)) {
+                                Icon(Icons.Filled.Shuffle, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(stringResource(R.string.jukebox_shuffle))
+                            }
+                        }
+
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(stringResource(R.string.discovery_playlist_native_transition), style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    stringResource(R.string.discovery_playlist_native_transition_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Switch(
+                                checked = playlist.nativeTransitionDefault,
+                                onCheckedChange = onToggleNativeDefault,
+                            )
+                        }
                     }
                 }
-            } }
+            }
+            if (isThisPlaylistPlaying) item {
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        stringResource(R.string.discovery_playlist_frozen_note),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(12.dp),
+                    )
+                }
+            }
             if (error) item { Text(stringResource(R.string.discovery_save_failed), color = MaterialTheme.colorScheme.error) }
             item {
-                Button(onClick = { choosing = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                OutlinedButton(onClick = { choosing = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                     Icon(Icons.Filled.Add, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.discovery_add_course))
@@ -1148,17 +1596,57 @@ internal fun DiscoveryPlaylist(playlist: com.mylittleblover.mkwplayer.library.Us
             if (playlist.courseIds.isEmpty()) item { Text(stringResource(R.string.discovery_playlist_empty)) }
             items(playlist.courseIds.size) { index ->
                 val code = playlist.courseIds[index]
+                val logicalCode = code.removeSuffix("_00")
+                val cfg = playlist.configAt(index)
                 val title = if (code in visible) catalog?.displayName(code, language) ?: code else stringResource(R.string.discovery_empty)
-                Card(Modifier.fillMaxWidth()) { Column(Modifier.fillMaxWidth().padding(8.dp)) {
-                    TextButton(onClick = { onCourse(code) }, enabled = code in visible, modifier = Modifier.fillMaxWidth()) {
-                        Text(title)
+                val presetName = when (cfg.presetId) {
+                    null, com.mylittleblover.mkwplayer.library.PresetRefs.SYSTEM_DEFAULT -> systemDefaultLabel
+                    com.mylittleblover.mkwplayer.library.PresetRefs.SYSTEM_KNOCKOUT -> systemKnockoutLabel
+                    else -> presets.firstOrNull { it.id == cfg.presetId }?.name ?: systemDefaultLabel
+                }
+                val nativeStatus = when (cfg.nativeTransitionEnabled) {
+                    true -> stringResource(R.string.discovery_playlist_entry_native_on)
+                    false -> stringResource(R.string.discovery_playlist_entry_native_off)
+                    null -> if (playlist.nativeTransitionDefault) stringResource(R.string.discovery_playlist_entry_native_inherit) else null
+                }
+                val metaLine = listOfNotNull(presetName, nativeStatus).joinToString(" · ")
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            PackArtwork.Thumbnail(
+                                packDirectory,
+                                listOfNotNull(courseArtwork[code] ?: courseArtwork[logicalCode]),
+                                Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)),
+                            ) {
+                                Icon(Icons.Outlined.MusicNote, null, modifier = Modifier.size(22.dp))
+                            }
+                            Column(
+                                Modifier.weight(1f).clickable(enabled = code in visible) { onPlayFrom(index) },
+                                verticalArrangement = Arrangement.spacedBy(2.dp),
+                            ) {
+                                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(metaLine, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            IconButton(onClick = { onCourse(code) }, enabled = code in visible) {
+                                Icon(Icons.Outlined.MusicNote, contentDescription = title)
+                            }
+                            IconButton(onClick = { editingEntryIndex = index }, enabled = code in visible) {
+                                Icon(Icons.Filled.Tune, contentDescription = stringResource(R.string.discovery_playlist_entry_config))
+                            }
+                        }
+                        Row(Modifier.align(Alignment.End)) {
+                            IconButton(onClick = { onMove(index, index - 1) }, enabled = index > 0) {
+                                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "${stringResource(R.string.discovery_move_up)}: $title, ${index + 1}")
+                            }
+                            IconButton(onClick = { onMove(index, index + 1) }, enabled = index + 1 < playlist.courseIds.size) {
+                                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "${stringResource(R.string.discovery_move_down)}: $title, ${index + 1}")
+                            }
+                            IconButton(onClick = { onRemove(index) }) {
+                                Icon(Icons.Filled.RemoveCircleOutline, contentDescription = "${stringResource(R.string.discovery_remove)}: $title, ${index + 1}")
+                            }
+                        }
                     }
-                    Row(Modifier.align(Alignment.End)) {
-                        IconButton(onClick = { onMove(index, index - 1) }, enabled = index > 0) { Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "${stringResource(R.string.discovery_move_up)}: $title, ${index + 1}" ) }
-                        IconButton(onClick = { onMove(index, index + 1) }, enabled = index + 1 < playlist.courseIds.size) { Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "${stringResource(R.string.discovery_move_down)}: $title, ${index + 1}" ) }
-                        IconButton(onClick = { onRemove(index) }) { Icon(Icons.Filled.RemoveCircleOutline, contentDescription = "${stringResource(R.string.discovery_remove)}: $title, ${index + 1}" ) }
-                    }
-                } }
+                }
             }
         }
     }
@@ -1558,6 +2046,7 @@ private fun extraOtherToQueueEntry(
             key = "extra:${item.id}",
             title = title,
             subtitle = categoryLabel,
+            sourceType = com.mylittleblover.mkwplayer.player.LinearSessionStore.SourceType.EXTRA,
             ostIndex = item.ostIndex,
             durationMs = item.durationMs,
             artworkName = item.artwork,
@@ -1570,6 +2059,7 @@ private fun extraOtherToQueueEntry(
             key = "extra:${item.id}",
             title = title,
             subtitle = categoryLabel,
+            sourceType = com.mylittleblover.mkwplayer.player.LinearSessionStore.SourceType.EXTRA,
             ostIndex = item.ostIndex,
             durationMs = item.durationMs,
             artworkName = item.artwork,
@@ -1579,6 +2069,7 @@ private fun extraOtherToQueueEntry(
             key = "extra:${item.id}",
             title = title,
             subtitle = categoryLabel,
+            sourceType = com.mylittleblover.mkwplayer.player.LinearSessionStore.SourceType.EXTRA,
             ostIndex = item.ostIndex,
             durationMs = item.durationMs,
             artworkName = item.artwork,
@@ -1588,6 +2079,7 @@ private fun extraOtherToQueueEntry(
             key = "extra:${item.id}",
             title = title,
             subtitle = categoryLabel,
+            sourceType = com.mylittleblover.mkwplayer.player.LinearSessionStore.SourceType.EXTRA,
             ostIndex = item.ostIndex,
             durationMs = item.durationMs,
             artworkName = item.artwork,
@@ -1603,6 +2095,7 @@ private fun extraSimpleToQueueEntry(
     key = "extra:${item.id}",
     title = item.localizedName(language),
     subtitle = categoryLabel,
+    sourceType = com.mylittleblover.mkwplayer.player.LinearSessionStore.SourceType.EXTRA,
     ostIndex = item.ostIndex,
     durationMs = item.durationMs,
     artworkName = item.artwork,

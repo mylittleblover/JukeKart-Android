@@ -47,6 +47,13 @@ internal class LinearQueue(
         val overlaidOpening: com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.OverlaidOpening? = null,
         val chainedSequence: com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.ChainedSequence? = null,
         val courseMedley: com.mylittleblover.mkwplayer.interactive.CourseMedleyCompiler.ResolvedMedley? = null,
+        val nativeTransitionEnabled: Boolean = false,
+        val nativeTransitionOverride: Boolean? = null,
+        val nativeTransitionSourceLabel: String? = null,
+        val sourceType: LinearSessionStore.SourceType = LinearSessionStore.SourceType.JUKEBOX,
+        val courseCode: String? = null,
+        val presetId: String? = null,
+        val medleyId: String? = null,
     )
 
     data class Snapshot(
@@ -290,6 +297,83 @@ internal class LinearQueue(
         currentEntry = nextItem
         currentBaseIndex = nextIdx
         return StepResult.Play(nextItem)
+    }
+
+    /** Non-mutating lookahead of upcoming entries for native cross-track handover chaining (#51-#53). */
+    fun peekNextEntries(limit: Int): List<Entry> {
+        if (limit <= 0 || currentEntry == null || repeatMode == RepeatMode.SINGLE) return emptyList()
+        val result = ArrayList<Entry>(limit)
+        for ((entry, _) in forwardHistory) {
+            if (result.size >= limit) return result
+            result += entry
+        }
+        for (entry in tempNextQueue) {
+            if (result.size >= limit) return result
+            result += entry
+        }
+        for ((entry, _) in upcomingBase) {
+            if (result.size >= limit) return result
+            result += entry
+        }
+        if (result.size < limit && repeatMode == RepeatMode.LIST && !shuffle && frozenBase.isNotEmpty()) {
+            for (entry in frozenBase) {
+                if (result.size >= limit) break
+                result += entry
+            }
+        }
+        return result
+    }
+
+    /** Advances queue silently on a native segment boundary when the queue was not mutated mid-track. */
+    fun advanceSilentForHandover(expectedKey: String): Entry? {
+        if (repeatMode == RepeatMode.SINGLE) return null
+        val peeked = peekNextEntries(1).firstOrNull() ?: return null
+        if (peeked.key != expectedKey) return null
+        val step = onNaturalEnd() as? StepResult.Play ?: return null
+        return step.entry
+    }
+
+    data class ExportedState(
+        val frozenBase: List<Entry>,
+        val current: Entry,
+        val currentBaseIndex: Int,
+        val pastHistory: List<Pair<Entry, Int>>,
+        val forwardHistory: List<Pair<Entry, Int>>,
+        val tempQueue: List<Entry>,
+        val upcomingBase: List<Pair<Entry, Int>>,
+        val repeatMode: RepeatMode,
+        val shuffle: Boolean,
+    )
+
+    fun exportState(): ExportedState? {
+        val active = currentEntry ?: return null
+        return ExportedState(
+            frozenBase = frozenBase.toList(),
+            current = active,
+            currentBaseIndex = currentBaseIndex,
+            pastHistory = pastHistory.toList(),
+            forwardHistory = forwardHistory.toList(),
+            tempQueue = tempNextQueue.toList(),
+            upcomingBase = upcomingBase.toList(),
+            repeatMode = repeatMode,
+            shuffle = shuffle,
+        )
+    }
+
+    fun restoreState(state: ExportedState) {
+        frozenBase = state.frozenBase.toList()
+        currentEntry = state.current
+        currentBaseIndex = state.currentBaseIndex
+        pastHistory.clear()
+        pastHistory.addAll(state.pastHistory)
+        forwardHistory.clear()
+        forwardHistory.addAll(state.forwardHistory)
+        tempNextQueue.clear()
+        tempNextQueue.addAll(state.tempQueue)
+        upcomingBase.clear()
+        upcomingBase.addAll(state.upcomingBase)
+        repeatMode = state.repeatMode
+        shuffle = state.shuffle
     }
 
     private fun rebuildUpcomingAfterStart(startIndex: Int) {
