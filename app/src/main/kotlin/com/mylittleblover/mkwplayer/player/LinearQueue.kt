@@ -54,6 +54,8 @@ internal class LinearQueue(
         val courseCode: String? = null,
         val presetId: String? = null,
         val medleyId: String? = null,
+        val sourceTrackKey: String? = null,
+        val roadCandidateVariants: List<Entry> = emptyList(),
     )
 
     data class Snapshot(
@@ -118,7 +120,7 @@ internal class LinearQueue(
             shuffle = shuffleOverride
         }
 
-        currentEntry = frozenBase[safeIndex]
+        currentEntry = resolveRoundEntry(frozenBase[safeIndex])
         currentBaseIndex = safeIndex
         rebuildUpcomingAfterStart(safeIndex)
         return currentEntry
@@ -280,7 +282,7 @@ internal class LinearQueue(
 
         pastHistory.addLast(current to currentBaseIndex)
         val round = if (shuffle) {
-            frozenBase.indices.map { frozenBase[it] to it }.shuffled(random).let { list ->
+            frozenBase.indices.map { resolveRoundEntry(frozenBase[it]) to it }.shuffled(random).let { list ->
                 // Avoid repeating the just-finished song at boundary when multiple tracks exist.
                 if (list.size > 1 && list.first().second == currentBaseIndex) {
                     list.drop(1) + list.first()
@@ -289,7 +291,7 @@ internal class LinearQueue(
                 }
             }
         } else {
-            frozenBase.indices.map { frozenBase[it] to it }
+            frozenBase.indices.map { resolveRoundEntry(frozenBase[it]) to it }
         }
         upcomingBase.clear()
         upcomingBase.addAll(round)
@@ -376,17 +378,24 @@ internal class LinearQueue(
         shuffle = state.shuffle
     }
 
+    private fun resolveRoundEntry(template: Entry): Entry {
+        val pool = template.roadCandidateVariants
+        if (pool.isEmpty()) return template
+        val picked = pool[random.nextInt(pool.size)]
+        return picked.copy(roadCandidateVariants = pool)
+    }
+
     private fun rebuildUpcomingAfterStart(startIndex: Int) {
         upcomingBase.clear()
         if (shuffle) {
             val rest = frozenBase.indices
                 .filter { it != startIndex }
-                .map { frozenBase[it] to it }
+                .map { resolveRoundEntry(frozenBase[it]) to it }
                 .shuffled(random)
             upcomingBase.addAll(rest)
         } else {
             for (i in (startIndex + 1) until frozenBase.size) {
-                upcomingBase.addLast(frozenBase[i] to i)
+                upcomingBase.addLast(resolveRoundEntry(frozenBase[i]) to i)
             }
         }
     }

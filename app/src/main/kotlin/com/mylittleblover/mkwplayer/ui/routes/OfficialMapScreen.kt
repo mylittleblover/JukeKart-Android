@@ -9,6 +9,11 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.Loop
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.MusicOff
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -68,18 +73,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mylittleblover.mkwplayer.R
 import com.mylittleblover.mkwplayer.library.MapAnchors
+import com.mylittleblover.mkwplayer.routes.CustomRouteEdgeConfig
+import com.mylittleblover.mkwplayer.routes.CustomRouteStop
 import com.mylittleblover.mkwplayer.routes.LocalizedNames
 import com.mylittleblover.mkwplayer.routes.OfficialRoute
 import com.mylittleblover.mkwplayer.routes.OfficialRouteCatalog
 import com.mylittleblover.mkwplayer.routes.OfficialRouteKind
+import com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog
 import com.mylittleblover.mkwplayer.ui.art.CupArt
 import com.mylittleblover.mkwplayer.ui.art.MapArtworkCache
 import com.mylittleblover.mkwplayer.ui.art.ArtworkSlot
 import com.mylittleblover.mkwplayer.ui.art.artworkFade
 import com.mylittleblover.mkwplayer.ui.art.rememberResourceArtwork
+import com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import com.mylittleblover.mkwplayer.ui.art.StageArt
+import java.io.File
 import kotlin.math.atan2
 import kotlin.math.roundToInt
 
@@ -97,6 +107,13 @@ internal fun OfficialMapScreen(
     onOpenCourse: (String) -> Unit,
     modifier: Modifier = Modifier,
     connections: com.mylittleblover.mkwplayer.library.StageConnections.Catalog? = null,
+    installedJukebox: List<Pair<JukeboxCatalog.TrackItem, JukeboxCatalog.Game>> = emptyList(),
+    packDirectory: File? = null,
+    inspectOfficialRoute: (OfficialRoute, Map<Int, String>) -> RoadJukeboxCatalog.RouteValidationReport? = { _, _ -> null },
+    inspectDraftRoute: (List<Pair<String, String>>, Map<Int, CustomRouteEdgeConfig>) -> RoadJukeboxCatalog.RouteValidationReport? = { _, _ -> null },
+    onPlayOfficialRoute: (OfficialRoute, Boolean, Map<Int, String>) -> Unit = { _, _, _ -> },
+    onSaveCustomRoute: (routeId: String?, name: String, stops: List<CustomRouteStop>, edges: List<CustomRouteEdgeConfig>, loopWholeRoute: Boolean) -> Unit = { _, _, _, _, _ -> },
+    onPlayCustomDraft: (name: String, stops: List<CustomRouteStop>, edges: List<CustomRouteEdgeConfig>, loopWholeRoute: Boolean) -> Unit = { _, _, _, _ -> },
 ) {
     val visibleRoutes = routes.visible(specialUnlocked)
     val visibleStages = routes.stageCodes(specialUnlocked)
@@ -114,6 +131,20 @@ internal fun OfficialMapScreen(
     val sink = course != null && connections != null && connections.outgoing(course).isEmpty()
     var picker by rememberSaveable { mutableStateOf(false) }
     var stops by rememberSaveable { mutableStateOf(false) }
+    var officialLoop by rememberSaveable(route?.id) { mutableStateOf(false) }
+    val sessionOverrides = remember(route?.id) { mutableStateMapOf<Int, String>() }
+    var pickingEdgeIndex by rememberSaveable { mutableStateOf<Int?>(null) }
+    var pickingOfficialLeg by rememberSaveable { mutableStateOf(false) }
+    var saveDialogOpen by rememberSaveable { mutableStateOf(false) }
+    var saveDraftName by rememberSaveable(state.editingRouteId) { mutableStateOf(state.editingRouteName) }
+    val defaultRouteName = stringResource(R.string.route_default_name)
+
+    val officialReport = remember(route, sessionOverrides.toMap(), packDirectory, installedJukebox) {
+        route?.let { inspectOfficialRoute(it, sessionOverrides.toMap()) }
+    }
+    val draftReport = remember(state.draft, state.draftEdgeConfigs, packDirectory, installedJukebox) {
+        if (state.draft.isNotEmpty()) inspectDraftRoute(state.draft, state.draftEdgeConfigs) else null
+    }
     val fallbackName = stringResource(R.string.map_course)
     val name: (String) -> String = { names.name(it, languageTag) ?: fallbackName }
 
@@ -139,7 +170,7 @@ internal fun OfficialMapScreen(
         } else {
             val from = state.editFrom!!
             when {
-                from == tapped -> state.editStart(null)
+                from == tapped -> if (state.draft.isEmpty()) state.editStart(null)
                 connections.connects(from, tapped) -> state.editAppend(from, tapped)
                 connections.connects(tapped, from) -> state.editRefuse(refusalReverse)
                 connections.outgoing(from).isEmpty() -> state.editRefuse("$refusalSink ${name(from)}")
@@ -155,7 +186,12 @@ internal fun OfficialMapScreen(
             BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
                 val viewportMaxHeight = maxHeight
                 MapCanvas(image, anchors.canvasWidth.toFloat(), pins, route, state, name, Modifier.fillMaxSize(),
-                    neighbours = neighbours, onPinTap = onPinTap, draft = state.draft, editFrom = state.editFrom)
+                    neighbours = neighbours, onPinTap = onPinTap, draft = state.draft, editFrom = state.editFrom,
+                    draftEdgeConfigs = state.draftEdgeConfigs,
+                    onDraftEdgeTap = { idx ->
+                        pickingOfficialLeg = false
+                        pickingEdgeIndex = idx
+                    })
                 val horizontalControls = maxHeight < 240.dp || (!wide && maxHeight < 400.dp)
                 Surface(
                     modifier = Modifier.align(Alignment.TopStart).padding(10.dp)
@@ -264,10 +300,48 @@ internal fun OfficialMapScreen(
                             ) {
                                 Column(Modifier.verticalScroll(rememberScrollState())) {
                                     if (state.editing) {
-                                        ConnectionEditorPanel(state, name, connections) { stops = false }
+                                        ConnectionEditorPanel(
+                                            state = state,
+                                            name = name,
+                                            languageTag = languageTag,
+                                            connections = connections,
+                                            draftReport = draftReport,
+                                            onPickEdgeMusic = { idx ->
+                                                pickingOfficialLeg = false
+                                                pickingEdgeIndex = idx
+                                            },
+                                            onSaveClick = {
+                                                saveDraftName = state.editingRouteName.ifBlank { defaultRouteName }
+                                                saveDialogOpen = true
+                                            },
+                                            onPlayDraft = {
+                                                val routeName = state.editingRouteName.ifBlank { defaultRouteName }
+                                                onPlayCustomDraft(routeName, state.toCustomRouteStops(), state.toCustomRouteEdges(), state.draftLoopWholeRoute)
+                                            },
+                                            onDone = { stops = false },
+                                        )
                                     } else {
-                                        MapSelectionPanel(route, course, name, languageTag, playableStages, state, { stops = true }, onOpenCourse,
-                                            neighbours = neighbours, sink = sink, connections = connections)
+                                        MapSelectionPanel(
+                                            route = route,
+                                            course = course,
+                                            name = name,
+                                            languageTag = languageTag,
+                                            playable = playableStages,
+                                            state = state,
+                                            onStops = { stops = true },
+                                            onOpenCourse = onOpenCourse,
+                                            neighbours = neighbours,
+                                            sink = sink,
+                                            connections = connections,
+                                            officialReport = officialReport,
+                                            loopRoute = officialLoop,
+                                            onLoopChange = { officialLoop = it },
+                                            onPlayRoute = {
+                                                if (route != null) {
+                                                    onPlayOfficialRoute(route, officialLoop, sessionOverrides.toMap())
+                                                }
+                                            },
+                                        )
                                     }
                                 }
                             }
@@ -279,10 +353,48 @@ internal fun OfficialMapScreen(
                 Column(Modifier.width(paneWidth).fillMaxHeight().verticalScroll(rememberScrollState())) {
                     TextButton(onClick = { picker = true }, modifier = Modifier.padding(horizontal = 8.dp)) { Text(stringResource(R.string.map_official_routes)) }
                     if (state.editing) {
-                        ConnectionEditorPanel(state, name, connections) { stops = false }
+                        ConnectionEditorPanel(
+                            state = state,
+                            name = name,
+                            languageTag = languageTag,
+                            connections = connections,
+                            draftReport = draftReport,
+                            onPickEdgeMusic = { idx ->
+                                pickingOfficialLeg = false
+                                pickingEdgeIndex = idx
+                            },
+                            onSaveClick = {
+                                saveDraftName = state.editingRouteName.ifBlank { defaultRouteName }
+                                saveDialogOpen = true
+                            },
+                            onPlayDraft = {
+                                val routeName = state.editingRouteName.ifBlank { defaultRouteName }
+                                onPlayCustomDraft(routeName, state.toCustomRouteStops(), state.toCustomRouteEdges(), state.draftLoopWholeRoute)
+                            },
+                            onDone = { stops = false },
+                        )
                     } else {
-                        MapSelectionPanel(route, course, name, languageTag, playableStages, state, { stops = true }, onOpenCourse,
-                            neighbours = neighbours, sink = sink, connections = connections)
+                        MapSelectionPanel(
+                            route = route,
+                            course = course,
+                            name = name,
+                            languageTag = languageTag,
+                            playable = playableStages,
+                            state = state,
+                            onStops = { stops = true },
+                            onOpenCourse = onOpenCourse,
+                            neighbours = neighbours,
+                            sink = sink,
+                            connections = connections,
+                            officialReport = officialReport,
+                            loopRoute = officialLoop,
+                            onLoopChange = { officialLoop = it },
+                            onPlayRoute = {
+                                if (route != null) {
+                                    onPlayOfficialRoute(route, officialLoop, sessionOverrides.toMap())
+                                }
+                            },
+                        )
                     }
                 }
             }
@@ -323,15 +435,143 @@ internal fun OfficialMapScreen(
             Text(stringResource(R.string.map_route_readonly), Modifier.padding(horizontal = 24.dp), style = MaterialTheme.typography.bodySmall)
             Text(stringResource(R.string.map_schematic), Modifier.padding(horizontal = 24.dp, vertical = 4.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             LazyColumn(Modifier.fillMaxWidth().heightIn(max = 560.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-                items(route.stops, key = { it.id }) { stop ->
+                items(route.stops.size, key = { idx -> route.stops[idx].id }) { idx ->
+                    val stop = route.stops[idx]
                     ListItem(
                         headlineContent = { Text(stringResource(R.string.map_route_stop, stop.ordinal, name(stop.stageCode))) },
                         supportingContent = if (stop == route.start || stop == route.end) ({ Text(stringResource(if (stop == route.start) R.string.map_start_badge else R.string.map_finish_badge)) }) else null,
                         modifier = Modifier.clickable(role = Role.Button) { state.selectCourse(stop.stageCode); sheetScope.launch { stopSheet.hide(); stops = false } },
                     )
+                    val leg = officialReport?.legs?.getOrNull(idx)
+                    if (leg != null) {
+                        val summary = edgeResolutionSummary(leg.resolution, languageTag)
+                        Surface(
+                            onClick = {
+                                pickingOfficialLeg = true
+                                pickingEdgeIndex = idx
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 2.dp),
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Icon(Icons.Filled.MusicNote, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        "${stringResource(R.string.route_road_prefix)} ${name(leg.from)} → ${name(leg.to)}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        summary,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (leg.resolution.isMissingOrIncomplete()) {
+                                            MaterialTheme.colorScheme.error
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                if (leg.resolution.hasKnownPool()) {
+                                    Text(
+                                        stringResource(R.string.preset_edit),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
+    }
+
+    val activeLegIndex = pickingEdgeIndex
+    val activeReport = if (pickingOfficialLeg) officialReport else draftReport
+    val activeLeg = if (activeLegIndex != null) activeReport?.legs?.getOrNull(activeLegIndex) else null
+    if (activeLeg != null && activeLegIndex != null) {
+        val currentCfg = if (!pickingOfficialLeg) {
+            state.edgeConfigAt(activeLegIndex)
+        } else {
+            CustomRouteEdgeConfig(from = activeLeg.from, to = activeLeg.to)
+        }
+        val currentOverrideKey = if (pickingOfficialLeg) sessionOverrides[activeLegIndex] else currentCfg.selectedJukeboxKey
+        val currentMuted = if (pickingOfficialLeg) false else !currentCfg.musicEnabled
+        RouteEdgeMusicPickerSheet(
+            legTitle = "${name(activeLeg.from)} → ${name(activeLeg.to)}",
+            leg = activeLeg,
+            installedJukebox = installedJukebox,
+            allowCustomSubstitute = !pickingOfficialLeg,
+            allowMute = !pickingOfficialLeg,
+            sessionHint = pickingOfficialLeg,
+            language = languageTag,
+            packDirectory = packDirectory,
+            currentSelectedKey = currentOverrideKey,
+            currentMuted = currentMuted,
+            onSelectAuto = {
+                if (pickingOfficialLeg) {
+                    sessionOverrides.remove(activeLegIndex)
+                } else {
+                    state.setEdgeMusic(activeLegIndex, musicEnabled = true, selectedJukeboxKey = null)
+                }
+            },
+            onSelectMuted = {
+                if (!pickingOfficialLeg) {
+                    state.setEdgeMusic(activeLegIndex, musicEnabled = false, selectedJukeboxKey = null)
+                }
+            },
+            onSelectTrackKey = { trackKey ->
+                if (pickingOfficialLeg) {
+                    sessionOverrides[activeLegIndex] = trackKey
+                } else {
+                    state.setEdgeMusic(activeLegIndex, musicEnabled = true, selectedJukeboxKey = trackKey)
+                }
+            },
+            onDismiss = { pickingEdgeIndex = null },
+        )
+    }
+
+    if (saveDialogOpen) {
+        AlertDialog(
+            onDismissRequest = { saveDialogOpen = false },
+            title = { Text(stringResource(R.string.map_edit_save)) },
+            text = {
+                OutlinedTextField(
+                    value = saveDraftName,
+                    onValueChange = { saveDraftName = it.take(120) },
+                    label = { Text(stringResource(R.string.route_name_label)) },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val trimmed = saveDraftName.trim().ifEmpty { defaultRouteName }
+                        state.editingRouteName = trimmed
+                        onSaveCustomRoute(
+                            state.editingRouteId,
+                            trimmed,
+                            state.toCustomRouteStops(),
+                            state.toCustomRouteEdges(),
+                            state.draftLoopWholeRoute,
+                        )
+                        saveDialogOpen = false
+                    },
+                    enabled = state.draft.isNotEmpty(),
+                ) { Text(stringResource(R.string.route_save_changes)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { saveDialogOpen = false }) { Text(stringResource(R.string.discovery_cancel)) }
+            },
+        )
     }
 }
 
@@ -340,14 +580,27 @@ internal fun OfficialMapScreen(
 private fun ConnectionEditorPanel(
     state: WorldMapState,
     name: (String) -> String,
+    languageTag: String,
     connections: com.mylittleblover.mkwplayer.library.StageConnections.Catalog?,
+    draftReport: RoadJukeboxCatalog.RouteValidationReport?,
+    onPickEdgeMusic: (Int) -> Unit,
+    onSaveClick: () -> Unit,
+    onPlayDraft: () -> Unit,
     onDone: () -> Unit,
 ) {
     val stops = state.draftStops()
     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.map_edit_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Text(stringResource(R.string.map_edit_hint), style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            state.editingRouteName.ifBlank { stringResource(R.string.map_edit_title) },
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            if (state.editingRouteId != null) stringResource(R.string.route_tail_only_note)
+            else stringResource(R.string.map_edit_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         state.editRefusal?.let {
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
@@ -357,10 +610,88 @@ private fun ConnectionEditorPanel(
             // Numbered so the order is visible: a route is a sequence, not a set of connections.
             Text(stops.mapIndexed { index, code -> "${index + 1}. ${name(code)}" }.joinToString("  →  "),
                 style = MaterialTheme.typography.bodyMedium)
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(Icons.Filled.Loop, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.route_loop_whole), style = MaterialTheme.typography.bodySmall)
+                }
+                Switch(
+                    checked = state.draftLoopWholeRoute,
+                    onCheckedChange = { state.draftLoopWholeRoute = it },
+                )
+            }
+            for ((edgeIdx, edge) in state.draft.withIndex()) {
+                val leg = draftReport?.legs?.getOrNull(edgeIdx)
+                val edgeTitle = "${edgeIdx + 1}. ${name(edge.first)} → ${name(edge.second)}"
+                val edgeSub = if (leg != null) {
+                    edgeResolutionSummary(leg.resolution, languageTag)
+                } else {
+                    stringResource(R.string.route_edge_music_auto)
+                }
+                val cfg = state.edgeConfigAt(edgeIdx)
+                Surface(
+                    onClick = { onPickEdgeMusic(edgeIdx) },
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(
+                            if (cfg.musicEnabled) Icons.Filled.MusicNote else Icons.Filled.MusicOff,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = if (leg?.resolution?.isMissingOrIncomplete() == true) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(edgeTitle, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(edgeSub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            }
+            if (draftReport?.canPlay == false) {
+                Text(
+                    draftReport.blockingReason ?: stringResource(R.string.route_blocked_incomplete_pool),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Button(
+                onClick = onSaveClick,
+                enabled = state.draft.isNotEmpty(),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                modifier = Modifier.heightIn(min = 36.dp),
+            ) {
+                Icon(Icons.Filled.Save, null, Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(stringResource(R.string.map_edit_save))
+            }
+            FilledTonalButton(
+                onClick = onPlayDraft,
+                enabled = state.draft.isNotEmpty() && draftReport?.canPlay != false,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                modifier = Modifier.heightIn(min = 36.dp),
+            ) {
+                Icon(Icons.Filled.PlayArrow, null, Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(stringResource(R.string.route_play))
+            }
             TextButton(onClick = state::editUndo, enabled = state.draft.isNotEmpty()) { Text(stringResource(R.string.map_edit_undo)) }
-            TextButton(onClick = state::editClear, enabled = state.draft.isNotEmpty()) { Text(stringResource(R.string.map_edit_clear)) }
+            TextButton(onClick = state::editClear, enabled = state.draft.isNotEmpty() && state.editingRouteId == null) { Text(stringResource(R.string.map_edit_clear)) }
             TextButton(onClick = { state.exitEdit(); onDone() }) { Text(stringResource(R.string.map_edit_exit)) }
         }
         // The provenance line is deliberately here and not in a tooltip: a route the listener builds is only
@@ -377,6 +708,10 @@ private fun MapSelectionPanel(
     playable: Set<String>, state: WorldMapState, onStops: () -> Unit, onOpenCourse: (String) -> Unit,
     neighbours: List<String> = emptyList(), sink: Boolean = false,
     connections: com.mylittleblover.mkwplayer.library.StageConnections.Catalog? = null,
+    officialReport: RoadJukeboxCatalog.RouteValidationReport? = null,
+    loopRoute: Boolean = false,
+    onLoopChange: (Boolean) -> Unit = {},
+    onPlayRoute: () -> Unit = {},
 ) {
     var connectionsExpanded by remember(course) { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -500,8 +835,31 @@ private fun MapSelectionPanel(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                if (officialReport?.canPlay == false) {
+                    Text(
+                        officialReport.blockingReason ?: stringResource(R.string.route_blocked_incomplete_pool),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Button(
+                        onClick = onPlayRoute,
+                        enabled = officialReport?.canPlay != false,
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                        modifier = Modifier.heightIn(min = 36.dp),
+                    ) {
+                        Icon(Icons.Filled.PlayArrow, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.route_play))
+                    }
+                    FilterChip(
+                        selected = loopRoute,
+                        onClick = { onLoopChange(!loopRoute) },
+                        leadingIcon = { Icon(Icons.Filled.Loop, null, Modifier.size(16.dp)) },
+                        label = { Text(stringResource(R.string.route_loop_whole)) },
+                    )
+                    OutlinedButton(
                         onClick = onStops,
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
                         modifier = Modifier.heightIn(min = 36.dp),
@@ -555,6 +913,8 @@ private fun MapCanvas(
     onPinTap: (String) -> Unit = { state.selectCourse(it) },
     draft: List<Pair<String, String>> = emptyList(),
     editFrom: String? = null,
+    draftEdgeConfigs: Map<Int, CustomRouteEdgeConfig> = emptyMap(),
+    onDraftEdgeTap: (Int) -> Unit = {},
 ) {
     val density = LocalDensity.current
     val context = LocalContext.current.applicationContext
@@ -727,6 +1087,35 @@ private fun MapCanvas(
                     Surface(Modifier.align(Alignment.TopEnd).offset(x = iconSize * .1f, y = -iconSize * .1f), shape = CircleShape, color = accent, contentColor = MaterialTheme.colorScheme.onPrimary) {
                         Text(visits.joinToString("·") { it.ordinal.toString() }, Modifier.padding(horizontal = iconSize * .08f, vertical = iconSize * .025f),
                             fontSize = (iconSize.value * .22f).sp, lineHeight = (iconSize.value * .25f).sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+        if (draft.isNotEmpty()) {
+            val badgePx = with(density) { 26.dp.toPx() }
+            for ((edgeIdx, edge) in draft.withIndex()) {
+                val a = pins.firstOrNull { it.code.removeSuffix("_00") == edge.first } ?: continue
+                val b = pins.firstOrNull { it.code.removeSuffix("_00") == edge.second } ?: continue
+                val mid = transform.project((a.u + b.u) / 2f, (a.v + b.v) / 2f)
+                val cfg = draftEdgeConfigs[edgeIdx]
+                val musicOn = cfg?.musicEnabled ?: true
+                Surface(
+                    onClick = { onDraftEdgeTap(edgeIdx) },
+                    shape = CircleShape,
+                    color = if (musicOn) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = if (musicOn) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                    shadowElevation = 3.dp,
+                    modifier = Modifier
+                        .offset { IntOffset((mid.x - badgePx / 2f).roundToInt(), (mid.y - badgePx / 2f).roundToInt()) }
+                        .size(26.dp)
+                        .zIndex(2f),
+                ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(
+                            if (musicOn) Icons.Filled.MusicNote else Icons.Filled.MusicOff,
+                            contentDescription = stringResource(R.string.route_pick_edge_track),
+                            modifier = Modifier.size(15.dp),
+                        )
                     }
                 }
             }

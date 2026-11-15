@@ -39,9 +39,10 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
         val favoritesError: Error? = null, val dailyError: Error? = null,
         val playlists: List<com.mylittleblover.mkwplayer.library.UserPlaylist> = emptyList(), val playlistError: Error? = null,
         val presets: List<com.mylittleblover.mkwplayer.library.CoursePreset> = emptyList(), val presetError: Error? = null,
+        val customRoutes: List<com.mylittleblover.mkwplayer.routes.CustomRoute> = emptyList(), val customRouteError: Error? = null,
         val recentIds: List<String> = emptyList(), val recentError: Error? = null,
     ) {
-        val error: Error? get() = favoritesError ?: dailyError ?: playlistError ?: presetError ?: recentError
+        val error: Error? get() = favoritesError ?: dailyError ?: playlistError ?: presetError ?: customRouteError ?: recentError
     }
     private val favorites = FavoriteStore(File(application.filesDir, "user-favorites.json"))
     private val recent = com.mylittleblover.mkwplayer.library.RecentCourseStore(File(application.filesDir, "recent-courses.json"))
@@ -50,6 +51,15 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
     private val playlistOperations = Mutex()
     private val presetStore = com.mylittleblover.mkwplayer.library.CoursePresetStore(File(application.filesDir, "course-presets.json"))
     private val presetOperations = Mutex()
+    private val customRouteStore = com.mylittleblover.mkwplayer.routes.CustomRouteStore(File(application.filesDir, "routes/custom_routes.json"))
+    private val customRouteOperations = Mutex()
+    private val connections: com.mylittleblover.mkwplayer.library.StageConnections.Catalog? by lazy {
+        runCatching {
+            getApplication<Application>().assets.open("stage_connections.json").bufferedReader().use {
+                com.mylittleblover.mkwplayer.library.StageConnections.parse(it.readText())
+            }
+        }.getOrNull()
+    }
     private val daily = DailySelectionStore(File(application.filesDir, "daily-selection.json"))
     private val candidates = MutableStateFlow<List<RecommendationCandidate>?>(null)
     private val favoriteOperations = Mutex()
@@ -69,6 +79,7 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
         updatePlaylists { playlists.read() }
         updateRecent { recent.read() }
         reloadPresets()
+        updateCustomRoutes { customRouteStore.read() }
         viewModelScope.launch {
             while (isActive) {
                 refreshDate()
@@ -191,12 +202,15 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
 
     fun deletePreset(id: String) {
         viewModelScope.launch {
-            val (presetResult, playlistResult) = presetOperations.withLock {
+            val (presetResult, playlistResult, routeResult) = presetOperations.withLock {
                 playlistOperations.withLock {
-                    withContext(Dispatchers.IO) {
-                        val cleanedPlaylists = playlists.clearPresetReferences(id)
-                        val updatedPresets = presetStore.delete(id)
-                        updatedPresets to cleanedPlaylists
+                    customRouteOperations.withLock {
+                        withContext(Dispatchers.IO) {
+                            val cleanedPlaylists = playlists.clearPresetReferences(id)
+                            val cleanedRoutes = customRouteStore.clearPresetReferences(id)
+                            val updatedPresets = presetStore.delete(id)
+                            Triple(updatedPresets, cleanedPlaylists, cleanedRoutes)
+                        }
                     }
                 }
             }
@@ -205,9 +219,82 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
                 presetError = if (presetResult.isFailure) Error.PLAYLISTS else null,
                 playlists = playlistResult.getOrElse { _state.value.playlists },
                 playlistError = if (playlistResult.isFailure) Error.PLAYLISTS else _state.value.playlistError,
+                customRoutes = routeResult.getOrElse { _state.value.customRoutes },
+                customRouteError = if (routeResult.isFailure) Error.PLAYLISTS else _state.value.customRouteError,
             )
         }
     }
+
+    private fun updateCustomRoutes(
+        operation: () -> Result<List<com.mylittleblover.mkwplayer.routes.CustomRoute>>,
+    ) {
+        viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            withContext(NonCancellable) {
+                customRouteOperations.withLock {
+                    val result = withContext(Dispatchers.IO) { operation() }
+                    result.onSuccess { list ->
+                        _state.update { it.copy(customRoutes = list, customRouteError = null) }
+                    }.onFailure {
+                        _state.update { it.copy(customRouteError = Error.PLAYLISTS) }
+                    }
+                }
+            }
+        }
+    }
+
+    fun reloadCustomRoutes() = updateCustomRoutes { customRouteStore.read() }
+
+    fun saveCustomRoute(
+        routeId: String?,
+        name: String,
+        stops: List<com.mylittleblover.mkwplayer.routes.CustomRouteStop>,
+        edges: List<com.mylittleblover.mkwplayer.routes.CustomRouteEdgeConfig>,
+        loopWholeRoute: Boolean,
+        onComplete: (Result<com.mylittleblover.mkwplayer.routes.CustomRoute>) -> Unit = {},
+    ) {
+        viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            withContext(NonCancellable) {
+                val res = customRouteOperations.withLock {
+                    withContext(Dispatchers.IO) {
+                        val conn = connections ?: return@withContext Result.failure<com.mylittleblover.mkwplayer.routes.CustomRoute>(
+                            IllegalStateException("Stage connections catalog unavailable"),
+                        )
+                        if (routeId == null) {
+                            customRouteStore.create(name, stops, edges, conn, loopWholeRoute)
+                        } else {
+                            customRouteStore.saveDraftOver(routeId, name, stops, edges, conn, loopWholeRoute)
+                        }
+                    }
+                }
+                res.fold(
+                    onSuccess = { saved ->
+                        val refreshed = withContext(Dispatchers.IO) { customRouteStore.read() }
+                        refreshed.onSuccess { list ->
+                            _state.update { it.copy(customRoutes = list, customRouteError = null) }
+                        }
+                        onComplete(Result.success(saved))
+                    },
+                    onFailure = { err ->
+                        _state.update { it.copy(customRouteError = Error.PLAYLISTS) }
+                        onComplete(Result.failure(err))
+                    },
+                )
+            }
+        }
+    }
+
+    fun renameCustomRoute(id: String, name: String) = updateCustomRoutes { customRouteStore.rename(id, name) }
+    fun deleteCustomRoute(id: String) = updateCustomRoutes { customRouteStore.delete(id) }
+    fun appendCustomRouteStop(id: String, stageCode: String) = updateCustomRoutes {
+        val conn = connections ?: return@updateCustomRoutes Result.failure(IllegalStateException("Stage connections catalog unavailable"))
+        customRouteStore.appendStop(id, stageCode, conn)
+    }
+    fun removeCustomRouteLastStop(id: String) = updateCustomRoutes { customRouteStore.removeLastStop(id) }
+    fun setCustomRouteStopPreset(id: String, stopIndex: Int, presetId: String?) =
+        updateCustomRoutes { customRouteStore.setStopPreset(id, stopIndex, presetId) }
+    fun setCustomRouteEdgeMusic(id: String, edgeIndex: Int, playMusic: Boolean, selectedJukeboxKey: String?) =
+        updateCustomRoutes { customRouteStore.setEdgeMusic(id, edgeIndex, playMusic, selectedJukeboxKey) }
+    fun setCustomRouteLoop(id: String, loop: Boolean) = updateCustomRoutes { customRouteStore.setLoopWholeRoute(id, loop) }
 
     fun duplicatePreset(id: String, newName: String) {
         viewModelScope.launch {

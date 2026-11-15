@@ -136,5 +136,13 @@ class NavStateTest {
         assertEquals(editor.detail, restoredEditor.detail)
         assertEquals(NavState.Detail.FlowEditor("FirstCircuit", "user:abc"), restoredEditor.detail)
         assertEquals(NavState.Detail.Course("FirstCircuit"), restoredEditor.back()?.detail)
+
+        val customRoute = NavState(tab = Tab.PLAYLISTS)
+            .open(NavState.Detail.AllPlaylists(section = 1))
+            .open(NavState.Detail.CustomRoute("route_99"))
+        val restoredRoute = NavState.restore(customRoute.snapshot())
+        assertEquals(Tab.PLAYLISTS, restoredRoute.tab)
+        assertEquals(NavState.Detail.CustomRoute("route_99"), restoredRoute.detail)
+        assertEquals(NavState.Detail.AllPlaylists(section = 1), restoredRoute.back()?.detail)
     }
 }

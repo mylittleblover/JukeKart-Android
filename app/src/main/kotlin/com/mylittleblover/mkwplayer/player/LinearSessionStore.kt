@@ -49,6 +49,7 @@ internal class LinearSessionStore(private val file: File) {
         val durationMs: Long = 0L,
         val artworkName: String? = null,
         val assetSha256: String? = null,
+        val sourceTrackKey: String? = null,
         val loop: Boolean = false,
         val loopStart: Long? = null,
         val loopEnd: Long? = null,
@@ -144,6 +145,7 @@ internal class LinearSessionStore(private val file: File) {
         .put("durationMs", e.durationMs)
         .put("artworkName", e.artworkName ?: JSONObject.NULL)
         .put("assetSha256", e.assetSha256 ?: JSONObject.NULL)
+        .put("sourceTrackKey", e.sourceTrackKey ?: JSONObject.NULL)
         .put("loop", e.loop)
         .put("loopStart", e.loopStart ?: JSONObject.NULL)
         .put("loopEnd", e.loopEnd ?: JSONObject.NULL)
@@ -173,6 +175,7 @@ internal class LinearSessionStore(private val file: File) {
             durationMs = obj.optLong("durationMs", 0L),
             artworkName = optStr(obj, "artworkName"),
             assetSha256 = optStr(obj, "assetSha256"),
+            sourceTrackKey = optStr(obj, "sourceTrackKey"),
             loop = obj.optBoolean("loop", false),
             loopStart = if (obj.has("loopStart") && !obj.isNull("loopStart")) obj.getLong("loopStart") else null,
             loopEnd = if (obj.has("loopEnd") && !obj.isNull("loopEnd")) obj.getLong("loopEnd") else null,

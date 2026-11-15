@@ -37,6 +37,15 @@ internal class WorldMapState(
     var draft by mutableStateOf<List<Pair<String, String>>>(emptyList())
         private set
 
+    var editingRouteId by mutableStateOf<String?>(null)
+        private set
+    var editingRouteName by mutableStateOf("")
+    var draftLoopWholeRoute by mutableStateOf(false)
+    var draftStopPresets by mutableStateOf<Map<Int, String?>>(emptyMap())
+        private set
+    var draftEdgeConfigs by mutableStateOf<Map<Int, com.mylittleblover.mkwplayer.routes.CustomRouteEdgeConfig>>(emptyMap())
+        private set
+
     /**
      * Why the last picked connection was refused, or null.
      *
@@ -46,8 +55,54 @@ internal class WorldMapState(
     var editRefusal by mutableStateOf<String?>(null)
         private set
 
-    fun enterEdit() { editing = true; editFrom = null; draft = emptyList(); editRefusal = null; selectedRouteId = null }
-    fun exitEdit() { editing = false; editFrom = null; draft = emptyList(); editRefusal = null }
+    fun enterEdit() {
+        editing = true
+        editingRouteId = null
+        editingRouteName = ""
+        draftLoopWholeRoute = false
+        draftStopPresets = emptyMap()
+        draftEdgeConfigs = emptyMap()
+        editFrom = null
+        draft = emptyList()
+        editRefusal = null
+        selectedRouteId = null
+    }
+
+    fun exitEdit() {
+        editing = false
+        editingRouteId = null
+        editingRouteName = ""
+        draftLoopWholeRoute = false
+        draftStopPresets = emptyMap()
+        draftEdgeConfigs = emptyMap()
+        editFrom = null
+        draft = emptyList()
+        editRefusal = null
+    }
+
+    /** Loads a saved [CustomRoute] into the map editor while respecting tail-only topology edits (#79). */
+    fun loadCustomRoute(route: com.mylittleblover.mkwplayer.routes.CustomRoute, points: List<Offset> = emptyList()) {
+        val pairs = route.stops.zipWithNext { a, b ->
+            a.stageCode.removeSuffix("_00") to b.stageCode.removeSuffix("_00")
+        }
+        editing = true
+        editingRouteId = route.id
+        editingRouteName = route.name
+        draftLoopWholeRoute = route.loopWholeRoute
+        draft = pairs
+        editFrom = route.stops.lastOrNull()?.stageCode?.removeSuffix("_00")
+        draftStopPresets = route.stops.mapIndexed { idx, s -> idx to s.presetId }.toMap()
+        draftEdgeConfigs = pairs.indices.mapNotNull { idx ->
+            route.edgeFor(idx)?.let { idx to it }
+        }.toMap()
+        editRefusal = null
+        selectedRouteId = null
+        selectedCourseCode = null
+        if (points.isNotEmpty()) {
+            if (width > 0f && height > 0f) camera = transform().fitTo(points, padding * 2f)
+            else pendingFit = points
+        }
+    }
 
     /** Records that [from] is the start of the next connection; null clears the pending start. */
     fun editStart(from: String?) { editFrom = from?.removeSuffix("_00"); editRefusal = null }
@@ -63,7 +118,16 @@ internal class WorldMapState(
         val b = to.removeSuffix("_00")
         if (a == b) return
         if (draft.lastOrNull() == (a to b)) return
+        val newIdx = draft.size
         draft = draft + (a to b)
+        draftEdgeConfigs = draftEdgeConfigs + (
+            newIdx to com.mylittleblover.mkwplayer.routes.CustomRouteEdgeConfig(
+                from = a,
+                to = b,
+                musicEnabled = true,
+                selectedJukeboxKey = null,
+            )
+            )
         editFrom = b
         editRefusal = null
     }
@@ -71,12 +135,54 @@ internal class WorldMapState(
     fun editRefuse(reason: String) { editRefusal = reason }
 
     fun editUndo() {
+        if (draft.isEmpty()) return
+        val removedEdgeIndex = draft.lastIndex
+        val removedStopIndex = draft.size
         draft = draft.dropLast(1)
+        draftEdgeConfigs = draftEdgeConfigs - removedEdgeIndex
+        draftStopPresets = draftStopPresets - removedStopIndex
         editFrom = draft.lastOrNull()?.second
         editRefusal = null
     }
 
-    fun editClear() { draft = emptyList(); editFrom = null; editRefusal = null }
+    fun editClear() {
+        editingRouteId = null
+        draft = emptyList()
+        draftEdgeConfigs = emptyMap()
+        draftStopPresets = emptyMap()
+        editFrom = null
+        editRefusal = null
+    }
+
+    fun setEdgeMusic(edgeIndex: Int, musicEnabled: Boolean, selectedJukeboxKey: String?) {
+        val pair = draft.getOrNull(edgeIndex) ?: return
+        draftEdgeConfigs = draftEdgeConfigs + (
+            edgeIndex to com.mylittleblover.mkwplayer.routes.CustomRouteEdgeConfig(
+                from = pair.first,
+                to = pair.second,
+                musicEnabled = musicEnabled,
+                selectedJukeboxKey = selectedJukeboxKey,
+            )
+            )
+    }
+
+    fun edgeConfigAt(edgeIndex: Int): com.mylittleblover.mkwplayer.routes.CustomRouteEdgeConfig {
+        val existing = draftEdgeConfigs[edgeIndex]
+        if (existing != null) return existing
+        val pair = draft.getOrNull(edgeIndex)
+        return com.mylittleblover.mkwplayer.routes.CustomRouteEdgeConfig(
+            from = pair?.first.orEmpty(),
+            to = pair?.second.orEmpty(),
+        )
+    }
+
+    fun toCustomRouteStops(): List<com.mylittleblover.mkwplayer.routes.CustomRouteStop> =
+        draftStops().mapIndexed { idx, code ->
+            com.mylittleblover.mkwplayer.routes.CustomRouteStop(stageCode = code, presetId = draftStopPresets[idx])
+        }
+
+    fun toCustomRouteEdges(): List<com.mylittleblover.mkwplayer.routes.CustomRouteEdgeConfig> =
+        draft.indices.map { idx -> edgeConfigAt(idx) }
 
     /** Every stage the draft visits, in order, including the first. */
     fun draftStops(): List<String> =

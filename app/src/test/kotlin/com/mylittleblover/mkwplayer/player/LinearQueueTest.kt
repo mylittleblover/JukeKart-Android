@@ -130,4 +130,36 @@ class LinearQueueTest {
         queue.setShuffle(false)
         assertEquals(listOf("k:C", "k:D"), queue.snapshot().upNext.map { it.key })
     }
+
+    @Test
+    fun roadCandidateVariantsRedrawnEachLoopWhileFixedOverridesPersist() {
+        val queue = LinearQueue(Random(17))
+        val stop0 = entry("Stop0")
+        val stop1 = entry("Stop1")
+        val candA = entry("RoadCandA").copy(sourceTrackKey = "t1")
+        val candB = entry("RoadCandB").copy(sourceTrackKey = "t2")
+        val candC = entry("RoadCandC").copy(sourceTrackKey = "t3")
+        val autoEdge = candA.copy(roadCandidateVariants = listOf(candA, candB, candC))
+        val pinnedEdge = entry("RoadPinned").copy(sourceTrackKey = "t9")
+
+        // Route order: Stop0 -> autoEdge -> Stop1 -> pinnedEdge; no fabricated return leg (#69, #80, #81).
+        queue.setRepeatMode(LinearQueue.RepeatMode.LIST)
+        val first = queue.startSession(listOf(stop0, autoEdge, stop1, pinnedEdge), 0)!!
+        assertEquals("k:Stop0", first.key)
+
+        val drawnKeys = mutableSetOf<String>()
+        repeat(6) {
+            val drawnAuto = (queue.onNaturalEnd() as LinearQueue.StepResult.Play).entry
+            assertTrue(drawnAuto.key in setOf("k:RoadCandA", "k:RoadCandB", "k:RoadCandC"))
+            drawnKeys += drawnAuto.key
+
+            assertEquals("k:Stop1", (queue.onNaturalEnd() as LinearQueue.StepResult.Play).entry.key)
+            val pinned = (queue.onNaturalEnd() as LinearQueue.StepResult.Play).entry
+            assertEquals("k:RoadPinned", pinned.key)
+
+            val wrappedStart = (queue.onNaturalEnd() as LinearQueue.StepResult.Play).entry
+            assertEquals("k:Stop0", wrappedStart.key)
+        }
+        assertTrue(drawnKeys.size >= 2, "Auto candidate pool should re-draw across loop rounds (#81), saw=$drawnKeys")
+    }
 }

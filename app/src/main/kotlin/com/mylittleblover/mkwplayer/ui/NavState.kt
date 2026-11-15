@@ -69,6 +69,7 @@ internal class NavState(
         data class Playlist(val id: String) : Detail
         data class AllPlaylists(val section: Int = 0) : Detail
         data class FlowEditor(val courseCode: String, val presetId: String? = null) : Detail
+        data class CustomRoute(val id: String) : Detail
 
         data object Settings : Detail
     }
@@ -100,6 +101,7 @@ internal class NavState(
             is Detail.Playlist -> listOf("playlist", page.id)
             is Detail.AllPlaylists -> listOf("all-playlists", page.section.toString())
             is Detail.FlowEditor -> listOf("flow-editor", "${page.courseCode}|${page.presetId.orEmpty()}")
+            is Detail.CustomRoute -> listOf("custom-route", page.id)
             Detail.Settings -> listOf("settings", "")
         }
     }
@@ -142,6 +144,7 @@ internal class NavState(
                         Detail.FlowEditor(code, preset)
                     }
                 }
+                "custom-route" -> value?.takeIf { it.isNotBlank() }?.let(Detail::CustomRoute)
                 "settings" -> Detail.Settings
                 else -> null
             }

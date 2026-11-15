@@ -434,12 +434,38 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         com.mylittleblover.mkwplayer.interactive.CourseMedleyCatalog.load(getApplication())
     }
 
-    private val localizedNames: com.mylittleblover.mkwplayer.routes.LocalizedNames? by lazy {
+    val localizedNames: com.mylittleblover.mkwplayer.routes.LocalizedNames? by lazy {
         runCatching {
             getApplication<Application>().assets.open("localized_names.json").bufferedReader().use {
                 com.mylittleblover.mkwplayer.routes.LocalizedNames.parse(it.readText())
             }
         }.getOrNull()
+    }
+
+    val stageConnections: com.mylittleblover.mkwplayer.library.StageConnections.Catalog? by lazy {
+        runCatching {
+            getApplication<Application>().assets.open("stage_connections.json").bufferedReader().use {
+                com.mylittleblover.mkwplayer.library.StageConnections.parse(it.readText())
+            }
+        }.getOrNull()
+    }
+
+    val officialRouteCatalog: com.mylittleblover.mkwplayer.routes.OfficialRouteCatalog? by lazy {
+        val knownStages = mapAnchors?.stages?.map { it.code }?.toSet().orEmpty()
+        runCatching {
+            getApplication<Application>().assets.open("official_routes.json").bufferedReader().use {
+                com.mylittleblover.mkwplayer.routes.OfficialRouteCatalog.parse(it.readText(), knownStages)
+            }
+        }.getOrNull()
+    }
+
+    @Volatile
+    var roadJukeboxPool: com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.CandidatePool =
+        com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.loadInternalPool(getApplication<Application>().filesDir)
+        private set
+
+    fun reloadRoadJukeboxPool() {
+        roadJukeboxPool = com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.loadInternalPool(getApplication<Application>().filesDir)
     }
 
     val packDirectory: java.io.File?
@@ -530,12 +556,13 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         )
     }
 
-    /** Inserts [item] at the front (LIFO) of the temporary "Play next" queue (#63, #64). */
+    /** Inserts [item] at the front (LIFO) of the temporary "Play next" queue (#63, #64, blocked by #68 on fixed routes). */
     fun playJukeboxNext(
         item: com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.TrackItem,
         game: com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.Game,
         languageTag: String,
     ) {
+        if (!_ui.value.allowPlayNext) return
         val entry = LinearPlaybackCoordinator.entryFor(item, game, languageTag)
         val wasIdle = !_ui.value.canStop && _ui.value.queue.current == null
         if (wasIdle) {
@@ -2248,6 +2275,254 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         return true
     }
 
+    sealed interface RoutePlayResult {
+        data object Started : RoutePlayResult
+        data class Blocked(val reason: String) : RoutePlayResult
+    }
+
+    fun allInstalledJukeboxItems(): List<Pair<com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.TrackItem, com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.Game>> =
+        jukebox.games.flatMap { game -> game.items.map { item -> item to game } }
+
+    fun inspectOfficialRoute(
+        route: com.mylittleblover.mkwplayer.routes.OfficialRoute,
+        sessionOverrides: Map<Int, String> = emptyMap(),
+    ): com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RouteValidationReport {
+        val dir = pack?.directory
+        val items = jukebox.games.flatMap { it.items }
+        return com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.inspectOfficialRoute(
+            route = route,
+            connections = stageConnections,
+            pool = roadJukeboxPool,
+            installedJukebox = items,
+            sessionOverrides = sessionOverrides,
+            isStagePlayable = ::canStartStage,
+            isStageHidden = ::isSpecialStageLocked,
+            isJukeboxReadable = { item -> dir != null && java.io.File(dir, "audio/${item.track.primary.sha256}").isFile },
+        )
+    }
+
+    fun inspectCustomRoute(
+        route: com.mylittleblover.mkwplayer.routes.CustomRoute,
+    ): com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RouteValidationReport {
+        val dir = pack?.directory
+        val items = jukebox.games.flatMap { it.items }
+        return com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.inspectCustomRoute(
+            route = route,
+            connections = stageConnections,
+            pool = roadJukeboxPool,
+            installedJukebox = items,
+            isStagePlayable = ::canStartStage,
+            isStageHidden = ::isSpecialStageLocked,
+            isJukeboxReadable = { item -> dir != null && java.io.File(dir, "audio/${item.track.primary.sha256}").isFile },
+        )
+    }
+
+    fun playOfficialRoute(
+        route: com.mylittleblover.mkwplayer.routes.OfficialRoute,
+        userPresets: List<com.mylittleblover.mkwplayer.library.CoursePreset>,
+        loopRoute: Boolean,
+        sessionOverrides: Map<Int, String> = emptyMap(),
+        languageTag: String,
+        suiteLabel: String,
+        rallyLabel: String,
+        roadPrefix: String,
+    ): RoutePlayResult {
+        if (nativePerformance?.isFading == true) {
+            return RoutePlayResult.Blocked("Playback is currently fading out.")
+        }
+        val report = inspectOfficialRoute(route, sessionOverrides)
+        if (!report.canPlay) {
+            val reason = report.blockingReason ?: "Route cannot be played."
+            _ui.value = _ui.value.copy(detail = reason)
+            return RoutePlayResult.Blocked(reason)
+        }
+        val stops = route.stops.map {
+            com.mylittleblover.mkwplayer.routes.CustomRouteStop(it.stageCode, null)
+        }
+        val entries = buildRouteQueueEntries(
+            routeId = "official:${route.id}",
+            stops = stops,
+            report = report,
+            userPresets = userPresets,
+            languageTag = languageTag,
+            suiteLabel = suiteLabel,
+            rallyLabel = rallyLabel,
+            roadPrefix = roadPrefix,
+            customSubstituteTag = "",
+        ) ?: return RoutePlayResult.Blocked("Missing required course medley audio.").also {
+            _ui.value = _ui.value.copy(detail = it.reason)
+        }
+        playExtraLinearQueue(
+            entries = entries,
+            startIndex = 0,
+            repeatMode = if (loopRoute) LinearQueue.RepeatMode.LIST else LinearQueue.RepeatMode.OFF,
+            shuffle = false,
+            context = LinearPlaybackCoordinator.SessionContext(
+                contextKind = LinearSessionStore.ContextKind.OFFICIAL_ROUTE,
+                contextId = route.id,
+                contextTitle = route.displayName(languageTag),
+                nativeTransitionDefault = false,
+                packFingerprints = currentPackFingerprints(),
+                allowPlayNext = false,
+                allowShuffle = false,
+                allowSingleRepeat = false,
+                allowRepeatToggle = true,
+            ),
+        )
+        requestNotificationPermissionIfNeeded()
+        return RoutePlayResult.Started
+    }
+
+    fun playCustomRoute(
+        route: com.mylittleblover.mkwplayer.routes.CustomRoute,
+        userPresets: List<com.mylittleblover.mkwplayer.library.CoursePreset>,
+        languageTag: String,
+        suiteLabel: String,
+        rallyLabel: String,
+        roadPrefix: String,
+        customSubstituteTag: String,
+    ): RoutePlayResult {
+        if (nativePerformance?.isFading == true) {
+            return RoutePlayResult.Blocked("Playback is currently fading out.")
+        }
+        val report = inspectCustomRoute(route)
+        if (!report.canPlay) {
+            val reason = report.blockingReason ?: "Custom route cannot be played."
+            _ui.value = _ui.value.copy(detail = reason)
+            return RoutePlayResult.Blocked(reason)
+        }
+        val entries = buildRouteQueueEntries(
+            routeId = "custom:${route.id}",
+            stops = route.stops,
+            report = report,
+            userPresets = userPresets,
+            languageTag = languageTag,
+            suiteLabel = suiteLabel,
+            rallyLabel = rallyLabel,
+            roadPrefix = roadPrefix,
+            customSubstituteTag = customSubstituteTag,
+        ) ?: return RoutePlayResult.Blocked("Missing required course medley audio.").also {
+            _ui.value = _ui.value.copy(detail = it.reason)
+        }
+        playExtraLinearQueue(
+            entries = entries,
+            startIndex = 0,
+            repeatMode = if (route.loopWholeRoute) LinearQueue.RepeatMode.LIST else LinearQueue.RepeatMode.OFF,
+            shuffle = false,
+            context = LinearPlaybackCoordinator.SessionContext(
+                contextKind = LinearSessionStore.ContextKind.CUSTOM_ROUTE,
+                contextId = route.id,
+                contextTitle = route.name,
+                nativeTransitionDefault = false,
+                packFingerprints = currentPackFingerprints(),
+                allowPlayNext = false,
+                allowShuffle = false,
+                allowSingleRepeat = false,
+                allowRepeatToggle = true,
+            ),
+        )
+        requestNotificationPermissionIfNeeded()
+        return RoutePlayResult.Started
+    }
+
+    private fun buildRouteQueueEntries(
+        routeId: String,
+        stops: List<com.mylittleblover.mkwplayer.routes.CustomRouteStop>,
+        report: com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RouteValidationReport,
+        userPresets: List<com.mylittleblover.mkwplayer.library.CoursePreset>,
+        languageTag: String,
+        suiteLabel: String,
+        rallyLabel: String,
+        roadPrefix: String,
+        customSubstituteTag: String,
+    ): List<LinearQueue.Entry>? {
+        val dir = pack?.directory ?: return null
+        val resolver = CourseFlowRecipeBuilder.packSourceResolver(pack?.manifest, interactiveIdentities, dir)
+        val gamesById = jukebox.games.associateBy { it.id }
+        val entries = mutableListOf<LinearQueue.Entry>()
+
+        for (i in stops.indices) {
+            val stop = stops[i]
+            val logical = stop.stageCode.removeSuffix("_00")
+            val presetRef = stop.presetId ?: com.mylittleblover.mkwplayer.library.PresetRefs.SYSTEM_DEFAULT
+            val resolved = CourseFlowRecipeBuilder.resolvePresetRef(
+                courseCode = logical,
+                presetRef = presetRef,
+                userPresets = userPresets,
+                minf = minfCatalog,
+                medleyCatalog = courseMedleyCatalog,
+                resolver = resolver,
+            ) ?: return null
+            val displayCourse = localizedNames?.name(logical, languageTag) ?: logical
+            val presetDisplayName = when (presetRef) {
+                com.mylittleblover.mkwplayer.library.PresetRefs.SYSTEM_KNOCKOUT -> rallyLabel
+                com.mylittleblover.mkwplayer.library.PresetRefs.SYSTEM_DEFAULT -> suiteLabel
+                else -> userPresets.firstOrNull { it.id == presetRef }?.name ?: suiteLabel
+            }
+            entries += LinearQueue.Entry(
+                key = "$routeId:stop:$i:$logical",
+                title = displayCourse,
+                subtitle = presetDisplayName,
+                sourceType = if (com.mylittleblover.mkwplayer.library.PresetRefs.isUser(presetRef)) {
+                    LinearSessionStore.SourceType.PRESET
+                } else {
+                    LinearSessionStore.SourceType.MEDLEY
+                },
+                courseCode = logical,
+                presetId = stop.presetId,
+                medleyId = resolved.medley.id,
+                nativeTransitionEnabled = false,
+                arrangement = presetDisplayName,
+                durationMs = resolved.medley.durationMs,
+                artworkName = extraCatalog.courseArtwork[logical],
+                courseMedley = resolved,
+            )
+
+            val leg = report.legs.getOrNull(i) ?: continue
+            val fromName = localizedNames?.name(leg.from, languageTag) ?: leg.from
+            val toName = localizedNames?.name(leg.to, languageTag) ?: leg.to
+            val legLabel = "$roadPrefix $fromName → $toName"
+
+            fun roadEntry(item: com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.TrackItem, subLabel: String): LinearQueue.Entry {
+                val game = gamesById[item.gameId]
+                val gameName = game?.localizedName(languageTag) ?: item.gameId
+                return LinearQueue.Entry(
+                    key = "$routeId:edge:$i:${item.key}",
+                    title = item.localizedDisplayName(languageTag),
+                    subtitle = subLabel,
+                    sourceType = LinearSessionStore.SourceType.JUKEBOX,
+                    gameId = item.gameId,
+                    gameTitle = gameName,
+                    yearLabel = game?.yearLabel?.takeIf { it.isNotBlank() },
+                    arrangement = item.localizedArrangement(languageTag),
+                    ostIndex = item.ostIndex,
+                    durationMs = item.durationMs,
+                    artworkName = item.ostIndex?.let { "t_%03d.webp".format(java.util.Locale.ROOT, it) },
+                    assetSha256 = item.track.primary.sha256,
+                    sourceTrackKey = item.track.key,
+                )
+            }
+
+            when (val res = leg.resolution) {
+                is com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.EdgeMusicResolution.KnownPoolComplete -> {
+                    val override = res.selectedOverride
+                    if (override != null) {
+                        entries += roadEntry(override, legLabel)
+                    } else if (res.candidates.isNotEmpty()) {
+                        val variants = res.candidates.map { roadEntry(it, legLabel) }
+                        entries += variants.first().copy(roadCandidateVariants = variants)
+                    }
+                }
+                is com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.EdgeMusicResolution.CustomSubstitute -> {
+                    val subLabel = if (customSubstituteTag.isNotBlank()) "$legLabel · $customSubstituteTag" else legLabel
+                    entries += roadEntry(res.track, subLabel)
+                }
+                else -> Unit // Candidate missing or muted -> cleanly skipped (#73)
+            }
+        }
+        return entries.takeIf { it.isNotEmpty() }
+    }
+
     /** Inspects any saved linear session on cold start and exposes "Continue listening" if still valid (#62, #89). */
     fun refreshContinueListening() {
         val currentState = _ui.value
@@ -2372,8 +2647,18 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     private fun verifySavedSessionAvailable(
         saved: LinearSessionStore.Snapshot,
         packDir: java.io.File?,
-        userPresets: List<CoursePreset>,
+        userPresets: List<com.mylittleblover.mkwplayer.library.CoursePreset>,
     ): Boolean {
+        if (saved.contextKind == LinearSessionStore.ContextKind.OFFICIAL_ROUTE) {
+            val route = saved.contextId?.let { officialRouteCatalog?.route(it) } ?: return false
+            if (!inspectOfficialRoute(route).canPlay) return false
+        } else if (saved.contextKind == LinearSessionStore.ContextKind.CUSTOM_ROUTE) {
+            val customFile = java.io.File(getApplication<Application>().filesDir, "custom-routes.json")
+            val route = saved.contextId?.let { id ->
+                com.mylittleblover.mkwplayer.routes.CustomRouteStore(customFile).find(id).getOrNull()
+            } ?: return false
+            if (!inspectCustomRoute(route).canPlay) return false
+        }
         val juke = jukebox
         val resolver = packDir?.let {
             CourseFlowRecipeBuilder.packSourceResolver(pack?.manifest, interactiveIdentities, it)
@@ -2399,7 +2684,11 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val nativeEnabled = se.nativeTransitionOverride ?: defaultNative
         return when (se.sourceType) {
             LinearSessionStore.SourceType.JUKEBOX -> {
-                if (!juke.tracksByKey.containsKey(se.key) || juke.packByKey[se.key] == null) return null
+                val lookupKey = se.sourceTrackKey ?: se.key
+                val item = juke.tracksByKey[lookupKey] ?: return null
+                val sha = se.assetSha256 ?: item.primary.sha256
+                val dir = juke.packByKey[lookupKey] ?: packDir ?: return null
+                if (!java.io.File(dir, "audio/$sha").isFile) return null
                 LinearQueue.Entry(
                     key = se.key,
                     title = se.title,
@@ -2412,7 +2701,8 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                     ostIndex = se.ostIndex,
                     durationMs = se.durationMs,
                     artworkName = se.artworkName,
-                    assetSha256 = se.assetSha256,
+                    assetSha256 = sha,
+                    sourceTrackKey = lookupKey,
                     loop = se.loop,
                     loopStart = se.loopStart,
                     loopEnd = se.loopEnd,

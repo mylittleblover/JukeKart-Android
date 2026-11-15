@@ -424,8 +424,9 @@ internal class LinearPlaybackCoordinator(
             PlaybackService.awaitForegroundPromotion()
             if (generation != requestGeneration) return@launch
 
-            val track = catalog.tracksByKey[entry.key]
-            val packDir = catalog.packByKey[entry.key] ?: extraPackDir
+            val lookupKey = entry.sourceTrackKey ?: entry.key
+            val track = catalog.tracksByKey[lookupKey]
+            val packDir = catalog.packByKey[lookupKey] ?: extraPackDir
             if (packDir == null || (
                     track == null &&
                     entry.assetSha256 == null &&
@@ -813,6 +814,7 @@ internal class LinearPlaybackCoordinator(
                 durationMs = item.durationMs,
                 artworkName = item.ostIndex?.let { "t_%03d.webp".format(java.util.Locale.ROOT, it) },
                 assetSha256 = item.track.primary.sha256,
+                sourceTrackKey = item.track.key,
             )
         }
     }

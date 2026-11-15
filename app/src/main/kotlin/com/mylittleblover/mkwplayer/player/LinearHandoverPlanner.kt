@@ -54,6 +54,7 @@ internal object LinearHandoverPlanner {
         durationMs = entry.durationMs,
         artworkName = entry.artworkName,
         assetSha256 = entry.assetSha256,
+        sourceTrackKey = entry.sourceTrackKey,
         loop = entry.loop,
         loopStart = entry.loopStart,
         loopEnd = entry.loopEnd,

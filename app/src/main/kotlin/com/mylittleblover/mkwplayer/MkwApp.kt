@@ -293,6 +293,8 @@ internal fun MkwApp(
                 is NavState.Detail.Interactive -> androidx.compose.ui.res.stringResource(R.string.discovery_interactive)
                 is NavState.Detail.Playlist -> androidx.compose.ui.res.stringResource(R.string.discovery_playlists)
                 is NavState.Detail.AllPlaylists -> androidx.compose.ui.res.stringResource(R.string.discovery_all_lists_title)
+                is NavState.Detail.CustomRoute -> discoveryState.customRoutes.firstOrNull { it.id == detail.id }?.name
+                    ?: androidx.compose.ui.res.stringResource(R.string.discovery_playlists_group_routes)
                 is NavState.Detail.FlowEditor -> androidx.compose.ui.res.stringResource(R.string.flow_editor_title)
                 is NavState.Detail.JukeboxGame -> ui.jukebox.gameById(detail.id)?.localizedName(languageTag)
                     ?: androidx.compose.ui.res.stringResource(R.string.discovery_free)
@@ -513,7 +515,70 @@ internal fun MkwApp(
                     onPlaylist = { nav = nav.open(NavState.Detail.Playlist(it)) },
                     onCup = { nav = nav.open(NavState.Detail.Cup(it)) },
                     onJukeboxGame = { nav = nav.open(NavState.Detail.JukeboxGame(it)) },
+                    onCreateRouteOnMap = {
+                        mapState.enterEdit()
+                        nav = nav.select(Tab.WORLD_MAP)
+                    },
+                    onCustomRoute = { nav = nav.open(NavState.Detail.CustomRoute(it)) },
+                    inspectCustomRoute = model::inspectCustomRoute,
                 )
+                detail is NavState.Detail.CustomRoute -> {
+                    val activeRoute = discoveryState.customRoutes.firstOrNull { it.id == detail.id }
+                    val suiteLabel = androidx.compose.ui.res.stringResource(R.string.discovery_suite)
+                    val rallyLabel = androidx.compose.ui.res.stringResource(R.string.discovery_rally)
+                    val roadPrefix = androidx.compose.ui.res.stringResource(R.string.route_road_prefix)
+                    val subTag = androidx.compose.ui.res.stringResource(R.string.route_custom_substitute_tag)
+                    val routeReport = remember(activeRoute, ui.pack, ui.jukebox) {
+                        activeRoute?.let(model::inspectCustomRoute)
+                    }
+                    com.mylittleblover.mkwplayer.ui.home.DiscoveryCustomRouteDetail(
+                        route = activeRoute,
+                        catalog = browse,
+                        language = languageTag,
+                        presets = discoveryState.presets,
+                        installedJukebox = model.allInstalledJukeboxItems(),
+                        packDirectory = model.packDirectory,
+                        courseArtwork = model.extraCatalog.courseArtwork,
+                        report = routeReport,
+                        onPlayRoute = { route ->
+                            if (model.playCustomRoute(
+                                    route = route,
+                                    userPresets = discoveryState.presets,
+                                    languageTag = languageTag,
+                                    suiteLabel = suiteLabel,
+                                    rallyLabel = rallyLabel,
+                                    roadPrefix = roadPrefix,
+                                    customSubstituteTag = subTag,
+                                ) is PlayerViewModel.RoutePlayResult.Started
+                            ) {
+                                nav = nav.open(NavState.Detail.Track)
+                            }
+                        },
+                        onEditOnMap = { route ->
+                            val points = route.stops.mapNotNull { stop ->
+                                model.mapAnchors?.stageTolerant(stop.stageCode)?.let {
+                                    androidx.compose.ui.geometry.Offset(it.u, it.v)
+                                }
+                            }
+                            mapState.loadCustomRoute(route, points)
+                            nav = nav.select(Tab.WORLD_MAP)
+                        },
+                        onToggleLoop = { discovery.setCustomRouteLoop(detail.id, it) },
+                        onRename = { discovery.renameCustomRoute(detail.id, it) },
+                        onDelete = { discovery.deleteCustomRoute(detail.id); nav = nav.back() ?: nav },
+                        onRemoveLastStop = { discovery.removeCustomRouteLastStop(detail.id) },
+                        onUpdateStopPreset = { stopIdx, presetId ->
+                            discovery.setCustomRouteStopPreset(detail.id, stopIdx, presetId)
+                        },
+                        onUpdateEdgeMusic = { edgeIdx, playMusic, trackKey ->
+                            discovery.setCustomRouteEdgeMusic(detail.id, edgeIdx, playMusic, trackKey)
+                        },
+                        onOpenCourse = { code -> nav = nav.open(NavState.Detail.Course(code)) },
+                        onOpenFlowEditor = { courseCode, presetId ->
+                            nav = nav.open(NavState.Detail.FlowEditor(courseCode, presetId))
+                        },
+                    )
+                }
                 detail is NavState.Detail.Playlist -> {
                     val activePlaylist = discoveryState.playlists.firstOrNull { it.id == detail.id }
                     val suiteLabel = androidx.compose.ui.res.stringResource(R.string.discovery_suite)
@@ -578,19 +643,48 @@ internal fun MkwApp(
                         },
                     )
                 }
-                detail is NavState.Detail.Cup -> com.mylittleblover.mkwplayer.ui.home.DiscoveryCup(
-                    browse?.route(detail.id, unlocked), browse, languageTag,
-                    onMap = { id ->
-                        val route = browse?.route(id, unlocked)
-                        val points = route?.stops.orEmpty().mapNotNull { stop -> model.mapAnchors?.stageTolerant(stop.stageCode)?.let { androidx.compose.ui.geometry.Offset(it.u, it.v) } }
-                        mapState.selectRoute(id, points)
-                        nav = nav.select(Tab.WORLD_MAP)
-                    }) { code -> nav = nav.open(NavState.Detail.Course(code)) }
+                detail is NavState.Detail.Cup -> {
+                    val cupRoute = browse?.route(detail.id, unlocked)
+                    val suiteLabel = androidx.compose.ui.res.stringResource(R.string.discovery_suite)
+                    val rallyLabel = androidx.compose.ui.res.stringResource(R.string.discovery_rally)
+                    val roadPrefix = androidx.compose.ui.res.stringResource(R.string.route_road_prefix)
+                    com.mylittleblover.mkwplayer.ui.home.DiscoveryCup(
+                        route = cupRoute,
+                        catalog = browse,
+                        language = languageTag,
+                        installedJukebox = model.allInstalledJukeboxItems(),
+                        packDirectory = model.packDirectory,
+                        inspectOfficialRoute = model::inspectOfficialRoute,
+                        onPlayRoute = { route, loop, overrides ->
+                            if (model.playOfficialRoute(
+                                    route = route,
+                                    userPresets = discoveryState.presets,
+                                    loopRoute = loop,
+                                    sessionOverrides = overrides,
+                                    languageTag = languageTag,
+                                    suiteLabel = suiteLabel,
+                                    rallyLabel = rallyLabel,
+                                    roadPrefix = roadPrefix,
+                                ) is PlayerViewModel.RoutePlayResult.Started
+                            ) {
+                                nav = nav.open(NavState.Detail.Track)
+                            }
+                        },
+                        onMap = { id ->
+                            val route = browse?.route(id, unlocked)
+                            val points = route?.stops.orEmpty().mapNotNull { stop -> model.mapAnchors?.stageTolerant(stop.stageCode)?.let { androidx.compose.ui.geometry.Offset(it.u, it.v) } }
+                            mapState.selectRoute(id, points)
+                            nav = nav.select(Tab.WORLD_MAP)
+                        },
+                        onCourse = { code -> nav = nav.open(NavState.Detail.Course(code)) },
+                    )
+                }
                 detail is NavState.Detail.JukeboxGame -> com.mylittleblover.mkwplayer.ui.home.DiscoveryJukeboxGame(
                     game = ui.jukebox.gameById(detail.id),
                     language = languageTag,
                     activeTrackKey = ui.selectedKey,
                     packDirectory = model.packDirectory,
+                    allowPlayNext = ui.allowPlayNext,
                     onPlayFromIndex = { game, index, shuffle ->
                         model.playJukeboxQueue(game, index, languageTag, shuffle = shuffle)
                         nav = nav.open(NavState.Detail.Track)
@@ -624,6 +718,7 @@ internal fun MkwApp(
                         extraCatalog = model.extraCatalog,
                         packDirectory = model.packDirectory,
                         activeTrackKey = ui.selectedKey,
+                        allowPlayNext = ui.allowPlayNext,
                         onJukeboxGame = { gameId -> nav = nav.open(NavState.Detail.JukeboxGame(gameId)) },
                         onPlayJukeboxTrack = { game, index ->
                             model.playJukeboxQueue(game, index, languageTag, shuffle = false)
@@ -662,7 +757,16 @@ internal fun MkwApp(
                         onAuditionExtra = { entry ->
                             model.playExtraLinearQueue(listOf(entry), 0, LinearQueue.RepeatMode.OFF, false)
                         })
-                    Tab.WORLD_MAP -> MapPage(model, ui, mapState) { code -> nav = nav.open(NavState.Detail.Course(code)) }
+                    Tab.WORLD_MAP -> MapPage(
+                        model = model,
+                        ui = ui,
+                        state = mapState,
+                        discovery = discovery,
+                        presets = discoveryState.presets,
+                        onOpenCourse = { code -> nav = nav.open(NavState.Detail.Course(code)) },
+                        onOpenCustomRoute = { routeId -> nav = nav.open(NavState.Detail.CustomRoute(routeId)) },
+                        onPlayStarted = { nav = nav.open(NavState.Detail.Track) },
+                    )
                     Tab.PLAYLISTS -> com.mylittleblover.mkwplayer.ui.home.DiscoveryPlaylists(
                         catalog = browse,
                         unlocked = unlocked,
@@ -676,6 +780,11 @@ internal fun MkwApp(
                         packDirectory = model.packDirectory,
                         onViewAll = { section -> nav = nav.open(NavState.Detail.AllPlaylists(section)) },
                         onJukeboxGame = { gameId -> nav = nav.open(NavState.Detail.JukeboxGame(gameId)) },
+                        onCustomRoute = { routeId -> nav = nav.open(NavState.Detail.CustomRoute(routeId)) },
+                        onPlanRouteOnMap = {
+                            mapState.enterEdit()
+                            nav = nav.select(Tab.WORLD_MAP)
+                        },
                     )
                 }
             }
@@ -968,9 +1077,22 @@ private fun CoursePage(
  * pushed off-screen with one flick is a map that has to be reloaded.
  */
 @Composable
-private fun MapPage(model: PlayerViewModel, ui: PlayerViewModel.Ui, state: WorldMapState, onOpenCourse: (String) -> Unit) {
+private fun MapPage(
+    model: PlayerViewModel,
+    ui: PlayerViewModel.Ui,
+    state: WorldMapState,
+    discovery: com.mylittleblover.mkwplayer.ui.home.DiscoveryViewModel,
+    presets: List<com.mylittleblover.mkwplayer.library.CoursePreset>,
+    onOpenCourse: (String) -> Unit,
+    onOpenCustomRoute: (String) -> Unit,
+    onPlayStarted: () -> Unit,
+) {
     val context = LocalContext.current.applicationContext
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
+    val suiteLabel = androidx.compose.ui.res.stringResource(R.string.discovery_suite)
+    val rallyLabel = androidx.compose.ui.res.stringResource(R.string.discovery_rally)
+    val roadPrefix = androidx.compose.ui.res.stringResource(R.string.route_road_prefix)
+    val subTag = androidx.compose.ui.res.stringResource(R.string.route_custom_substitute_tag)
     val loaded by produceState<Result<MapResources>?>(null, model) {
         value = withContext(Dispatchers.IO) {
             runCatching {
@@ -1007,6 +1129,71 @@ private fun MapPage(model: PlayerViewModel, ui: PlayerViewModel.Ui, state: World
         languageTag = languageTag, specialUnlocked = com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(ui.unlock),
         playableStages = playable, state = state, onOpenCourse = onOpenCourse,
         connections = data.connections,
+        installedJukebox = remember(ui.jukebox) { model.allInstalledJukeboxItems() },
+        packDirectory = model.packDirectory,
+        inspectOfficialRoute = model::inspectOfficialRoute,
+        inspectDraftRoute = { pairs, edgeCfgs ->
+            val stopCodes = if (pairs.isEmpty()) emptyList() else listOf(pairs.first().first) + pairs.map { it.second }
+            val synthetic = com.mylittleblover.mkwplayer.routes.CustomRoute(
+                id = state.editingRouteId ?: "draft",
+                name = state.editingRouteName,
+                stops = stopCodes.mapIndexed { idx, code ->
+                    com.mylittleblover.mkwplayer.routes.CustomRouteStop(code, state.draftStopPresets[idx])
+                },
+                edges = pairs.indices.map { idx ->
+                    edgeCfgs[idx] ?: com.mylittleblover.mkwplayer.routes.CustomRouteEdgeConfig(
+                        from = pairs[idx].first,
+                        to = pairs[idx].second,
+                    )
+                },
+                loopWholeRoute = state.draftLoopWholeRoute,
+            )
+            model.inspectCustomRoute(synthetic)
+        },
+        onPlayOfficialRoute = { route, loop, overrides ->
+            if (model.playOfficialRoute(
+                    route = route,
+                    userPresets = presets,
+                    loopRoute = loop,
+                    sessionOverrides = overrides,
+                    languageTag = languageTag,
+                    suiteLabel = suiteLabel,
+                    rallyLabel = rallyLabel,
+                    roadPrefix = roadPrefix,
+                ) is PlayerViewModel.RoutePlayResult.Started
+            ) {
+                onPlayStarted()
+            }
+        },
+        onSaveCustomRoute = { routeId, routeName, stops, edges, loop ->
+            discovery.saveCustomRoute(routeId, routeName, stops, edges, loop) { res ->
+                res.onSuccess { saved ->
+                    state.exitEdit()
+                    onOpenCustomRoute(saved.id)
+                }
+            }
+        },
+        onPlayCustomDraft = { routeName, stops, edges, loop ->
+            val draftRoute = com.mylittleblover.mkwplayer.routes.CustomRoute(
+                id = state.editingRouteId ?: "draft",
+                name = routeName,
+                stops = stops,
+                edges = edges,
+                loopWholeRoute = loop,
+            )
+            if (model.playCustomRoute(
+                    route = draftRoute,
+                    userPresets = presets,
+                    languageTag = languageTag,
+                    suiteLabel = suiteLabel,
+                    rallyLabel = rallyLabel,
+                    roadPrefix = roadPrefix,
+                    customSubstituteTag = subTag,
+                ) is PlayerViewModel.RoutePlayResult.Started
+            ) {
+                onPlayStarted()
+            }
+        },
     )
 }
 

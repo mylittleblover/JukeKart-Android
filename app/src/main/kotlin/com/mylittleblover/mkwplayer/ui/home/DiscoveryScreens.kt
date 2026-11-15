@@ -23,6 +23,10 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Loop
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MusicOff
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
@@ -71,9 +75,16 @@ import androidx.compose.ui.semantics.contentDescription
 import kotlinx.coroutines.launch
 import com.mylittleblover.mkwplayer.R
 import com.mylittleblover.mkwplayer.library.BrowseCatalog
+import com.mylittleblover.mkwplayer.library.PresetRefs
+import com.mylittleblover.mkwplayer.routes.CustomRoute
 import com.mylittleblover.mkwplayer.routes.OfficialRoute
 import com.mylittleblover.mkwplayer.routes.OfficialRouteKind
+import com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog
 import com.mylittleblover.mkwplayer.ui.art.StageArt
+import com.mylittleblover.mkwplayer.ui.routes.RouteEdgeMusicPickerSheet
+import com.mylittleblover.mkwplayer.ui.routes.edgeResolutionSummary
+import com.mylittleblover.mkwplayer.ui.routes.hasKnownPool
+import com.mylittleblover.mkwplayer.ui.routes.isMissingOrIncomplete
 
 @Composable
 private fun CourseTile(
@@ -391,6 +402,7 @@ internal fun DiscoveryMedia(catalog: BrowseCatalog?, unlocked: Boolean, language
     extraCatalog: ExtraMusicCatalog.Catalog = ExtraMusicCatalog.Catalog(),
     packDirectory: java.io.File? = null,
     activeTrackKey: String? = null,
+    allowPlayNext: Boolean = true,
     onJukeboxGame: (String) -> Unit = {},
     onPlayJukeboxTrack: (JukeboxCatalog.Game, Int) -> Unit = { _, _ -> },
     onPlayAllJukebox: (Boolean) -> Unit = {},
@@ -412,6 +424,7 @@ internal fun DiscoveryMedia(catalog: BrowseCatalog?, unlocked: Boolean, language
                     extraCatalog = extraCatalog,
                     packDirectory = packDirectory,
                     activeTrackKey = activeTrackKey,
+                    allowPlayNext = allowPlayNext,
                     onJukeboxGame = onJukeboxGame,
                     onPlayJukeboxTrack = onPlayJukeboxTrack,
                     onPlayAllJukebox = onPlayAllJukebox,
@@ -435,6 +448,7 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                             extraCatalog: ExtraMusicCatalog.Catalog = ExtraMusicCatalog.Catalog(),
                             packDirectory: java.io.File? = null,
                             activeTrackKey: String? = null,
+                            allowPlayNext: Boolean = true,
                             onJukeboxGame: (String) -> Unit = {},
                             onPlayJukeboxTrack: (JukeboxCatalog.Game, Int) -> Unit = { _, _ -> },
                             onPlayAllJukebox: (Boolean) -> Unit = {},
@@ -851,6 +865,7 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                                 subtitleExtra = game.localizedName(language),
                                 packDirectory = packDirectory,
                                 playing = activeTrackKey == item.key,
+                                allowPlayNext = allowPlayNext,
                                 onPlay = { onPlayJukeboxTrack(game, idx) },
                                 onPlayNext = {
                                     onPlayJukeboxNext(item, game)
@@ -888,6 +903,7 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                             subtitleExtra = game.localizedName(language),
                             packDirectory = packDirectory,
                             playing = activeTrackKey == item.key,
+                            allowPlayNext = allowPlayNext,
                             onPlay = { onPlayJukeboxTrack(game, idx) },
                             onPlayNext = {
                                 onPlayJukeboxNext(item, game)
@@ -952,8 +968,23 @@ private fun RouteRow(route: OfficialRoute, catalog: BrowseCatalog?, language: St
 }
 
 @Composable
-internal fun DiscoveryCup(route: OfficialRoute?, catalog: BrowseCatalog?, language: String,
-    onMap: (String) -> Unit, onCourse: (String) -> Unit) {
+internal fun DiscoveryCup(
+    route: OfficialRoute?,
+    catalog: BrowseCatalog?,
+    language: String,
+    installedJukebox: List<Pair<JukeboxCatalog.TrackItem, JukeboxCatalog.Game>> = emptyList(),
+    packDirectory: java.io.File? = null,
+    inspectOfficialRoute: (OfficialRoute, Map<Int, String>) -> RoadJukeboxCatalog.RouteValidationReport? = { _, _ -> null },
+    onPlayRoute: (OfficialRoute, Boolean, Map<Int, String>) -> Unit = { _, _, _ -> },
+    onMap: (String) -> Unit,
+    onCourse: (String) -> Unit,
+) {
+    var loopRoute by rememberSaveable(route?.id) { mutableStateOf(false) }
+    val sessionOverrides = remember(route?.id) { mutableStateMapOf<Int, String>() }
+    var pickingLegIndex by rememberSaveable { mutableStateOf<Int?>(null) }
+    val report = remember(route, sessionOverrides.toMap(), packDirectory, installedJukebox) {
+        route?.let { inspectOfficialRoute(it, sessionOverrides.toMap()) }
+    }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (route == null) item { Text(stringResource(R.string.discovery_empty)) }
         else {
@@ -973,24 +1004,116 @@ internal fun DiscoveryCup(route: OfficialRoute?, catalog: BrowseCatalog?, langua
                                 Text(stringResource(R.string.map_route_stops, route.stops.size), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
-                        OutlinedButton(onClick = { onMap(route.id) }, modifier = Modifier.fillMaxWidth()) {
-                            Text(stringResource(R.string.discovery_view_map))
+                        if (report?.canPlay == false) {
+                            Text(
+                                report.blockingReason ?: stringResource(R.string.route_blocked_incomplete_pool),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
                         }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { onPlayRoute(route, loopRoute, sessionOverrides.toMap()) },
+                                enabled = report?.canPlay != false,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Icon(Icons.Filled.PlayArrow, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(stringResource(R.string.route_play))
+                            }
+                            OutlinedButton(onClick = { onMap(route.id) }) {
+                                Icon(Icons.Filled.Map, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(stringResource(R.string.discovery_view_map))
+                            }
+                        }
+                        FilterChip(
+                            selected = loopRoute,
+                            onClick = { loopRoute = !loopRoute },
+                            leadingIcon = { Icon(Icons.Filled.Loop, null, Modifier.size(18.dp)) },
+                            label = { Text(stringResource(R.string.route_loop_whole)) },
+                        )
                     }
                 }
             }
             item { Text(stringResource(R.string.discovery_course_order), style = MaterialTheme.typography.titleLarge) }
-            items(route.stops, key = { it.id }) { stop ->
-                Card(onClick = { onCourse(stop.stageCode) }, modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Text(stop.ordinal.toString(), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                        StageArt.resolve(stop.stageCode)?.let { ResourceArtwork(it, Modifier.size(52.dp)) }
-                        Text(catalog?.displayName(stop.stageCode, language) ?: stop.stageCode, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+            itemsIndexed(route.stops, key = { _, stop -> stop.id }) { idx, stop ->
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Card(onClick = { onCourse(stop.stageCode) }, modifier = Modifier.fillMaxWidth()) {
+                        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Text(stop.ordinal.toString(), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                            StageArt.resolve(stop.stageCode)?.let { ResourceArtwork(it, Modifier.size(52.dp)) }
+                            Text(catalog?.displayName(stop.stageCode, language) ?: stop.stageCode, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+                    val leg = report?.legs?.getOrNull(idx)
+                    if (leg != null) {
+                        val fromTitle = catalog?.displayName(leg.from, language) ?: leg.from
+                        val toTitle = catalog?.displayName(leg.to, language) ?: leg.to
+                        val summary = edgeResolutionSummary(leg.resolution, language)
+                        Surface(
+                            onClick = { pickingLegIndex = idx },
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp),
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Icon(Icons.Outlined.MusicNote, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        "${stringResource(R.string.route_road_prefix)} $fromTitle → $toTitle",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        summary,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (leg.resolution.isMissingOrIncomplete()) {
+                                            MaterialTheme.colorScheme.error
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                if (leg.resolution.hasKnownPool()) {
+                                    Icon(Icons.Filled.Tune, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
+    }
+    val pickIdx = pickingLegIndex
+    val activeLeg = if (pickIdx != null) report?.legs?.getOrNull(pickIdx) else null
+    if (activeLeg != null && pickIdx != null) {
+        val fromTitle = catalog?.displayName(activeLeg.from, language) ?: activeLeg.from
+        val toTitle = catalog?.displayName(activeLeg.to, language) ?: activeLeg.to
+        RouteEdgeMusicPickerSheet(
+            legTitle = "$fromTitle → $toTitle",
+            leg = activeLeg,
+            installedJukebox = installedJukebox,
+            allowCustomSubstitute = false,
+            allowMute = false,
+            sessionHint = true,
+            language = language,
+            packDirectory = packDirectory,
+            currentSelectedKey = sessionOverrides[pickIdx],
+            currentMuted = false,
+            onSelectAuto = { sessionOverrides.remove(pickIdx) },
+            onSelectMuted = {},
+            onSelectTrackKey = { trackKey -> sessionOverrides[pickIdx] = trackKey },
+            onDismiss = { pickingLegIndex = null },
+        )
     }
 }
 
@@ -1008,6 +1131,8 @@ internal fun DiscoveryPlaylists(
     packDirectory: java.io.File? = null,
     onViewAll: (Int) -> Unit = {},
     onJukeboxGame: (String) -> Unit = {},
+    onCustomRoute: (String) -> Unit = {},
+    onPlanRouteOnMap: () -> Unit = {},
 ) {
     val rallies = catalog?.routes(OfficialRouteKind.RALLY, unlocked).orEmpty()
     val gpRoutes = catalog?.routes(OfficialRouteKind.GRAND_PRIX, unlocked).orEmpty()
@@ -1087,6 +1212,59 @@ internal fun DiscoveryPlaylists(
                                 Text(playlist.name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 Text(
                                     stringResource(R.string.jukebox_tracks_count, playlist.courseIds.size),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        item { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)) }
+        item {
+            PlaylistGroupHeader(
+                title = stringResource(R.string.discovery_playlists_group_routes),
+                count = state.customRoutes.size,
+                onViewAll = { onViewAll(1) },
+                action = {
+                    OutlinedButton(onClick = onPlanRouteOnMap) {
+                        Icon(Icons.Filled.Map, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.route_plan_on_map))
+                    }
+                },
+            )
+        }
+        if (state.customRoutes.isEmpty()) {
+            item {
+                Text(
+                    stringResource(R.string.discovery_no_saved),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            item {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(state.customRoutes.take(5), key = { "my-route:${it.id}" }) { customRoute ->
+                        val firstCode = customRoute.stops.firstOrNull()?.stageCode?.removeSuffix("_00")
+                        val artwork = firstCode?.let { extraCatalog.courseArtwork[it] ?: extraCatalog.courseArtwork["${it}_00"] }
+                        Card(onClick = { onCustomRoute(customRoute.id) }, modifier = Modifier.width(164.dp)) {
+                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                PackArtwork.Thumbnail(
+                                    packDirectory,
+                                    listOfNotNull(artwork),
+                                    Modifier.fillMaxWidth().height(112.dp).clip(RoundedCornerShape(12.dp))
+                                        .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)),
+                                ) {
+                                    if (firstCode != null) CourseCover(firstCode, Modifier.fillMaxSize())
+                                    else Icon(Icons.Filled.Map, null, Modifier.size(36.dp), tint = MaterialTheme.colorScheme.primary)
+                                }
+                                Text(customRoute.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(
+                                    stringResource(R.string.route_stops_count, customRoute.stops.size),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -1188,6 +1366,9 @@ internal fun DiscoveryAllPlaylists(
     onPlaylist: (String) -> Unit,
     onCup: (String) -> Unit,
     onJukeboxGame: (String) -> Unit,
+    onCreateRouteOnMap: () -> Unit = {},
+    onCustomRoute: (String) -> Unit = {},
+    inspectCustomRoute: (CustomRoute) -> RoadJukeboxCatalog.RouteValidationReport? = { null },
 ) {
     var section by rememberSaveable(initialSection) { mutableIntStateOf(initialSection.coerceIn(0, 3)) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -1274,18 +1455,38 @@ internal fun DiscoveryAllPlaylists(
                 }
                 1 -> {
                     item {
-                        Surface(
-                            Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        ) {
-                            Text(
-                                stringResource(R.string.discovery_no_saved),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(16.dp),
-                            )
+                        OutlinedButton(onClick = onCreateRouteOnMap) {
+                            Icon(Icons.Filled.Map, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(stringResource(R.string.route_plan_on_map))
                         }
+                    }
+                    val matchingRoutes = state.customRoutes.filter {
+                        trimmed.isEmpty() || it.name.contains(trimmed, ignoreCase = true)
+                    }
+                    if (matchingRoutes.isEmpty()) {
+                        item { Text(stringResource(R.string.discovery_no_saved)) }
+                    }
+                    items(matchingRoutes, key = { "all-route:${it.id}" }) { customRoute ->
+                        val report = inspectCustomRoute(customRoute)
+                        val first = customRoute.stops.firstOrNull()?.stageCode?.removeSuffix("_00")
+                        val legsSummary = stringResource(R.string.route_legs_count, (customRoute.stops.size - 1).coerceAtLeast(0))
+                        val stopsSummary = stringResource(R.string.route_stops_count, customRoute.stops.size)
+                        val sub = if (report?.canPlay == false) {
+                            "$stopsSummary · $legsSummary · ${report.blockingReason ?: stringResource(R.string.route_invalid_topology)}"
+                        } else if (customRoute.loopWholeRoute) {
+                            "$stopsSummary · $legsSummary · ${stringResource(R.string.route_loop_whole)}"
+                        } else {
+                            "$stopsSummary · $legsSummary"
+                        }
+                        ExtraSquareRow(
+                            title = customRoute.name,
+                            subtitle = sub,
+                            packDirectory = packDirectory,
+                            artworkName = first?.let { extraCatalog.courseArtwork[it] ?: extraCatalog.courseArtwork["${it}_00"] },
+                            fallbackCourseCode = first,
+                            onClick = { onCustomRoute(customRoute.id) },
+                        )
                     }
                 }
                 2 -> {
@@ -1725,6 +1926,7 @@ private fun JukeboxTrackRow(
     indexNumber: Int? = null,
     packDirectory: java.io.File? = null,
     playing: Boolean = false,
+    allowPlayNext: Boolean = true,
     onPlay: () -> Unit,
     onPlayNext: () -> Unit,
     onPlayFromHere: () -> Unit,
@@ -1796,8 +1998,14 @@ private fun JukeboxTrackRow(
                 }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     DropdownMenuItem(
-                        text = { Text(stringResource(R.string.jukebox_play_next)) },
+                        text = {
+                            Text(
+                                if (allowPlayNext) stringResource(R.string.jukebox_play_next)
+                                else "${stringResource(R.string.jukebox_play_next)} (${stringResource(R.string.route_play_next_disabled)})",
+                            )
+                        },
                         leadingIcon = { Icon(Icons.AutoMirrored.Filled.QueueMusic, null) },
+                        enabled = allowPlayNext,
                         onClick = {
                             menuOpen = false
                             onPlayNext()
@@ -1828,6 +2036,7 @@ internal fun DiscoveryJukeboxGame(
     language: String,
     activeTrackKey: String?,
     packDirectory: java.io.File? = null,
+    allowPlayNext: Boolean = true,
     onPlayFromIndex: (JukeboxCatalog.Game, Int, Boolean) -> Unit,
     onPlayNext: (JukeboxCatalog.TrackItem, JukeboxCatalog.Game) -> Unit,
 ) {
@@ -1929,6 +2138,7 @@ internal fun DiscoveryJukeboxGame(
                     indexNumber = index + 1,
                     packDirectory = packDirectory,
                     playing = activeTrackKey == item.key,
+                    allowPlayNext = allowPlayNext,
                     onPlay = { onPlayFromIndex(game, index, false) },
                     onPlayNext = {
                         onPlayNext(item, game)
@@ -2110,4 +2320,373 @@ private fun formatExtraDuration(ms: Long): String {
     val min = totalSec / 60L
     val sec = totalSec % 60L
     return "%d:%02d".format(java.util.Locale.ROOT, min, sec)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun DiscoveryCustomRouteDetail(
+    route: CustomRoute?,
+    catalog: BrowseCatalog?,
+    language: String,
+    presets: List<com.mylittleblover.mkwplayer.library.CoursePreset>,
+    installedJukebox: List<Pair<JukeboxCatalog.TrackItem, JukeboxCatalog.Game>>,
+    packDirectory: java.io.File?,
+    courseArtwork: Map<String, String>,
+    report: RoadJukeboxCatalog.RouteValidationReport?,
+    onPlayRoute: (CustomRoute) -> Unit,
+    onEditOnMap: (CustomRoute) -> Unit,
+    onToggleLoop: (Boolean) -> Unit,
+    onRename: (String) -> Unit,
+    onDelete: () -> Unit,
+    onRemoveLastStop: () -> Unit,
+    onUpdateStopPreset: (Int, String?) -> Unit,
+    onUpdateEdgeMusic: (Int, Boolean, String?) -> Unit,
+    onOpenCourse: (String) -> Unit,
+    onOpenFlowEditor: (String, String?) -> Unit,
+) {
+    if (route == null) {
+        Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+            Text(stringResource(R.string.discovery_empty))
+        }
+        return
+    }
+    var menuOpen by remember { mutableStateOf(false) }
+    var renaming by rememberSaveable { mutableStateOf(false) }
+    var deleting by rememberSaveable { mutableStateOf(false) }
+    var newName by rememberSaveable(route.id) { mutableStateOf(route.name) }
+    var editingStopIndex by rememberSaveable { mutableStateOf<Int?>(null) }
+    var pickingEdgeIndex by rememberSaveable { mutableStateOf<Int?>(null) }
+    val presetSheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val systemDefaultLabel = stringResource(R.string.preset_system_default)
+    val systemKnockoutLabel = stringResource(R.string.preset_system_knockout)
+
+    if (renaming) {
+        AlertDialog(
+            onDismissRequest = { renaming = false },
+            title = { Text(stringResource(R.string.route_rename)) },
+            text = {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it.take(120) },
+                    label = { Text(stringResource(R.string.route_name_label)) },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { onRename(newName); renaming = false }, enabled = newName.isNotBlank()) {
+                    Text(stringResource(R.string.route_save_changes))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { renaming = false }) { Text(stringResource(R.string.discovery_cancel)) }
+            },
+        )
+    }
+
+    if (deleting) {
+        AlertDialog(
+            onDismissRequest = { deleting = false },
+            title = { Text(stringResource(R.string.route_delete_confirm_title)) },
+            text = { Text(route.name) },
+            confirmButton = {
+                TextButton(onClick = { deleting = false; onDelete() }) {
+                    Text(stringResource(R.string.route_delete), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleting = false }) { Text(stringResource(R.string.discovery_cancel)) }
+            },
+        )
+    }
+
+    val stopPresetIdx = editingStopIndex
+    if (stopPresetIdx != null && stopPresetIdx in route.stops.indices) {
+        val stop = route.stops[stopPresetIdx]
+        val logicalCode = stop.stageCode.removeSuffix("_00")
+        val matchingPresets = presets.filter { it.courseCode.equals(logicalCode, ignoreCase = true) }
+        val courseTitle = catalog?.displayName(logicalCode, language) ?: logicalCode
+        ModalBottomSheet(sheetState = presetSheet, onDismissRequest = { editingStopIndex = null }) {
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    stringResource(R.string.route_stop_preset_title, stopPresetIdx + 1, courseTitle),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    stringResource(R.string.discovery_playlist_entry_preset),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    val isDefaultSelected = stop.presetId == null || stop.presetId == PresetRefs.SYSTEM_DEFAULT
+                    FilterChip(
+                        selected = isDefaultSelected,
+                        onClick = { onUpdateStopPreset(stopPresetIdx, null); editingStopIndex = null },
+                        label = { Text(systemDefaultLabel) },
+                    )
+                    FilterChip(
+                        selected = stop.presetId == PresetRefs.SYSTEM_KNOCKOUT,
+                        onClick = { onUpdateStopPreset(stopPresetIdx, PresetRefs.SYSTEM_KNOCKOUT); editingStopIndex = null },
+                        label = { Text(systemKnockoutLabel) },
+                    )
+                    matchingPresets.forEach { preset ->
+                        FilterChip(
+                            selected = stop.presetId == preset.id,
+                            onClick = { onUpdateStopPreset(stopPresetIdx, preset.id); editingStopIndex = null },
+                            label = { Text(preset.name) },
+                        )
+                    }
+                    OutlinedButton(onClick = {
+                        editingStopIndex = null
+                        onOpenFlowEditor(logicalCode, stop.presetId)
+                    }) {
+                        Icon(Icons.Filled.Edit, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.preset_new))
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+        }
+    }
+
+    val pickEdgeIdx = pickingEdgeIndex
+    val activeLeg = if (pickEdgeIdx != null) report?.legs?.getOrNull(pickEdgeIdx) else null
+    if (activeLeg != null && pickEdgeIdx != null) {
+        val edgeCfg = route.edgeFor(pickEdgeIdx)
+        val fromTitle = catalog?.displayName(activeLeg.from, language) ?: activeLeg.from
+        val toTitle = catalog?.displayName(activeLeg.to, language) ?: activeLeg.to
+        RouteEdgeMusicPickerSheet(
+            legTitle = "$fromTitle → $toTitle",
+            leg = activeLeg,
+            installedJukebox = installedJukebox,
+            allowCustomSubstitute = true,
+            allowMute = true,
+            sessionHint = false,
+            language = language,
+            packDirectory = packDirectory,
+            currentSelectedKey = edgeCfg?.selectedJukeboxKey,
+            currentMuted = edgeCfg?.musicEnabled == false,
+            onSelectAuto = { onUpdateEdgeMusic(pickEdgeIdx, true, null) },
+            onSelectMuted = { onUpdateEdgeMusic(pickEdgeIdx, false, null) },
+            onSelectTrackKey = { trackKey -> onUpdateEdgeMusic(pickEdgeIdx, true, trackKey) },
+            onDismiss = { pickingEdgeIndex = null },
+        )
+    }
+
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            Surface(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+            ) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(route.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                            Text(
+                                "${stringResource(R.string.route_stops_count, route.stops.size)} · ${stringResource(R.string.route_legs_count, (route.stops.size - 1).coerceAtLeast(0))}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Box {
+                            IconButton(onClick = { menuOpen = true }) {
+                                Icon(Icons.Filled.MoreVert, contentDescription = null)
+                            }
+                            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.route_rename)) },
+                                    leadingIcon = { Icon(Icons.Filled.Edit, null) },
+                                    onClick = { menuOpen = false; newName = route.name; renaming = true },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.route_delete), color = MaterialTheme.colorScheme.error) },
+                                    leadingIcon = { Icon(Icons.Filled.DeleteOutline, null, tint = MaterialTheme.colorScheme.error) },
+                                    onClick = { menuOpen = false; deleting = true },
+                                )
+                            }
+                        }
+                    }
+
+                    if (report?.canPlay == false) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.errorContainer,
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Icon(Icons.Filled.WarningAmber, null, tint = MaterialTheme.colorScheme.onErrorContainer)
+                                Text(
+                                    report.blockingReason ?: stringResource(R.string.route_invalid_topology),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                )
+                            }
+                        }
+                    }
+
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { onPlayRoute(route) },
+                            enabled = report?.canPlay != false,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(Icons.Filled.PlayArrow, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(stringResource(R.string.route_play))
+                        }
+                        OutlinedButton(onClick = { onEditOnMap(route) }) {
+                            Icon(Icons.Filled.Map, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(stringResource(R.string.route_edit_on_map))
+                        }
+                    }
+
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(R.string.route_loop_whole), style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                stringResource(R.string.route_loop_whole_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(checked = route.loopWholeRoute, onCheckedChange = onToggleLoop)
+                    }
+
+                    Text(
+                        stringResource(R.string.route_tail_only_note),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+
+        itemsIndexed(route.stops, key = { idx, stop -> "route-stop:$idx:${stop.stageCode}" }) { idx, stop ->
+            val logical = stop.stageCode.removeSuffix("_00")
+            val stopTitle = catalog?.displayName(logical, language) ?: logical
+            val presetLabel = when (stop.presetId) {
+                null, PresetRefs.SYSTEM_DEFAULT -> systemDefaultLabel
+                PresetRefs.SYSTEM_KNOCKOUT -> systemKnockoutLabel
+                else -> presets.firstOrNull { it.id == stop.presetId }?.name ?: systemDefaultLabel
+            }
+            val artwork = courseArtwork[logical] ?: courseArtwork["${logical}_00"]
+            val isLastRemovableTail = idx == route.stops.lastIndex && route.stops.size > 2
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Card(
+                    onClick = { onOpenCourse(logical) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text(
+                            "${idx + 1}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        PackArtwork.Thumbnail(
+                            packDirectory,
+                            listOfNotNull(artwork),
+                            Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)),
+                        ) {
+                            CourseCover(logical, Modifier.fillMaxSize())
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(stopTitle, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(presetLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        IconButton(onClick = { editingStopIndex = idx }) {
+                            Icon(Icons.Filled.Tune, contentDescription = stringResource(R.string.discovery_playlist_entry_preset))
+                        }
+                        if (isLastRemovableTail) {
+                            IconButton(onClick = onRemoveLastStop) {
+                                Icon(
+                                    Icons.Filled.RemoveCircleOutline,
+                                    contentDescription = stringResource(R.string.route_tail_delete_stop),
+                                    tint = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                val leg = report?.legs?.getOrNull(idx)
+                val edgeCfg = if (idx < route.stops.lastIndex) route.edgeFor(idx) else null
+                if (idx < route.stops.lastIndex) {
+                    val nextLogical = route.stops[idx + 1].stageCode.removeSuffix("_00")
+                    val fromName = catalog?.displayName(logical, language) ?: logical
+                    val toName = catalog?.displayName(nextLogical, language) ?: nextLogical
+                    val summary = if (leg != null) {
+                        edgeResolutionSummary(leg.resolution, language)
+                    } else {
+                        stringResource(R.string.route_edge_music_auto)
+                    }
+                    Surface(
+                        onClick = { pickingEdgeIndex = idx },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp),
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Icon(
+                                if (edgeCfg?.musicEnabled != false) Icons.Outlined.MusicNote else Icons.Filled.MusicOff,
+                                null,
+                                Modifier.size(18.dp),
+                                tint = if (leg?.resolution?.isMissingOrIncomplete() == true || leg?.connectionValid == false) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                },
+                            )
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    "${stringResource(R.string.route_road_prefix)} $fromName → $toName",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    summary,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (leg?.resolution?.isMissingOrIncomplete() == true) {
+                                        MaterialTheme.colorScheme.error
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            Icon(Icons.Filled.Tune, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
