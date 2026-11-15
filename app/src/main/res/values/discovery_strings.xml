@@ -174,4 +174,7 @@
     <string name="route_loop_whole_desc">Loops wrap directly from finish to start without inventing a return road.</string>
     <string name="route_connecting_hint">Tap another connected course, or save this route.</string>
     <string name="route_play_next_disabled">Fixed route order active</string>
+    <string name="jukebox_all_eras">All years</string>
+    <string name="jukebox_decade_label">%1$ds</string>
+    <string name="jukebox_chronological_note">Chronological by source game release · Official OST / original order within each game</string>
 </resources>

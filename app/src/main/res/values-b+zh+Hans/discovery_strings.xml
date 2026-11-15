@@ -174,4 +174,7 @@
     <string name="route_loop_whole_desc">开启整条路线循环后，播完终点站将直接回到起点重播，不会凭空编造返程公路。</string>
     <string name="route_connecting_hint">点选下一条相连赛道继续延伸，或保存当前路线。</string>
     <string name="route_play_next_disabled">当前为固定路线顺序</string>
+    <string name="jukebox_all_eras">全部年代</string>
+    <string name="jukebox_decade_label">%1$d 年代</string>
+    <string name="jukebox_chronological_note">按来源作品首次发行时间升序 · 作品内依官方原声带 / 原作顺序</string>
 </resources>

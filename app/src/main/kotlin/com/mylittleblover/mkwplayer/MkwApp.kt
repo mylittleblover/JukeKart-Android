@@ -278,6 +278,18 @@ internal fun MkwApp(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
+            val activeMediaCategory = nav.detail == null && nav.tab == Tab.MEDIA && mediaCategory >= 0
+            val mediaCategoryTitleRes = when (mediaCategory) {
+                0 -> R.string.discovery_gp
+                1 -> R.string.discovery_rally
+                2 -> R.string.discovery_vs
+                3 -> R.string.discovery_battle
+                4 -> R.string.discovery_free
+                5 -> R.string.discovery_other
+                6 -> R.string.discovery_sounds
+                7 -> R.string.discovery_nintendo_music
+                else -> null
+            }
             val title = when (val detail = nav.detail) {
                 NavState.Detail.Settings -> androidx.compose.ui.res.stringResource(R.string.settings_title)
                 is NavState.Detail.Course -> androidx.compose.ui.res.stringResource(R.string.nav_course)
@@ -298,10 +310,25 @@ internal fun MkwApp(
                 is NavState.Detail.FlowEditor -> androidx.compose.ui.res.stringResource(R.string.flow_editor_title)
                 is NavState.Detail.JukeboxGame -> ui.jukebox.gameById(detail.id)?.localizedName(languageTag)
                     ?: androidx.compose.ui.res.stringResource(R.string.discovery_free)
-                else -> tabTitle(nav.tab)
+                else -> if (activeMediaCategory && mediaCategoryTitleRes != null) {
+                    androidx.compose.ui.res.stringResource(mediaCategoryTitleRes)
+                } else {
+                    tabTitle(nav.tab)
+                }
             }
-            AppHeader(title, nav.canGoBack, nav.detail != NavState.Detail.Settings,
-                onBack = { nav = nav.back() ?: nav }, onSettings = { nav = nav.open(NavState.Detail.Settings) })
+            AppHeader(
+                title = title,
+                canBack = nav.canGoBack || activeMediaCategory,
+                showSettings = nav.detail != NavState.Detail.Settings,
+                onBack = {
+                    if (nav.canGoBack) {
+                        nav = nav.back() ?: nav
+                    } else if (activeMediaCategory) {
+                        mediaCategory = -1
+                    }
+                },
+                onSettings = { nav = nav.open(NavState.Detail.Settings) },
+            )
         },
         bottomBar = {
             Column {
@@ -312,7 +339,11 @@ internal fun MkwApp(
                 ) {
                     com.mylittleblover.mkwplayer.ui.interactive.InteractiveStopBar(
                         canStop = ui.canStop, canFade = !ui.busy && model.canFadeStop, fading = ui.flow?.fading == true,
-                        onStop = model::stop, onFade = model::fadeStopPerformance)
+                        onStop = model::stop, onFade = model::fadeStopPerformance,
+                        paused = ui.canResume,
+                        fadeRemainingFrames = ui.flow?.fadeRemainingFrames,
+                        transportRate = ui.flow?.transportRate ?: 48000,
+                    )
                 }
                 AnimatedVisibility(
                     visible = ui.canStop && !playerDetail,
@@ -1237,7 +1268,11 @@ private fun PlayerDismissContainer(
                 dismissed = true
                 onDismiss()
             } else {
-                offsetY.animateTo(0f, com.mylittleblover.mkwplayer.ui.AppMotion.dragReleaseSpring)
+                offsetY.animateTo(
+                    targetValue = 0f,
+                    animationSpec = com.mylittleblover.mkwplayer.ui.AppMotion.dragReleaseSpring,
+                    initialVelocity = velocityY,
+                )
             }
         }
     }
@@ -1345,10 +1380,10 @@ private fun ConsolePage(
                     } else {
                         Column(
                             Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            PlayerCover(model.currentStageCode, model.packDirectory, coverArtNames, Modifier.fillMaxWidth(), maxCoverWidth = 320.dp)
+                            PlayerCover(model.currentStageCode, model.packDirectory, coverArtNames, Modifier.fillMaxWidth(), maxCoverWidth = 232.dp)
                             PlayerInformation(model, ui, displayTitle, Modifier.fillMaxWidth())
                         }
                     }
@@ -1361,7 +1396,7 @@ private fun ConsolePage(
                         shape = RoundedCornerShape(20.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                     ) {
-                        Column(Modifier.animateContentSize(tween(220)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(Modifier.animateContentSize(tween(200, easing = com.mylittleblover.mkwplayer.ui.AppMotion.easeOut)).padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             AnimatedVisibility(visible = !ui.canStop && model.initialEntryChoices.isNotEmpty()) {
                                 com.mylittleblover.mkwplayer.ui.interactive.InteractiveEntryChooser(
                                     choices = model.initialEntryChoices, selected = model.selectedEntrySegment,
@@ -1369,14 +1404,14 @@ private fun ConsolePage(
                             }
                             if (flow.performanceBlocker != null) Text(flow.performanceBlocker, style = MaterialTheme.typography.bodySmall)
                             else {
-                                com.mylittleblover.mkwplayer.ui.interactive.InteractiveStageBanner(
+                                com.mylittleblover.mkwplayer.ui.interactive.InteractivePhaseControlZone(
                                     flow = flow,
+                                    paused = ui.canResume,
+                                    onAdvance = model::advancePerformance,
+                                    onFast = model::toggleFast,
                                     onCancel = model::cancelPendingPerformance,
+                                    onEnd = model::takeOutro,
                                 )
-                                com.mylittleblover.mkwplayer.ui.interactive.InteractiveActionBar(flow,
-                                    onAdvance = model::advancePerformance, onFast = model::toggleFast,
-                                    onCancel = model::cancelPendingPerformance, onEnd = model::takeOutro,
-                                    showCancelInBar = false)
                                 val hasExtraControls = (flow.outros.size > 1 && flow.canEnd) ||
                                     flow.hasSpeakerOverlay ||
                                     flow.versionNumbers.isNotEmpty()
@@ -1558,7 +1593,8 @@ private fun MiniPlayer(
                     orientation = Orientation.Vertical,
                     state = rememberDraggableState { delta ->
                         scope.launch {
-                            dragOffsetY.snapTo((dragOffsetY.value + delta).coerceIn(-swipeOpenThresholdPx * 1.6f, 6f))
+                            val adjusted = if (delta > 0f && dragOffsetY.value >= 0f) delta * 0.25f else delta
+                            dragOffsetY.snapTo((dragOffsetY.value + adjusted).coerceIn(-swipeOpenThresholdPx * 1.6f, 6f))
                         }
                     },
                     onDragStopped = { velocity ->
@@ -1567,7 +1603,11 @@ private fun MiniPlayer(
                                 dragOffsetY.snapTo(0f)
                                 onOpen()
                             } else {
-                                dragOffsetY.animateTo(0f, com.mylittleblover.mkwplayer.ui.AppMotion.snapSpring)
+                                dragOffsetY.animateTo(
+                                    targetValue = 0f,
+                                    animationSpec = com.mylittleblover.mkwplayer.ui.AppMotion.dragReleaseSpring,
+                                    initialVelocity = velocity,
+                                )
                             }
                         }
                     },

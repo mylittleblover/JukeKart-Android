@@ -502,6 +502,7 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
     val shortLabel = stringResource(R.string.discovery_sounds)
     val nmLabel = stringResource(R.string.discovery_nintendo_music)
     val listState = rememberSaveable(category, saver = LazyListState.Saver) { LazyListState() }
+    var selectedJukeboxDecade by rememberSaveable { mutableStateOf<Int?>(null) }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -509,21 +510,6 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (category >= 0) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { onCategory(-1) }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                        }
-                        Text(
-                            stringResource(categories[category]),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
                 OutlinedTextField(
                     value = query,
                     onValueChange = onQuery,
@@ -549,7 +535,7 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
             if (category >= 0) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
             }
-            val categoryHeight = 114.dp * LocalDensity.current.fontScale.coerceIn(1f, 1.35f)
+            val categoryHeight = 124.dp * LocalDensity.current.fontScale.coerceIn(1f, 1.5f)
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -612,8 +598,9 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                                             Text(
                                                 categoryLabel,
                                                 style = MaterialTheme.typography.titleSmall,
-                                                lineHeight = 18.sp,
+                                                lineHeight = 19.sp,
                                                 fontWeight = FontWeight.Bold,
+                                                minLines = 2,
                                                 maxLines = 2,
                                                 overflow = TextOverflow.Ellipsis,
                                             )
@@ -624,7 +611,31 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                         }
                     }
                 }
-                items(routes, key = { it.id }) { route -> RouteRow(route, catalog, language) { onCup(route.id) } }
+                if (category == 0 && query.isBlank()) {
+                    val rows = routes.chunked(2)
+                    items(rows, key = { pair -> "gp-grid:" + pair.joinToString(":") { it.id } }) { pair ->
+                        Row(
+                            Modifier.fillMaxWidth().height(IntrinsicSize.Max),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            pair.forEach { route ->
+                                CupMosaicCard(
+                                    route = route,
+                                    language = language,
+                                    packDirectory = packDirectory,
+                                    courseArtwork = extraCatalog.courseArtwork,
+                                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                                    onClick = { onCup(route.id) },
+                                )
+                            }
+                            if (pair.size == 1) {
+                                Spacer(Modifier.weight(1f))
+                            }
+                        }
+                    }
+                } else {
+                    items(routes, key = { it.id }) { route -> RouteRow(route, catalog, language) { onCup(route.id) } }
+                }
                 if (courses.isNotEmpty() && (category == 2 || sfcCourses.isNotEmpty())) {
                     item(key = "vs-standard-header") {
                         Text(
@@ -831,12 +842,50 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                     }
                 }
                 if (query.isBlank()) {
-                    items(jukebox.games, key = { "game:${it.id}" }) { game ->
+                    val decades = jukebox.games.mapNotNull { g -> g.year.takeIf { it > 0 }?.let { (it / 10) * 10 } }.distinct().sorted()
+                    val activeDecade = selectedJukeboxDecade?.takeIf { it in decades }
+                    if (decades.isNotEmpty()) {
+                        item(key = "jukebox-chronology-index") {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    stringResource(R.string.jukebox_chronological_note),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                if (decades.size > 1) {
+                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        item(key = "era-all") {
+                                            FilterChip(
+                                                selected = activeDecade == null,
+                                                onClick = { selectedJukeboxDecade = null },
+                                                label = { Text(stringResource(R.string.jukebox_all_eras)) },
+                                            )
+                                        }
+                                        items(decades, key = { "era:$it" }) { decade ->
+                                            FilterChip(
+                                                selected = activeDecade == decade,
+                                                onClick = {
+                                                    selectedJukeboxDecade = if (activeDecade == decade) null else decade
+                                                },
+                                                label = { Text(stringResource(R.string.jukebox_decade_label, decade)) },
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    val shownGames = if (activeDecade == null) jukebox.games else {
+                        jukebox.games.filter { g -> g.year > 0 && (g.year / 10) * 10 == activeDecade }
+                    }
+                    val orderIndexById = jukebox.games.withIndex().associate { (idx, g) -> g.id to (idx + 1) }
+                    items(shownGames, key = { "game:${it.id}" }) { game ->
                         JukeboxGameRow(
                             game = game,
                             language = language,
                             packDirectory = packDirectory,
                             artworkName = extraCatalog.jukeboxGameArtwork[game.id],
+                            chronologicalIndex = orderIndexById[game.id],
                         ) { onJukeboxGame(game.id) }
                     }
                 } else {
@@ -941,6 +990,84 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
             }
         }
         SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+    }
+}
+
+@Composable
+private fun CupMosaicCard(
+    route: OfficialRoute,
+    language: String,
+    packDirectory: java.io.File? = null,
+    courseArtwork: Map<String, String> = emptyMap(),
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val emblem = com.mylittleblover.mkwplayer.ui.art.CupArt.routeEmblem(route.id)
+    val mosaicCodes = route.stops.take(4).map { it.stageCode }
+    val cardInteraction = remember { MutableInteractionSource() }
+    val pressScale = com.mylittleblover.mkwplayer.ui.rememberPressScale(cardInteraction, pressedScale = 0.97f)
+    Card(
+        onClick = onClick,
+        interactionSource = cardInteraction,
+        modifier = modifier.graphicsLayer { scaleX = pressScale; scaleY = pressScale },
+        shape = RoundedCornerShape(18.dp),
+    ) {
+        Column(Modifier.fillMaxSize().padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1.35f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+            ) {
+                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    for (rowIdx in 0..1) {
+                        Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                            for (colIdx in 0..1) {
+                                val tileCode = mosaicCodes.getOrNull(rowIdx * 2 + colIdx)
+                                if (tileCode != null) {
+                                    com.mylittleblover.mkwplayer.ui.art.CourseCover(
+                                        code = tileCode,
+                                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                                        showIcon = false,
+                                        packDirectory = packDirectory,
+                                        artworkName = courseArtwork[tileCode] ?: courseArtwork[tileCode.removeSuffix("_00")],
+                                    )
+                                } else {
+                                    Box(Modifier.weight(1f).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceVariant))
+                                }
+                            }
+                        }
+                    }
+                }
+                emblem?.let {
+                    Surface(
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                        shadowElevation = 2.dp,
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp).size(36.dp),
+                    ) {
+                        ResourceArtwork(it, Modifier.fillMaxSize().padding(4.dp))
+                    }
+                }
+            }
+            Column(Modifier.fillMaxWidth().padding(horizontal = 2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    route.displayName(language),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    minLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    stringResource(R.string.map_route_stops, route.stops.size),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+        }
     }
 }
 
@@ -1859,11 +1986,17 @@ private fun JukeboxGameRow(
     language: String,
     packDirectory: java.io.File? = null,
     artworkName: String? = null,
+    chronologicalIndex: Int? = null,
     onClick: () -> Unit,
 ) {
     val localized = game.localizedName(language)
     val countLabel = stringResource(R.string.jukebox_tracks_count, game.items.size)
-    val sub = if (game.yearLabel.isNotBlank()) "${game.yearLabel} · $countLabel" else countLabel
+    val indexBadge = chronologicalIndex?.let { "#%02d".format(java.util.Locale.ROOT, it) }
+    val sub = listOfNotNull(
+        indexBadge,
+        game.yearLabel.takeIf { it.isNotBlank() },
+        countLabel,
+    ).joinToString(" · ")
     Surface(
         onClick = onClick,
         color = MaterialTheme.colorScheme.surface,

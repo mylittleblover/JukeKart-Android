@@ -199,8 +199,59 @@ internal fun InteractiveStageBanner(
 }
 
 @Composable
-internal fun InteractiveStopBar(canStop: Boolean, canFade: Boolean, fading: Boolean, onStop: () -> Unit, onFade: (Int) -> Unit) {
+internal fun InteractiveStopBar(
+    canStop: Boolean,
+    canFade: Boolean,
+    fading: Boolean,
+    onStop: () -> Unit,
+    onFade: (Int) -> Unit,
+    paused: Boolean = false,
+    fadeRemainingFrames: Long? = null,
+    transportRate: Int = 48000,
+) {
     var showFade by rememberSaveable { mutableStateOf(false) }
+    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val holdProgress = remember { androidx.compose.animation.core.Animatable(0f) }
+    val longPressTimeoutMs = androidx.compose.ui.platform.LocalViewConfiguration.current.longPressTimeoutMillis.toInt().coerceAtLeast(300)
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val reduceMotion = com.mylittleblover.mkwplayer.ui.rememberReducedMotion()
+
+    LaunchedEffect(interactionSource, canFade, fading) {
+        if (!canFade || fading) {
+            holdProgress.snapTo(0f)
+            return@LaunchedEffect
+        }
+        interactionSource.interactions.collect { interaction ->
+            when (interaction) {
+                is androidx.compose.foundation.interaction.PressInteraction.Press -> {
+                    holdProgress.snapTo(0f)
+                    holdProgress.animateTo(
+                        targetValue = 1f,
+                        animationSpec = tween(
+                            durationMillis = if (reduceMotion) 0 else longPressTimeoutMs,
+                            easing = androidx.compose.animation.core.LinearEasing,
+                        ),
+                    )
+                }
+                is androidx.compose.foundation.interaction.PressInteraction.Release,
+                is androidx.compose.foundation.interaction.PressInteraction.Cancel -> {
+                    holdProgress.animateTo(
+                        targetValue = 0f,
+                        animationSpec = tween(
+                            durationMillis = if (reduceMotion) 0 else 140,
+                            easing = com.mylittleblover.mkwplayer.ui.AppMotion.easeOut,
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    val remainText = fadeRemainingFrames?.let { frames ->
+        val rate = transportRate.coerceAtLeast(1)
+        String.format(java.util.Locale.ROOT, "%.1f", frames.toDouble() / rate.toDouble())
+    }
+    val holdFillColor = MaterialTheme.colorScheme.error.copy(alpha = 0.16f)
     Surface(
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
@@ -208,26 +259,63 @@ internal fun InteractiveStopBar(canStop: Boolean, canFade: Boolean, fading: Bool
     ) {
         Surface(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp).heightIn(min = 48.dp)
-                .combinedClickable(enabled = canStop, role = Role.Button, onClick = onStop,
+                .combinedClickable(
+                    interactionSource = interactionSource,
+                    indication = androidx.compose.foundation.LocalIndication.current,
+                    enabled = canStop,
+                    role = Role.Button,
+                    onClick = onStop,
                     onLongClickLabel = stringResource(R.string.interactive_fade_choose),
-                    onLongClick = if (canFade && !fading) ({ showFade = true }) else null),
+                    onLongClick = if (canFade && !fading) ({
+                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                        showFade = true
+                    }) else null,
+                ),
             shape = RoundedCornerShape(14.dp),
             color = if (canStop) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceVariant,
             contentColor = if (canStop) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
             border = if (canStop) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null,
         ) {
-            Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Filled.Stop,
-                    contentDescription = null,
-                    tint = if (canStop) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    stringResource(R.string.interactive_stop),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
+            androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth()) {
+                val fillFraction = holdProgress.value.coerceIn(0f, 1f)
+                if (fillFraction > 0.005f) {
+                    Surface(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .graphicsLayer {
+                                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
+                                scaleX = fillFraction
+                            },
+                        color = holdFillColor,
+                        content = {},
+                    )
+                }
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Filled.Stop,
+                        contentDescription = null,
+                        tint = if (canStop) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    val stopLabel = when {
+                        fading && paused && remainText != null -> stringResource(R.string.interactive_fade_paused, remainText)
+                        fading && remainText != null -> stringResource(R.string.interactive_fade_remaining, remainText)
+                        fading -> stringResource(R.string.interactive_fading)
+                        canFade -> "${stringResource(R.string.interactive_stop)} · ${stringResource(R.string.interactive_stop_hold_hint)}"
+                        else -> stringResource(R.string.interactive_stop)
+                    }
+                    Text(
+                        stopLabel,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
@@ -538,5 +626,183 @@ internal fun InteractiveActionBar(
                 }
             }
         }
+    }
+}
+
+@Composable
+internal fun syncPointText(sync: com.mylittleblover.mkwplayer.graph.MusicGraphBuilder.SyncPoint?): String? = when (sync) {
+    com.mylittleblover.mkwplayer.graph.MusicGraphBuilder.SyncPoint.Immediate -> stringResource(R.string.interactive_sync_immediate)
+    com.mylittleblover.mkwplayer.graph.MusicGraphBuilder.SyncPoint.NextBeat -> stringResource(R.string.interactive_sync_next_beat)
+    com.mylittleblover.mkwplayer.graph.MusicGraphBuilder.SyncPoint.NextBar -> stringResource(R.string.interactive_sync_next_bar)
+    com.mylittleblover.mkwplayer.graph.MusicGraphBuilder.SyncPoint.NextGrid -> stringResource(R.string.interactive_sync_next_grid)
+    com.mylittleblover.mkwplayer.graph.MusicGraphBuilder.SyncPoint.ExitCue -> stringResource(R.string.interactive_sync_exit_cue)
+    com.mylittleblover.mkwplayer.graph.MusicGraphBuilder.SyncPoint.NextCue -> stringResource(R.string.interactive_sync_next_cue)
+    com.mylittleblover.mkwplayer.graph.MusicGraphBuilder.SyncPoint.NextCustomCue -> stringResource(R.string.interactive_sync_custom_cue)
+    null -> null
+}
+
+/**
+ * Unified first-screen performance control zone grouping current section, queued target with
+ * its real musical sync point, immediate cancel button, and primary transition actions together.
+ */
+@Composable
+internal fun InteractivePhaseControlZone(
+    flow: PlayerViewModel.FlowUi,
+    paused: Boolean,
+    onAdvance: () -> Unit,
+    onFast: () -> Unit,
+    onCancel: () -> Unit,
+    onEnd: () -> Unit,
+) {
+    val active = flow.performing && flow.voiceCount > 0 && flow.sourceFrame != null
+    val currentTitle = when {
+        flow.performing && flow.voiceCount > 0 && flow.sourceFrame == null -> stringResource(R.string.stage_transitioning)
+        else -> stageText(flow.stageKey ?: flow.performanceStage)
+    }
+    val nextHintLabel = if (flow.pendingStageKey == null && flow.canAdvance && flow.nextAdvanceTargetKey != null) {
+        val syncLabel = syncPointText(flow.nextAdvanceSyncPoint)
+        if (syncLabel != null) {
+            stringResource(R.string.interactive_next_trigger_hint, stageText(flow.nextAdvanceTargetKey), syncLabel)
+        } else {
+            stageText(flow.nextAdvanceTargetKey)
+        }
+    } else null
+
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    stringResource(R.string.interactive_current_stage_label),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    currentTitle,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (nextHintLabel != null) {
+                    Text(
+                        nextHintLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            if (active && flow.voiceCount > 0) {
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ) {
+                    Text(
+                        stringResource(R.string.interactive_voice_count, flow.voiceCount),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+
+        if (flow.pendingStageKey != null) {
+            val pendingName = stageText(flow.pendingStageKey)
+            val syncText = syncPointText(flow.pendingSyncPoint)
+            val waitText = if (syncText != null) {
+                stringResource(R.string.interactive_pending_with_sync, pendingName, syncText)
+            } else {
+                stringResource(R.string.interactive_pending_next_cue, pendingName)
+            }
+            Surface(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.SkipNext,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(
+                        waitText,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (flow.canCancelPending) {
+                        FilledTonalButton(
+                            onClick = onCancel,
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            modifier = Modifier.heightIn(min = 38.dp),
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.Undo, null, Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                stringResource(R.string.interactive_action_cancel),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (flow.fading) {
+            val remainText = flow.fadeRemainingFrames?.let { frames ->
+                val rate = flow.transportRate.coerceAtLeast(1)
+                String.format(java.util.Locale.ROOT, "%.1f", frames.toDouble() / rate.toDouble())
+            }
+            val fadeLabel = when {
+                paused && remainText != null -> stringResource(R.string.interactive_fade_paused, remainText)
+                remainText != null -> stringResource(R.string.interactive_fade_remaining, remainText)
+                else -> stringResource(R.string.interactive_fading)
+            }
+            Surface(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
+            ) {
+                Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        fadeLabel,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                    Text(
+                        stringResource(R.string.interactive_fade_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f),
+                    )
+                }
+            }
+        }
+
+        InteractiveActionBar(
+            flow = flow,
+            onAdvance = onAdvance,
+            onFast = onFast,
+            onCancel = onCancel,
+            onEnd = onEnd,
+            showCancelInBar = false,
+        )
     }
 }

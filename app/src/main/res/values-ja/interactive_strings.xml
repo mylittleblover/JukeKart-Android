@@ -38,4 +38,15 @@
     <string name="interactive_pending_next_cue">切替予約：%1$s · 次の切り替えポイントで移行</string>
     <string name="interactive_outro_label">アウトロ選択</string>
     <string name="interactive_outro_pick">アウトロを選ぶ</string>
+    <string name="interactive_sync_immediate">即時切替</string>
+    <string name="interactive_sync_next_beat">次の拍</string>
+    <string name="interactive_sync_next_bar">次の小節</string>
+    <string name="interactive_sync_next_grid">次の 4 拍グリッド</string>
+    <string name="interactive_sync_exit_cue">次の退出ポイント</string>
+    <string name="interactive_sync_next_cue">次のキューポイント</string>
+    <string name="interactive_sync_custom_cue">次のカスタムキュー</string>
+    <string name="interactive_pending_with_sync">切替予約：%1$s · 待機：%2$s</string>
+    <string name="interactive_next_trigger_hint">次：%1$s · %2$s</string>
+    <string name="interactive_fade_paused">フェード一時停止 · 残り %1$s 秒（停止中）</string>
+    <string name="interactive_stop_hold_hint">タップで停止 · 長押しでフェード</string>
 </resources>

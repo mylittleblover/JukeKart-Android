@@ -38,4 +38,15 @@
     <string name="interactive_pending_next_cue">待切换：%1$s · 将在下一个音乐过渡点自动切入</string>
     <string name="interactive_outro_label">尾奏选择</string>
     <string name="interactive_outro_pick">选择尾奏</string>
+    <string name="interactive_sync_immediate">立即切换</string>
+    <string name="interactive_sync_next_beat">下一拍</string>
+    <string name="interactive_sync_next_bar">下一小节</string>
+    <string name="interactive_sync_next_grid">下一 4 拍网格</string>
+    <string name="interactive_sync_exit_cue">下一个合法退出点</string>
+    <string name="interactive_sync_next_cue">下一 Cue 标记点</string>
+    <string name="interactive_sync_custom_cue">下一自定义标记点</string>
+    <string name="interactive_pending_with_sync">待切换：%1$s · 等待：%2$s</string>
+    <string name="interactive_next_trigger_hint">下一阶段：%1$s · %2$s</string>
+    <string name="interactive_fade_paused">淡出已暂停 · 剩余 %1$s 秒（已冻结）</string>
+    <string name="interactive_stop_hold_hint">轻点立即停止 · 长按选择淡出</string>
 </resources>

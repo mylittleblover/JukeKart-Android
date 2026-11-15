@@ -117,5 +117,31 @@ class NativeInteractiveDriverTest {
         d.observe(NativeInteractiveDriver.Observation(102,500,voices=0,stopped=true))
         assertTrue(d.finished)
     }
+    @Test fun fadeStopPausesAndFreezesCountdownWithoutFinishingAndCannotBeCancelled() {
+        val d=driver()
+        d.observe(NativeInteractiveDriver.Observation(100,100,voices=1,transportFrame=1000))
+        assertNull(d.advance())
+        assertEquals(101,d.pending)
+        assertTrue(d.apply { observe(NativeInteractiveDriver.Observation(100,120,voices=1,destination=101,canCancel=true,transportFrame=1200)) }.canCancelPending)
+
+        // Starting fade clears pending transitions and forbids cancellation (#47).
+        d.markFadeRequested()
+        assertTrue(d.isFading)
+        assertNull(d.pending)
+        assertFalse(d.canCancelPending)
+        assertFalse(d.canAdvance)
+        assertFalse(d.canEnd)
+
+        // Pausing mid-fade freezes transportFrame/remaining countdown and does not finish prematurely (#47).
+        val frozenPaused = NativeInteractiveDriver.Observation(100, 140, paused = true, voices = 0, transportFrame = 48000, fadeEndFrame = 144000)
+        d.observe(frozenPaused)
+        assertFalse(d.finished)
+        assertFalse(d.canCancelPending)
+        assertEquals(96000L, frozenPaused.fadeEndFrame!! - frozenPaused.transportFrame!!)
+
+        // Resuming advances until voices reach 0 at fadeEndFrame and completes.
+        d.observe(NativeInteractiveDriver.Observation(-1, null, paused = false, voices = 0, transportFrame = 144000, fadeEndFrame = 144000))
+        assertTrue(d.finished)
+    }
 
 }

@@ -231,6 +231,10 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val hasSpeakerOverlay: Boolean = false,
         val speakerEnabled: Boolean = false,
         val isBattleTrack: Boolean = false,
+        val pendingSyncPoint: com.mylittleblover.mkwplayer.graph.MusicGraphBuilder.SyncPoint? = null,
+        val pendingSourceCue: String? = null,
+        val nextAdvanceTargetKey: String? = null,
+        val nextAdvanceSyncPoint: com.mylittleblover.mkwplayer.graph.MusicGraphBuilder.SyncPoint? = null,
     )
 
     /**
@@ -2826,6 +2830,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         startPerformance()
         val driver=nativePerformance ?: return
         if(driver.isFading) return
+        if(_ui.value.canResume) resume()
         val plan=interactivePlan ?: return
         val error=session.fadeStop(seconds*plan.spec.bpm/60.0)
         if(error==null) { packPlaybackRequest++;driver.markFadeRequested() }
@@ -3075,12 +3080,24 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val observation=driver.observationState
         val segment=plan.spec.segments.singleOrNull { it.index==driver.current }
         val label=plan.labels[driver.current] ?: "Waiting"
-        val pending=driver.pending?.let { " → ${plan.labels[it]} (queued)" }.orEmpty()
+        val pendingId=driver.pending
+        val pendingTrans=pendingId?.let { target ->
+            plan.spec.transitions.firstOrNull { driver.current in it.sources && target in it.destinations }
+        }
+        val upcomingId=if (pendingId == null && driver.canAdvance) plan.next[driver.current] else null
+        val upcomingTrans=upcomingId?.let { target ->
+            plan.spec.transitions.firstOrNull { driver.current in it.sources && target in it.destinations }
+        }
+        val pending=pendingId?.let { " → ${plan.labels[it]} (queued)" }.orEmpty()
         val updated = _ui.value.copy(detail=if(fromAction) error else driver.diagnostic ?: _ui.value.detail,flow=current.copy(
             activeSegment=driver.current,performing=!driver.finished,
             performanceStage=if(driver.finished) "Finished" else label+pending,
             stageKey=if(driver.finished) "Finished" else label,
-            pendingStageKey=if(driver.finished) null else driver.pending?.let { plan.labels[it] },
+            pendingStageKey=if(driver.finished) null else pendingId?.let { plan.labels[it] },
+            pendingSyncPoint=if(driver.finished) null else pendingTrans?.sync,
+            pendingSourceCue=if(driver.finished) null else pendingTrans?.sourceCue,
+            nextAdvanceTargetKey=if(driver.finished) null else upcomingId?.let { plan.labels[it] },
+            nextAdvanceSyncPoint=if(driver.finished) null else upcomingTrans?.sync,
             canAdvance=driver.canAdvance,canEnd=driver.canEnd,fastPlaying=driver.isFast,canFast=driver.canFast,
             selectedVersion=driver.currentVersion,availableVersions=driver.availableVersions,
             selectedRegion=driver.currentRegion,availableRegions=driver.availableRegions,canCancelPending=driver.canCancelPending,

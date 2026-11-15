@@ -174,4 +174,7 @@
     <string name="route_loop_whole_desc">ループ時は終点から始点へ直接戻り、架空の帰り道は生成しません。</string>
     <string name="route_connecting_hint">接続された次のコースを選択するか、ルートを保存してください。</string>
     <string name="route_play_next_disabled">固定ルート順で再生中</string>
+    <string name="jukebox_all_eras">全年代</string>
+    <string name="jukebox_decade_label">%1$d年代</string>
+    <string name="jukebox_chronological_note">原作の初出年順 · 各作品内は公式サントラ / 原作順に収録</string>
 </resources>
