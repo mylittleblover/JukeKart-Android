@@ -47,5 +47,6 @@
     <string name="map_edit_save">保存为路线</string>
     <string name="map_edit_saved">已保存</string>
     <string name="map_edit_source">连接表来自游戏导出的 Stage_Connections_Final。</string>
+    <string name="map_edit_refusal_missing">游戏没有定义这两条赛道之间的连接。</string>
     <string name="map_course_connections_hidden">另有 %1$d 条连接已定义，但未显示在这张地图上。</string>
 </resources>

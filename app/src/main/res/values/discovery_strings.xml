@@ -90,4 +90,11 @@
     <string name="jukebox_up_next_temp">Up next (Play next)</string>
     <string name="jukebox_up_next_list">Up next</string>
     <string name="jukebox_queue_empty">Nothing else queued.</string>
+    <string name="discovery_search_all">Search courses, cups, games, and tracks</string>
+    <string name="discovery_vs_standard">MKW courses</string>
+    <string name="discovery_vs_sfc">SFC courses &amp; missions</string>
+    <string name="discovery_battle_summary">%1$d tracks · Normal &amp; Final phase interactive</string>
+    <string name="discovery_audition">Preview</string>
+    <string name="discovery_create_name_hint">Enter a name to enable creation.</string>
+    <string name="discovery_official_quick">Official events</string>
 </resources>

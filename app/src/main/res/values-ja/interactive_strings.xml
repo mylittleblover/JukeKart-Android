@@ -34,4 +34,8 @@
     <string name="interactive_action_fast">最終ラップ</string>
     <string name="interactive_action_end">終了</string>
     <string name="interactive_action_cancel">キャンセル</string>
+    <string name="interactive_current_stage_label">現在のパート</string>
+    <string name="interactive_pending_next_cue">切替予約：%1$s · 次の切り替えポイントで移行</string>
+    <string name="interactive_outro_label">アウトロ選択</string>
+    <string name="interactive_outro_pick">アウトロを選ぶ</string>
 </resources>

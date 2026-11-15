@@ -4,6 +4,7 @@ import com.mylittleblover.mkwplayer.library.BrowseCatalog
 import com.mylittleblover.mkwplayer.pack.PackManifest
 import com.mylittleblover.mkwplayer.pack.PackRegistry
 import com.mylittleblover.mkwplayer.registry.ResourceKind
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.Locale
@@ -32,6 +33,7 @@ internal object JukeboxCatalog {
         val ostSeries: String,
         val bwavGameIds: List<String>,
         val names: Map<String, String>,
+        val searchAliases: List<String> = emptyList(),
     ) {
         fun localizedName(languageTag: String): String {
             val lang = normalizeLanguage(languageTag)
@@ -44,6 +46,7 @@ internal object JukeboxCatalog {
             add(year.toString())
             addAll(names.values)
             addAll(bwavGameIds)
+            addAll(searchAliases)
         }
     }
 
@@ -63,6 +66,10 @@ internal object JukeboxCatalog {
         val frames: Long,
         val sampleRate: Int,
         val durationMs: Long,
+        val localizedNames: Map<String, String> = emptyMap(),
+        val localizedTitles: Map<String, String> = emptyMap(),
+        val localizedArrangements: Map<String, String> = emptyMap(),
+        val searchAliases: List<String> = emptyList(),
     )
 
     data class Metadata(
@@ -94,11 +101,30 @@ internal object JukeboxCatalog {
         val frames: Long,
         val sampleRate: Int,
         val durationMs: Long,
+        val localizedNames: Map<String, String> = emptyMap(),
+        val localizedTitles: Map<String, String> = emptyMap(),
+        val localizedArrangements: Map<String, String> = emptyMap(),
+        val searchAliases: List<String> = emptyList(),
     ) {
         val key: String get() = track.key
 
         val durationFormatted: String
             get() = formatDurationMs(durationMs)
+
+        fun localizedDisplayName(languageTag: String): String {
+            val lang = normalizeLanguage(languageTag)
+            return localizedNames[lang] ?: localizedNames["en"] ?: displayName
+        }
+
+        fun localizedTitle(languageTag: String): String {
+            val lang = normalizeLanguage(languageTag)
+            return localizedTitles[lang] ?: localizedTitles["en"] ?: title
+        }
+
+        fun localizedArrangement(languageTag: String): String? {
+            val lang = normalizeLanguage(languageTag)
+            return localizedArrangements[lang] ?: localizedArrangements["en"] ?: arrangement
+        }
 
         fun matches(query: String, gameNames: Collection<String> = emptyList()): Boolean {
             val tokens = query.trim().lowercase(Locale.ROOT)
@@ -109,6 +135,10 @@ internal object JukeboxCatalog {
                 add(displayName)
                 add(title)
                 arrangement?.let { add(it) }
+                addAll(localizedNames.values)
+                addAll(localizedTitles.values)
+                addAll(localizedArrangements.values)
+                addAll(searchAliases)
                 add(track.title)
                 jukeboxCode?.let { add(it) }
                 ostIndex?.let { add(it.toString()); add("#$it") }
@@ -203,6 +233,7 @@ internal object JukeboxCatalog {
                         add(game.id)
                         if (game.yearLabel.isNotBlank()) add(game.yearLabel)
                         addAll(game.localizedNames.values)
+                        addAll(game.searchAliases)
                     }
                     for (item in game.items) {
                         if (item.matches(trimmed, gameTerms)) {
@@ -223,24 +254,6 @@ internal object JukeboxCatalog {
         val games = buildList {
             for (i in 0 until gamesJson.length()) {
                 val g = gamesJson.getJSONObject(i)
-                val namesObj = g.optJSONObject("names")
-                val names = buildMap {
-                    if (namesObj != null) {
-                        val keys = namesObj.keys()
-                        while (keys.hasNext()) {
-                            val k = keys.next()
-                            put(k, namesObj.getString(k))
-                        }
-                    }
-                }
-                val bwavIdsArr = g.optJSONArray("bwavGameIds")
-                val bwavIds = buildList {
-                    if (bwavIdsArr != null) {
-                        for (j in 0 until bwavIdsArr.length()) {
-                            add(bwavIdsArr.getString(j))
-                        }
-                    }
-                }
                 add(
                     GameMetadata(
                         id = g.getString("id"),
@@ -248,8 +261,9 @@ internal object JukeboxCatalog {
                         year = g.optInt("year", 0),
                         yearLabel = g.optString("yearLabel", ""),
                         ostSeries = g.optString("ostSeries", g.getString("id")),
-                        bwavGameIds = bwavIds,
-                        names = names,
+                        bwavGameIds = readStringList(g.optJSONArray("bwavGameIds")),
+                        names = readStringMap(g.optJSONObject("names")),
+                        searchAliases = readStringList(g.optJSONArray("searchAliases")),
                     ),
                 )
             }
@@ -277,12 +291,38 @@ internal object JukeboxCatalog {
                         frames = t.optLong("frames", 0L),
                         sampleRate = t.optInt("sampleRate", 48_000),
                         durationMs = t.optLong("durationMs", 0L),
+                        localizedNames = readStringMap(t.optJSONObject("names")),
+                        localizedTitles = readStringMap(t.optJSONObject("titles")),
+                        localizedArrangements = readStringMap(t.optJSONObject("arrangements")),
+                        searchAliases = readStringList(t.optJSONArray("searchAliases")),
                     ),
                 )
             }
         }
         Metadata(games = games, tracks = tracks)
     }.getOrNull()
+
+    private fun readStringMap(obj: JSONObject?): Map<String, String> {
+        if (obj == null) return emptyMap()
+        return buildMap {
+            val keys = obj.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val value = obj.optString(key, "").trim()
+                if (value.isNotEmpty()) put(key, value)
+            }
+        }
+    }
+
+    private fun readStringList(arr: JSONArray?): List<String> {
+        if (arr == null) return emptyList()
+        return buildList {
+            for (i in 0 until arr.length()) {
+                val value = arr.optString(i, "").trim()
+                if (value.isNotEmpty()) add(value)
+            }
+        }
+    }
 
     fun load(registry: PackRegistry, metadata: Metadata? = null): Catalog {
         val tracks = linkedMapOf<String, PackManifest.Track>()
@@ -331,6 +371,10 @@ internal object JukeboxCatalog {
                     frames = meta.frames,
                     sampleRate = meta.sampleRate,
                     durationMs = meta.durationMs,
+                    localizedNames = meta.localizedNames,
+                    localizedTitles = meta.localizedTitles,
+                    localizedArrangements = meta.localizedArrangements,
+                    searchAliases = meta.searchAliases,
                 )
             } else {
                 val fallbackGame = sourceGameOf(track.title)

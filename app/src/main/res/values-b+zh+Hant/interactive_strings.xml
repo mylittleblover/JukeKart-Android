@@ -34,4 +34,8 @@
     <string name="interactive_action_fast">最後一圈</string>
     <string name="interactive_action_end">結束賽道</string>
     <string name="interactive_action_cancel">取消切換</string>
+    <string name="interactive_current_stage_label">目前階段</string>
+    <string name="interactive_pending_next_cue">待切換：%1$s · 將在下一個音樂過渡點自動切入</string>
+    <string name="interactive_outro_label">尾奏選擇</string>
+    <string name="interactive_outro_pick">選擇尾奏</string>
 </resources>

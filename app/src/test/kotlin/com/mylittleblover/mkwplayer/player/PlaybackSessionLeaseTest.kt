@@ -6,11 +6,11 @@ import com.mylittleblover.mkwplayer.graph.MusicGraphBuilder as G
 import kotlin.test.*
 
 class PlaybackSessionLeaseTest {
-    private class Device : SessionAudioEngine {
+    private class Device(private val handle: Long = 1L) : SessionAudioEngine {
         var leased=false; var creates=0; var closes=0;var rejected=0
         var streamedBinds=0
         override val sampleRate=48000
-        override fun nativeHandle()=1L
+        override fun nativeHandle()=handle
         override fun sourceSnapshot(slot: Int): LongArray?=null
         override fun loadGraph(packet: ByteArray): Int = if(leased) { rejected++; 1 } else 0
         override fun bindBwav(assetIndex: Int,bytes: ByteArray,assetId: String): Int = if(leased) { rejected++;1 } else 0
@@ -53,6 +53,44 @@ class PlaybackSessionLeaseTest {
         val d=Device();val session=PlaybackSession({d},{_,_->d.output()})
         session.loadFlow("mixed",packet(),listOf("a" to byteArrayOf(1)),1000,100,streamed=true,preparedAssets=setOf("a"))
         assertEquals(0,d.streamedBinds)
+    }
+
+    @Test fun backgroundPreparedFlowCommitsCleanlyAndDiscardClosesWithoutLeasing() {
+        val activeEngine = Device(1L)
+        val stagedEngine = Device(2L)
+        val discardedEngine = Device(3L)
+        val engines = ArrayDeque(listOf(activeEngine, stagedEngine, discardedEngine))
+        val session = PlaybackSession(
+            createEngine = { engines.removeFirst() },
+            openOutput = { handle, _ ->
+                when (handle) {
+                    1L -> activeEngine.output()
+                    2L -> stagedEngine.output()
+                    else -> discardedEngine.output()
+                }
+            },
+        )
+        assertNull(session.loadFlow("First", packet(), listOf("a" to byteArrayOf(1)), 1000, 100).detail)
+        assertTrue(activeEngine.leased)
+
+        val prep = session.prepareFlow("Second", packet(), listOf("a" to byteArrayOf(1)), 1000, 100, linear = true)
+        assertTrue(prep is PlaybackSession.PrepareResult.Ok)
+        assertTrue(activeEngine.leased)
+        assertFalse(stagedEngine.leased)
+        assertEquals(0, activeEngine.rejected)
+        assertEquals(0, stagedEngine.rejected)
+
+        val canceledPrep = session.prepareFlow("Canceled", packet(), listOf("a" to byteArrayOf(1)), 1000, 100, linear = true)
+        assertTrue(canceledPrep is PlaybackSession.PrepareResult.Ok)
+        (canceledPrep as PlaybackSession.PrepareResult.Ok).prepared.discard()
+
+        val state = session.commitPrepared((prep as PlaybackSession.PrepareResult.Ok).prepared)
+        assertNull(state.detail)
+        assertTrue(state.loaded)
+        assertTrue(state.linear)
+        assertFalse(activeEngine.leased)
+        assertEquals(1, activeEngine.closes)
+        session.release()
     }
 
 }

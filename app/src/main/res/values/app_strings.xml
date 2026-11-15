@@ -28,4 +28,5 @@
     <string name="settings_output_flat">Full range kept, no ceiling</string>
     <string name="settings_output_limited">Peaks held under the ceiling</string>
     <string name="settings_output_default">Default</string>
+    <string name="settings_dev_title">Developer &amp; testing</string>
 </resources>

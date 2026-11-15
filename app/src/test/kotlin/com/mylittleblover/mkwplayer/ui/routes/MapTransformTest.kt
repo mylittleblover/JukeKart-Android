@@ -43,11 +43,13 @@ class MapTransformTest {
     }
     @Test fun panningCannotLoseTheMapAtEitherEdge() {
         val leftBottom = MapTransform.create(600f, 600f, 1f, MapCamera(3f, -100f, 100f))
-        assertEquals(0f, leftBottom.left, .001f)
-        assertEquals(-1200f, leftBottom.top, .001f)
+        assertEquals(300f, leftBottom.left, .001f)
+        assertEquals(-1500f, leftBottom.top, .001f)
+        assertEquals(300f, leftBottom.top + leftBottom.drawnHeight, .001f)
         val rightTop = MapTransform.create(600f, 600f, 1f, MapCamera(3f, 100f, -100f))
-        assertEquals(-1200f, rightTop.left, .001f)
-        assertEquals(0f, rightTop.top, .001f)
+        assertEquals(-1500f, rightTop.left, .001f)
+        assertEquals(300f, rightTop.left + rightTop.drawnWidth, .001f)
+        assertEquals(300f, rightTop.top, .001f)
     }
     @Test fun pinchKeepsTheGeographicalPointUnderItsCentroid() {
         val before = MapTransform.create(600f, 600f, 1f, MapCamera(3f))
@@ -105,10 +107,10 @@ class MapTransformTest {
         assertTrue(last.x <= 336f && last.y <= 696f)
     }
 
-    @Test fun zoomedEdgePanningKeepsSpaceForTheEntireStageTouchTarget() {
+    @Test fun zoomedEdgePanningLetsBorderStagesReachViewportCenterWithoutLosingTheMap() {
         val transform = MapTransform.create(360f, 720f, 1f, MapCamera(3f, -100f, -100f), fitPadding = 24f)
-        assertEquals(24f, transform.left, .001f)
-        assertEquals(24f, transform.top, .001f)
+        assertEquals(180f, transform.left, .001f)
+        assertEquals(360f, transform.top, .001f)
     }
     @Test fun officialStopBoundsFitWithoutChangingTheirCoordinates() {
         val points = listOf(Offset(.2f, .3f), Offset(.7f, .7f), Offset(.5f, .4f))

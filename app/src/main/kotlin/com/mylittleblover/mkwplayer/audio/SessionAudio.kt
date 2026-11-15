@@ -17,8 +17,8 @@ internal interface SessionAudioEngine : PlaybackEngine {
      */
     fun setOutputGain(gainDb: Double, ceilingDb: Double): Int = 1
 
-    /** Set dynamic gain (dB) for a compiled track layer node (`track.index`). */
-    fun setLayerGain(trackIndex: Int, gainDb: Double): Int = 1
+    /** Set dynamic gain (dB) for a compiled track layer node (`track.index`), optionally fading over [fadeMs]. */
+    fun setLayerGain(trackIndex: Int, gainDb: Double, fadeMs: Int = 0): Int = 1
 }
 
 internal interface SessionAudioOutput {

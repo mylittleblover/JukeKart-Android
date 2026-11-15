@@ -7,6 +7,10 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -24,18 +28,24 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -143,17 +153,57 @@ internal fun OfficialMapScreen(
         val paneWidth = if (maxWidth >= 840.dp) 320.dp else 248.dp
         Row(Modifier.fillMaxSize()) {
             BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
+                val viewportMaxHeight = maxHeight
                 MapCanvas(image, anchors.canvasWidth.toFloat(), pins, route, state, name, Modifier.fillMaxSize(),
                     neighbours = neighbours, onPinTap = onPinTap, draft = state.draft, editFrom = state.editFrom)
                 val horizontalControls = maxHeight < 240.dp || (!wide && maxHeight < 400.dp)
                 Surface(
-                    modifier = Modifier.align(Alignment.TopStart).padding(12.dp).widthIn(max = (maxWidth - if (horizontalControls) 184.dp else 88.dp).coerceIn(0.dp, 320.dp)),
-                    shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = .96f), shadowElevation = 2.dp,
+                    modifier = Modifier.align(Alignment.TopStart).padding(10.dp)
+                        .widthIn(max = (maxWidth - if (horizontalControls) 196.dp else 72.dp).coerceIn(140.dp, 340.dp)),
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+                    shadowElevation = 3.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)),
                 ) {
-                    Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
-                        Text(stringResource(R.string.map_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        if (!horizontalControls) Text(stringResource(R.string.map_subtitle, pins.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (!wide) TextButton(onClick = { picker = true }, contentPadding = PaddingValues(horizontal = 0.dp)) { Text(stringResource(R.string.map_official_routes)) }
+                    Row(
+                        Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Column(Modifier.weight(1f, fill = false)) {
+                            Text(
+                                stringResource(R.string.map_title),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            if (!horizontalControls) {
+                                Text(
+                                    stringResource(R.string.map_subtitle, pins.size),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                        if (!wide) {
+                            Surface(
+                                onClick = { picker = true },
+                                shape = RoundedCornerShape(999.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                            ) {
+                                Text(
+                                    stringResource(R.string.map_official_routes),
+                                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
                     }
                 }
                 val controls: @Composable () -> Unit = {
@@ -169,22 +219,57 @@ internal fun OfficialMapScreen(
                         }
                     }
                 }
-                if (horizontalControls) {
-                    Row(Modifier.align(Alignment.TopEnd).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) { controls() }
-                } else {
-                    Column(Modifier.align(Alignment.TopEnd).padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { controls() }
+                Surface(
+                    modifier = Modifier.align(Alignment.TopEnd).padding(10.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+                    shadowElevation = 3.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)),
+                ) {
+                    if (horizontalControls) {
+                        Row(Modifier.padding(3.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) { controls() }
+                    } else {
+                        Column(Modifier.padding(3.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) { controls() }
+                    }
                 }
                 if (!wide) {
-                    Surface(
-                        Modifier.align(Alignment.BottomCenter).padding(12.dp).widthIn(max = 640.dp).fillMaxWidth().heightIn(max = maxHeight * .45f),
-                        shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = .98f), shadowElevation = 3.dp,
+                    val hasActiveBottom = state.editing || route != null || course != null
+                    Box(
+                        Modifier.align(Alignment.BottomCenter).padding(10.dp).widthIn(max = 640.dp)
+                            .animateContentSize(tween(220, easing = com.mylittleblover.mkwplayer.ui.AppMotion.easeOut)),
                     ) {
-                        Column(Modifier.verticalScroll(rememberScrollState())) {
-                            if (state.editing) {
-                                ConnectionEditorPanel(state, name, connections) { stops = false }
-                            } else {
-                                MapSelectionPanel(route, course, name, languageTag, playableStages, state, { stops = true }, onOpenCourse,
-                                    neighbours = neighbours, sink = sink, connections = connections)
+                        if (!hasActiveBottom) {
+                            Surface(
+                                shape = RoundedCornerShape(999.dp),
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+                                shadowElevation = 3.dp,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
+                            ) {
+                                Text(
+                                    stringResource(R.string.map_browse_hint),
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        } else {
+                            Surface(
+                                Modifier.fillMaxWidth().heightIn(max = viewportMaxHeight * .33f),
+                                shape = RoundedCornerShape(20.dp),
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = .97f),
+                                shadowElevation = 4.dp,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)),
+                            ) {
+                                Column(Modifier.verticalScroll(rememberScrollState())) {
+                                    if (state.editing) {
+                                        ConnectionEditorPanel(state, name, connections) { stops = false }
+                                    } else {
+                                        MapSelectionPanel(route, course, name, languageTag, playableStages, state, { stops = true }, onOpenCourse,
+                                            neighbours = neighbours, sink = sink, connections = connections)
+                                    }
+                                }
                             }
                         }
                     }
@@ -236,6 +321,7 @@ internal fun OfficialMapScreen(
         ModalBottomSheet(sheetState = stopSheet, onDismissRequest = { stops = false }) {
             Text(route.displayName(languageTag), Modifier.padding(horizontal = 24.dp, vertical = 12.dp), style = MaterialTheme.typography.headlineSmall)
             Text(stringResource(R.string.map_route_readonly), Modifier.padding(horizontal = 24.dp), style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.map_schematic), Modifier.padding(horizontal = 24.dp, vertical = 4.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             LazyColumn(Modifier.fillMaxWidth().heightIn(max = 560.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
                 items(route.stops, key = { it.id }) { stop ->
                     ListItem(
@@ -292,64 +378,159 @@ private fun MapSelectionPanel(
     neighbours: List<String> = emptyList(), sink: Boolean = false,
     connections: com.mylittleblover.mkwplayer.library.StageConnections.Catalog? = null,
 ) {
-    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    var connectionsExpanded by remember(course) { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         when {
             course != null -> {
-                Text(name(course), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(stringResource(if (course in playable) R.string.map_audio_ready else R.string.map_audio_missing), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        name(course),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = if (course in playable) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                    ) {
+                        Text(
+                            stringResource(if (course in playable) R.string.map_audio_ready else R.string.map_audio_missing),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (course in playable) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                    }
+                }
                 // The game's own connections for this course. A course with none says so, because
                 // "nowhere" is the answer for a finish line and pretending otherwise would show a road
                 // the game does not have.
                 when {
-                    sink -> Text(stringResource(R.string.map_course_sink), style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    sink -> Text(
+                        stringResource(R.string.map_course_sink),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                     neighbours.isNotEmpty() -> {
                         // The count is the table's own, not the number drawn. A locked destination is hidden
                         // from the map but still exists in the export, and reporting "7 connections" when the
                         // game defines 8 would be a quieter lie than hiding the pin.
                         val total = connections?.outgoing(course)?.size ?: neighbours.size
-                        Text(
-                            stringResource(R.string.map_course_connections,
-                                total, neighbours.joinToString(" · ") { name(it) }),
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (total > neighbours.size) {
-                            Text(stringResource(R.string.map_course_connections_hidden, total - neighbours.size),
-                                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(
+                            Modifier.fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { connectionsExpanded = !connectionsExpanded }
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(
+                                stringResource(
+                                    R.string.map_course_connections,
+                                    total,
+                                    neighbours.joinToString(" · ") { name(it) },
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = if (connectionsExpanded) 4 else 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Icon(
+                                if (connectionsExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (connectionsExpanded && total > neighbours.size) {
+                            Text(
+                                stringResource(R.string.map_course_connections_hidden, total - neighbours.size),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
-                    else -> Text(stringResource(R.string.map_course_no_connections), style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    else -> Text(
+                        stringResource(R.string.map_course_no_connections),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { onOpenCourse(course) }) { Text(stringResource(R.string.map_course_details)) }
-                    TextButton(onClick = { state.clearCourse() }) { Text(stringResource(if (route != null) R.string.map_back_route else R.string.map_close)) }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Button(
+                        onClick = { onOpenCourse(course) },
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                        modifier = Modifier.heightIn(min = 36.dp),
+                    ) { Text(stringResource(R.string.map_course_details)) }
+                    TextButton(
+                        onClick = { state.clearCourse() },
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.heightIn(min = 36.dp),
+                    ) { Text(stringResource(if (route != null) R.string.map_back_route else R.string.map_close)) }
                 }
             }
             route != null -> {
-                Text(route.displayName(languageTag), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(stringResource(R.string.map_start, name(route.start.stageCode)), style = MaterialTheme.typography.bodyMedium)
-                Text(stringResource(R.string.map_finish, name(route.end.stageCode)), style = MaterialTheme.typography.bodyMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = onStops) { Text(stringResource(R.string.map_view_stops)) }
-                    TextButton(onClick = { state.clearSelection() }) { Text(stringResource(R.string.map_clear_route)) }
+                Text(
+                    route.displayName(languageTag),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        stringResource(R.string.map_start, name(route.start.stageCode)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        stringResource(R.string.map_finish, name(route.end.stageCode)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-                Text(stringResource(R.string.map_schematic), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Button(
+                        onClick = onStops,
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                        modifier = Modifier.heightIn(min = 36.dp),
+                    ) { Text(stringResource(R.string.map_view_stops)) }
+                    TextButton(
+                        onClick = { state.clearSelection() },
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.heightIn(min = 36.dp),
+                    ) { Text(stringResource(R.string.map_clear_route)) }
+                }
             }
             else -> Text(stringResource(R.string.map_browse_hint), style = MaterialTheme.typography.bodyMedium)
         }
-        Text(stringResource(R.string.map_art_notice), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
 private fun MapControl(symbol: String, label: String, enabled: Boolean = true, onClick: () -> Unit) {
-    FilledTonalIconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(48.dp).semantics { contentDescription = label },
+    FilledTonalIconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.size(40.dp).semantics { contentDescription = label },
         colors = IconButtonDefaults.filledTonalIconButtonColors(
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = Color.Transparent,
             contentColor = MaterialTheme.colorScheme.onSurface,
-            disabledContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
-            disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.50f),
-        )) {
+            disabledContainerColor = Color.Transparent,
+            disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.36f),
+        ),
+    ) {
         // Every symbol the caller passes must have an icon: an unmapped one used to fall through to the
         // location glyph, so the edit button looked like a second "recentre" control.
         Icon(
@@ -361,6 +542,7 @@ private fun MapControl(symbol: String, label: String, enabled: Boolean = true, o
                 else -> Icons.Filled.MyLocation
             },
             contentDescription = null,
+            modifier = Modifier.size(20.dp),
         )
     }
 }
@@ -399,22 +581,37 @@ private fun MapCanvas(
         label = "route-highlight-mask",
     )
     val occurrences = route?.stops?.groupBy { it.stageCode }.orEmpty()
-    BoxWithConstraints(modifier.background(Color(0xFF24516F)).clipToBounds().pointerInput(state) {
-        detectTransformGestures { centroid, pan, zoom, _ -> state.gesture(centroid, pan, zoom) }
-    }) {
+    BoxWithConstraints(
+        modifier
+            .background(
+                Brush.radialGradient(
+                    colors = listOf(Color(0xFF214E6B), Color(0xFF14354C)),
+                ),
+            )
+            .clipToBounds()
+            .pointerInput(state) {
+                detectTransformGestures { centroid, pan, zoom, _ -> state.gesture(centroid, pan, zoom) }
+            },
+    ) {
         val transform = state.configure(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat(), image.width.toFloat() / image.height, padding)
         Canvas(Modifier.fillMaxSize().then(artworkFade(image))) {
             if (transform.drawnWidth > 0f && transform.drawnHeight > 0f) {
                 withTransform({
                     translate(transform.left, transform.top)
                     scale(transform.drawnWidth / image.width, transform.drawnHeight / image.height, pivot = Offset.Zero)
-                }) { drawImage(image, filterQuality = FilterQuality.Medium) }
+                }) { drawImage(image, filterQuality = FilterQuality.High) }
                 highlightMask?.let { mask ->
                     if (maskAlpha > 0f) {
+                        val layerPaint = Paint().apply { alpha = maskAlpha }
+                        drawContext.canvas.saveLayer(Rect(Offset.Zero, size), layerPaint)
+                        drawRect(Color(0x91060C1A))
                         withTransform({
                             translate(transform.left, transform.top)
                             scale(transform.drawnWidth / mask.width, transform.drawnHeight / mask.height, pivot = Offset.Zero)
-                        }) { drawImage(mask, alpha = maskAlpha, filterQuality = FilterQuality.Medium) }
+                        }) {
+                            drawImage(mask, blendMode = BlendMode.DstOut, filterQuality = FilterQuality.High)
+                        }
+                        drawContext.canvas.restore()
                     }
                 }
             }
@@ -507,7 +704,7 @@ private fun MapCanvas(
                     ArtworkSlot(Modifier.fillMaxSize()) { edgePx ->
                     val artwork = rememberResourceArtwork(art, edgePx)
                     if (artwork != null) {
-                    val painter = remember(artwork) { BitmapPainter(artwork.bitmap) }
+                    val painter = remember(artwork) { BitmapPainter(artwork.bitmap, filterQuality = FilterQuality.High) }
                     Image(painter, contentDescription = null, modifier = Modifier.fillMaxSize()
                         .then(artworkFade(artwork.bitmap))
                         .graphicsLayer { scaleX = selectionScale; scaleY = selectionScale }

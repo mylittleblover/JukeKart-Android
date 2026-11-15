@@ -36,8 +36,11 @@ internal fun CourseCover(
     modifier: Modifier = Modifier,
     formalArt: androidx.compose.ui.graphics.painter.Painter? = null,
     showIcon: Boolean = false,
+    packDirectory: java.io.File? = null,
+    artworkName: String? = null,
 ) {
     val cover = code?.let { CourseCoverArt.resolve(it) }
+    val packArtNames = listOfNotNull(artworkName)
 
     when {
         formalArt != null -> Box(modifier) {
@@ -45,6 +48,22 @@ internal fun CourseCover(
                 contentScale = ContentScale.Crop)
             if (showIcon) code?.let { StageArt.resolve(it) }?.let {
                 ResourceArtwork(it, Modifier.align(Alignment.BottomEnd).size(72.dp))
+            }
+        }
+
+        packDirectory != null && packArtNames.isNotEmpty() -> ArtworkSlot(modifier) { edge ->
+            Box(Modifier.fillMaxSize()) {
+                val packed = PackArtwork.rememberArtwork(packDirectory, packArtNames, edge)
+                if (packed != null) {
+                    FadingArtwork(packed.bitmap, Modifier.fillMaxSize(), ContentScale.Crop)
+                } else if (cover != null) {
+                    ResourceArtwork(cover, Modifier.fillMaxSize(), ContentScale.Crop)
+                } else {
+                    CoursePlaceholder(code, Modifier.fillMaxSize(), showIcon = false)
+                }
+                if (showIcon) code?.let { StageArt.resolve(it) }?.let {
+                    ResourceArtwork(it, Modifier.align(Alignment.BottomEnd).size(72.dp))
+                }
             }
         }
 

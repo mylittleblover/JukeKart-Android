@@ -128,7 +128,7 @@ internal class LinearPlaybackCoordinator(
         val session = sessionProvider()
         val current = queue.snapshot().current
         if (session.state.value.linear && session.state.value.active &&
-            current?.overlaidOpening == null && current?.chainedSequence == null
+            current?.overlaidOpening == null && current?.chainedSequence == null && current?.courseMedley == null
         ) {
             session.setLinearRepeat(mode == LinearQueue.RepeatMode.SINGLE, activeLoopStart, activeLoopEnd)
         }
@@ -228,7 +228,14 @@ internal class LinearPlaybackCoordinator(
 
             val track = catalog.tracksByKey[entry.key]
             val packDir = catalog.packByKey[entry.key] ?: extraPackDir
-            if (packDir == null || (track == null && entry.assetSha256 == null && entry.overlaidOpening == null && entry.chainedSequence == null)) {
+            if (packDir == null || (
+                    track == null &&
+                    entry.assetSha256 == null &&
+                    entry.overlaidOpening == null &&
+                    entry.chainedSequence == null &&
+                    entry.courseMedley == null
+                )
+            ) {
                 publishSnapshot(active = false, error = "No installed pack carries this track.", loading = false)
                 return@launch
             }
@@ -236,115 +243,104 @@ internal class LinearPlaybackCoordinator(
             val session = sessionProvider()
             if (entry.overlaidOpening != null) {
                 val op = entry.overlaidOpening
-                val compiled = withContext(Dispatchers.IO) {
-                    runCatching {
-                        val opBytes = readRawBwav(op.op.sha256, packDir)
-                        val telopBytes = readRawBwav(op.telop.sha256, packDir)
-                        com.mylittleblover.mkwplayer.interactive.ExtraInteractiveCompilers.compileOverlaidOpeningGraph(op, opBytes, telopBytes)
-                    }
-                }.getOrElse { problem ->
-                    publishSnapshot(active = false, error = problem.message ?: "Could not read audio.", loading = false)
-                    return@launch
-                }
-                if (generation != requestGeneration) return@launch
-                activeLoopStart = -1L
-                activeLoopEnd = -1L
-                val sessionState = session.loadLinearGraph(
-                    title = entry.title,
-                    packet = compiled.packet,
-                    assets = compiled.assets,
-                    frames = compiled.totalFrames,
-                    streamed = false,
-                )
-                if (sessionState.detail != null) {
-                    publishSnapshot(active = false, error = sessionState.detail, loading = false)
-                    return@launch
-                }
-                _state.value = LinearUiState(
-                    active = true,
-                    current = entry,
-                    queue = queue.snapshot(),
-                    totalFrames = compiled.totalFrames,
+                openCompiledFlowEntry(
+                    entry = entry,
+                    session = session,
+                    generation = generation,
                     sampleRate = op.op.sampleRate,
-                    error = null,
-                    loading = false,
-                )
-                appContext?.let { PlaybackService.start(it) }
+                    streamed = false,
+                ) {
+                    val opBytes = readRawBwav(op.op.sha256, packDir)
+                    val telopBytes = readRawBwav(op.telop.sha256, packDir)
+                    com.mylittleblover.mkwplayer.interactive.ExtraInteractiveCompilers.compileOverlaidOpeningGraph(op, opBytes, telopBytes)
+                }
                 return@launch
             }
 
             if (entry.chainedSequence != null) {
                 val chained = entry.chainedSequence
-                val compiled = withContext(Dispatchers.IO) {
-                    runCatching {
-                        val bytesByStem = buildMap {
-                            chained.parts.forEach { part ->
-                                if (part.asset.stem !in this) {
-                                    put(part.asset.stem, readRawBwav(part.asset.sha256, packDir))
-                                }
+                openCompiledFlowEntry(
+                    entry = entry,
+                    session = session,
+                    generation = generation,
+                    sampleRate = chained.parts.firstOrNull()?.asset?.sampleRate ?: 48000,
+                    streamed = false,
+                ) {
+                    val bytesByStem = buildMap {
+                        chained.parts.forEach { part ->
+                            if (part.asset.stem !in this) {
+                                put(part.asset.stem, readRawBwav(part.asset.sha256, packDir))
                             }
                         }
-                        com.mylittleblover.mkwplayer.interactive.ExtraInteractiveCompilers.compileChainedSequenceGraph(chained, bytesByStem)
                     }
-                }.getOrElse { problem ->
-                    publishSnapshot(active = false, error = problem.message ?: "Could not read audio.", loading = false)
-                    return@launch
+                    com.mylittleblover.mkwplayer.interactive.ExtraInteractiveCompilers.compileChainedSequenceGraph(chained, bytesByStem)
                 }
-                if (generation != requestGeneration) return@launch
-                activeLoopStart = -1L
-                activeLoopEnd = -1L
-                val sampleRate = chained.parts.firstOrNull()?.asset?.sampleRate ?: 48000
-                val sessionState = session.loadLinearGraph(
-                    title = entry.title,
-                    packet = compiled.packet,
-                    assets = compiled.assets,
-                    frames = compiled.totalFrames,
-                    streamed = false,
-                )
-                if (sessionState.detail != null) {
-                    publishSnapshot(active = false, error = sessionState.detail, loading = false)
-                    return@launch
+                return@launch
+            }
+
+            if (entry.courseMedley != null) {
+                val resolved = entry.courseMedley
+                openCompiledFlowEntry(
+                    entry = entry,
+                    session = session,
+                    generation = generation,
+                    sampleRate = resolved.sampleRate,
+                    streamed = true,
+                ) {
+                    val bytesByStem = resolved.stemDigests.mapValues { (_, sha) ->
+                        readRawBwav(sha, packDir)
+                    }
+                    com.mylittleblover.mkwplayer.interactive.CourseMedleyCompiler.compileGraph(
+                        medley = resolved.medley,
+                        sampleRate = resolved.sampleRate,
+                        bytesByStem = bytesByStem,
+                    )
                 }
-                _state.value = LinearUiState(
-                    active = true,
-                    current = entry,
-                    queue = queue.snapshot(),
-                    totalFrames = compiled.totalFrames,
-                    sampleRate = sampleRate,
-                    error = null,
-                    loading = false,
-                )
-                appContext?.let { PlaybackService.start(it) }
                 return@launch
             }
 
             val sha256 = track?.primary?.sha256 ?: entry.assetSha256!!
-            val loaded = withContext(Dispatchers.IO) {
-                readPlayableAudio(sha256, packDir, entry.loopStart, entry.loopEnd)
-            }
-            if (generation != requestGeneration) return@launch
-
-            val result = loaded.getOrElse { problem ->
-                publishSnapshot(active = false, error = problem.message ?: "Could not read audio.", loading = false)
-                return@launch
-            }
-
-            activeLoopStart = result.loopStart ?: -1L
-            activeLoopEnd = result.loopEnd ?: -1L
             val singleLoop = queue.repeatMode == LinearQueue.RepeatMode.SINGLE
-            val sessionState = session.loadLinear(
-                title = entry.title,
-                audio = result.bytes,
-                assetId = sha256,
-                frames = result.frames,
-                loop = singleLoop,
-                streamed = true,
-                loopStart = result.loopStart,
-                loopEnd = result.loopEnd,
-            )
-            if (sessionState.detail != null) {
-                publishSnapshot(active = false, error = sessionState.detail, loading = false)
+            val preparedResult = withContext(Dispatchers.IO) {
+                readPlayableAudio(sha256, packDir, entry.loopStart, entry.loopEnd).map { result ->
+                    result to session.prepareLinear(
+                        title = entry.title,
+                        audio = result.bytes,
+                        assetId = sha256,
+                        frames = result.frames,
+                        loop = singleLoop,
+                        streamed = true,
+                        loopStart = result.loopStart,
+                        loopEnd = result.loopEnd,
+                    )
+                }
+            }
+            val (result, prep) = preparedResult.getOrElse { problem ->
+                if (generation == requestGeneration) {
+                    publishSnapshot(active = false, error = problem.message ?: "Could not read audio.", loading = false)
+                }
                 return@launch
+            }
+            when (prep) {
+                is PlaybackSession.PrepareResult.Failed -> {
+                    if (generation == requestGeneration) {
+                        publishSnapshot(active = false, error = prep.reason, loading = false)
+                    }
+                    return@launch
+                }
+                is PlaybackSession.PrepareResult.Ok -> {
+                    if (generation != requestGeneration) {
+                        withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { prep.prepared.discard() }
+                        return@launch
+                    }
+                    activeLoopStart = result.loopStart ?: -1L
+                    activeLoopEnd = result.loopEnd ?: -1L
+                    session.commitPrepared(prep.prepared)
+                    val desiredSingleLoop = queue.repeatMode == LinearQueue.RepeatMode.SINGLE
+                    if (desiredSingleLoop != singleLoop) {
+                        session.setLinearRepeat(desiredSingleLoop, activeLoopStart, activeLoopEnd)
+                    }
+                }
             }
 
             _state.value = LinearUiState(
@@ -359,6 +355,59 @@ internal class LinearPlaybackCoordinator(
 
             appContext?.let { PlaybackService.start(it) }
         }
+    }
+
+    private suspend fun openCompiledFlowEntry(
+        entry: LinearQueue.Entry,
+        session: PlaybackSession,
+        generation: Long,
+        sampleRate: Int,
+        streamed: Boolean,
+        compile: () -> com.mylittleblover.mkwplayer.interactive.ExtraInteractiveCompilers.CompiledLinearGraph,
+    ) {
+        val preparedResult = withContext(Dispatchers.IO) {
+            runCatching {
+                val compiled = compile()
+                compiled.totalFrames to session.prepareFlow(
+                    title = entry.title,
+                    packet = compiled.packet,
+                    assets = compiled.assets,
+                    frames = compiled.totalFrames,
+                    startSegment = 100,
+                    streamed = streamed,
+                    linear = true,
+                )
+            }
+        }
+        val (totalFrames, prep) = preparedResult.getOrElse { problem ->
+            publishSnapshot(active = false, error = problem.message ?: "Could not read audio.", loading = false)
+            return
+        }
+        when (prep) {
+            is PlaybackSession.PrepareResult.Failed -> {
+                publishSnapshot(active = false, error = prep.reason, loading = false)
+                return
+            }
+            is PlaybackSession.PrepareResult.Ok -> {
+                if (generation != requestGeneration) {
+                    withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { prep.prepared.discard() }
+                    return
+                }
+                activeLoopStart = -1L
+                activeLoopEnd = -1L
+                session.commitPrepared(prep.prepared)
+            }
+        }
+        _state.value = LinearUiState(
+            active = true,
+            current = entry,
+            queue = queue.snapshot(),
+            totalFrames = totalFrames,
+            sampleRate = sampleRate,
+            error = null,
+            loading = false,
+        )
+        appContext?.let { PlaybackService.start(it) }
     }
 
     private fun publishSnapshot(
@@ -424,15 +473,15 @@ internal class LinearPlaybackCoordinator(
 
         fun entryFor(item: JukeboxCatalog.TrackItem, game: JukeboxCatalog.Game, languageTag: String): LinearQueue.Entry {
             val gameName = game.localizedName(languageTag)
-            val arrSuffix = item.arrangement?.let { " ($it)" }.orEmpty()
+            val arrangement = item.localizedArrangement(languageTag)
             return LinearQueue.Entry(
                 key = item.key,
-                title = "${item.title}$arrSuffix",
+                title = item.localizedDisplayName(languageTag),
                 subtitle = if (game.yearLabel.isNotBlank()) "${game.yearLabel} · $gameName" else gameName,
                 gameId = game.id,
                 gameTitle = gameName,
                 yearLabel = game.yearLabel.ifBlank { null },
-                arrangement = item.arrangement,
+                arrangement = arrangement,
                 ostIndex = item.ostIndex,
                 durationMs = item.durationMs,
             )

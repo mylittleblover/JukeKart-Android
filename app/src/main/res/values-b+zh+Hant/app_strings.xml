@@ -19,4 +19,10 @@
     <string name="nav_course">賽道詳情</string>
     <string name="settings_library_counts">已匯入 %1$d 首 · 可播放 %2$d 首</string>
     <string name="settings_import_details">匯入詳情</string>
+    <string name="settings_output_title">輸出電平</string>
+    <string name="settings_output_hint">遊戲原始音訊的母帶音量偏低。在此調高增益會套用至每一首曲目；峰值上限可避免爆音削波。</string>
+    <string name="settings_output_flat">保留完整動態，不設上限</string>
+    <string name="settings_output_limited">將峰值限制在上限之內</string>
+    <string name="settings_output_default">預設</string>
+    <string name="settings_dev_title">開發者與測試選項</string>
 </resources>

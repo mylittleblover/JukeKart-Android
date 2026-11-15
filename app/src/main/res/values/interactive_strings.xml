@@ -34,4 +34,8 @@
     <string name="interactive_action_fast">Final Lap</string>
     <string name="interactive_action_end">Finish</string>
     <string name="interactive_action_cancel">Cancel</string>
+    <string name="interactive_current_stage_label">Current stage</string>
+    <string name="interactive_pending_next_cue">Queued: %1$s · Switches at next transition point</string>
+    <string name="interactive_outro_label">Outro exit</string>
+    <string name="interactive_outro_pick">Choose outro</string>
 </resources>

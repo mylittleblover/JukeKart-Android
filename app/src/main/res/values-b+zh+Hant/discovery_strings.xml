@@ -90,4 +90,11 @@
     <string name="jukebox_up_next_temp">接下來播放（臨時插播）</string>
     <string name="jukebox_up_next_list">目前清單後續曲目</string>
     <string name="jukebox_queue_empty">佇列中暫無後續曲目。</string>
+    <string name="discovery_search_all">搜尋賽道、盃賽、作品與曲目</string>
+    <string name="discovery_vs_standard">本作賽道</string>
+    <string name="discovery_vs_sfc">SFC 復刻賽道 / 任務</string>
+    <string name="discovery_battle_summary">共 %1$d 首 · 支援一般 / 即將結束階段切換</string>
+    <string name="discovery_audition">試聽</string>
+    <string name="discovery_create_name_hint">輸入名稱即可建立。</string>
+    <string name="discovery_official_quick">官方賽程速覽</string>
 </resources>

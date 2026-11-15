@@ -12,14 +12,16 @@ import kotlin.test.assertTrue
 
 class JukeboxMetadataCatalogTest {
 
-    private fun bundledCatalogFile(): File {
+    private fun bundledCatalogFile(): File = bundledAssetFile("jukebox_catalog.json")
+
+    private fun bundledAssetFile(name: String): File {
         val candidates = listOf(
-            File("src/main/assets/jukebox_catalog.json"),
-            File("app/src/main/assets/jukebox_catalog.json"),
-            File("MKW-Player/app/src/main/assets/jukebox_catalog.json"),
+            File("src/main/assets/$name"),
+            File("app/src/main/assets/$name"),
+            File("MKW-Player/app/src/main/assets/$name"),
         )
         return candidates.firstOrNull { it.isFile }
-            ?: error("Could not locate jukebox_catalog.json from ${File(".").absolutePath}")
+            ?: error("Could not locate $name from ${File(".").absolutePath}")
     }
 
     private fun fakeTrack(
@@ -151,5 +153,112 @@ class JukeboxMetadataCatalogTest {
         val fallbackGame = catalog.gameForTrack(unknownTrack.key)
         assertNotNull(fallbackGame)
         assertFalse(catalog.search("Mystery TestTheme").trackHits.isEmpty())
+    }
+
+    @Test
+    fun localizesAllJukeboxGamesAndTracksPerMarioWikiAndSupportsMultiLanguageSearch() {
+        val metadata = JukeboxCatalog.parseMetadata(bundledCatalogFile().readText())!!
+        val languages = listOf("en", "ja", "zh-Hans", "zh-Hant")
+
+        for (game in metadata.games) {
+            for (lang in languages) {
+                assertFalse(game.names[lang].isNullOrBlank(), "Missing $lang game name for ${game.id}")
+            }
+        }
+        for (track in metadata.tracks) {
+            for (lang in languages) {
+                assertFalse(track.localizedNames[lang].isNullOrBlank(), "Missing $lang track name for #${track.ostIndex}")
+                assertFalse(track.localizedTitles[lang].isNullOrBlank(), "Missing $lang track title for #${track.ostIndex}")
+                if (track.ostArrangement != null) {
+                    assertFalse(
+                        track.localizedArrangements[lang].isNullOrBlank(),
+                        "Missing $lang arrangement for #${track.ostIndex}",
+                    )
+                }
+            }
+        }
+
+        val fullCatalog = JukeboxCatalog.buildCatalog(
+            jukeboxTracks = metadata.tracks.map { fakeTrack(it.packTrackKey, it.bwavStem, it.sha256) },
+            metadata = metadata,
+        )
+
+        assertEquals("超级咚奇刚", fullCatalog.gameById("dkc")!!.localizedName("zh-CN"))
+        assertEquals("超级马力欧USA", fullCatalog.gameById("smb2")!!.localizedName("zh-CN"))
+        assertEquals("瑪利歐賽車 Double Dash!!", fullCatalog.gameById("mkdd")!!.localizedName("zh-TW"))
+        assertEquals("マリオカートアドバンス", fullCatalog.gameById("mksc")!!.localizedName("ja-JP"))
+        assertEquals("超级马力欧阳光", fullCatalog.gameById("sms")!!.localizedName("zh-Hans"))
+        assertEquals("New 超级马力欧兄弟 Wii", fullCatalog.gameById("nsmbwii")!!.localizedName("zh-Hans"))
+        assertEquals("马力欧卡丁车实况：家庭赛车场", fullCatalog.gameById("mklhc")!!.localizedName("zh-Hans"))
+
+        val track177 = fullCatalog.itemForTrack(metadata.tracks.first { it.ostIndex == 177 }.packTrackKey)!!
+        assertEquals("ウォーターランド", track177.localizedDisplayName("ja"))
+        assertEquals("ウォーターランド", track177.localizedTitle("ja"))
+        assertEquals(null, track177.localizedArrangement("ja"))
+
+        val track120 = fullCatalog.itemForTrack(metadata.tracks.first { it.ostIndex == 120 }.packTrackKey)!!
+        assertEquals("地上BGM ラテンVer.", track120.localizedDisplayName("ja"))
+        assertEquals("地上BGM", track120.localizedTitle("ja"))
+        assertEquals("ラテンVer.", track120.localizedArrangement("ja"))
+
+        val track246 = fullCatalog.itemForTrack(metadata.tracks.first { it.ostIndex == 246 }.packTrackKey)!!
+        assertEquals("瓦力欧矿山", track246.localizedDisplayName("zh-Hans"))
+        assertEquals("瓦力欧矿山", track246.localizedTitle("zh-Hans"))
+        assertEquals(null, track246.localizedArrangement("zh-Hans"))
+
+        val waluigiHits = fullCatalog.search("瓦路易吉").trackHits
+        assertTrue(waluigiHits.any { it.second.ostIndex in setOf(225, 226) })
+
+        val coconutHits = fullCatalog.search("椰子广场").trackHits
+        assertTrue(coconutHits.any { it.second.ostIndex == 244 })
+
+        val gustyHits = fullCatalog.search("ウィンドガーデン").trackHits
+        assertTrue(gustyHits.any { it.second.ostIndex == 238 })
+
+        val dkcGameHits = fullCatalog.search("超级森喜刚").games
+        assertTrue(dkcGameHits.any { it.id == "dkc" })
+    }
+
+    @Test
+    fun extraMusicCatalogHasCompleteMarioWikiLocalizations() {
+        val catalog = ExtraMusicCatalog.parse(bundledAssetFile("extra_music_catalog.json").readText())
+        val languages = listOf("en", "ja", "zh-Hans", "zh-Hant")
+
+        val allEntries = buildList {
+            catalog.sfcCourses.forEach { add(it.id to it.names) }
+            catalog.battleTracks.forEach { add(it.id to it.names) }
+            catalog.otherMusic.forEach { add(it.id to it.names) }
+            catalog.shortSounds.forEach { add(it.id to it.names) }
+            catalog.nintendoMusicSpecial.forEach { add(it.id to it.names) }
+        }
+        assertTrue(allEntries.size >= 80)
+        for ((id, names) in allEntries) {
+            for (lang in languages) {
+                assertFalse(names[lang].isNullOrBlank(), "Missing $lang name in extra_music_catalog for $id")
+            }
+        }
+
+        val choco = catalog.sfcCourses.first { it.id == "sfc_choco_island" }
+        assertEquals("Choco Island (Mission)", choco.localizedName("en"))
+        assertEquals("巧克力岛（任务）", choco.localizedName("zh-Hans"))
+        assertEquals("巧克力島（任務）", choco.localizedName("zh-Hant"))
+        assertEquals("チョコレーとう（ミッション）", choco.localizedName("ja"))
+
+        val delfino = catalog.battleTracks.first { it.id == "battle_delfino_pier" }
+        assertEquals("水上丽都（Mario Kart Wii）", delfino.localizedName("zh-Hans"))
+
+        val openingFlower = catalog.otherMusic.first { it.id == "opening_flower" }
+        assertEquals("开场（鲜花杯）", openingFlower.localizedName("zh-Hans"))
+
+        val victoryLap = catalog.otherMusic.first { it.id == "victory_lap" }
+        assertEquals("胜利圈", victoryLap.localizedName("zh-Hans"))
+        assertEquals("馳往勝利", victoryLap.localizedName("zh-Hant"))
+
+        val finalLapFf = catalog.shortSounds.first { it.id == "final_lap_fanfare" }
+        assertEquals("最后一圈 鸣乐", finalLapFf.localizedName("zh-Hans"))
+
+        val titleTheme = catalog.otherMusic.first { it.id == "title_theme" }
+        assertEquals("Title Theme", titleTheme.localizedName("en"))
+        assertEquals("Main Theme", titleTheme.localizedName("zh-Hans"))
     }
 }

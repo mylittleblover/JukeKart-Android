@@ -232,7 +232,7 @@ internal object ExtraInteractiveCompilers {
         }
         val chosenEntry = if (initialSegment == TWO_STATE_SEG_FAST) TWO_STATE_SEG_FAST else TWO_STATE_SEG_MAIN
 
-        return InteractivePlaybackPlan(
+        val basePlan = InteractivePlaybackPlan(
             name = track.id,
             spec = spec,
             packet = packet,
@@ -250,6 +250,14 @@ internal object ExtraInteractiveCompilers {
             entryPreparedAssets = entryPrepared,
             customInitialSegments = listOf(TWO_STATE_SEG_MAIN, TWO_STATE_SEG_FAST),
         )
+        val ffBytes = bytesByStem[FinalLapFanfareCompiler.ASSET]
+            ?: bytesByStem[FinalLapFanfareCompiler.ASSET.removeSuffix(".bwav")]
+        val extendBytes = if (ffBytes != null) {
+            bytesByStem + (FinalLapFanfareCompiler.ASSET to ffBytes)
+        } else {
+            bytesByStem
+        }
+        return FinalLapFanfareCompiler.extend(basePlan, extendBytes)
     }
 
     fun compileOverlaidOpeningGraph(

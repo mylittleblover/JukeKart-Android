@@ -10,6 +10,10 @@ internal object FinalLapFanfareCompiler {
     // Median measured from three gameplay recordings, not a MINF event. See research note.
     private const val FAST_START = 188_880L
     private const val SHA256 = "60790cdf84a2e04c9fffca7ccee8bafa5be2bfb6ceb6dfd4f98ecfc8bdd8ce94"
+    @Volatile
+    private var verifiedAssetBytes: ByteArray? = null
+    @Volatile
+    private var verifiedDigest: ByteArray? = null
 
     fun extend(base: InteractivePlaybackPlan, bytes: Map<String,ByteArray>): InteractivePlaybackPlan {
         val fastTargets=(listOfNotNull(base.fast)+base.versions.mapNotNull { it.fast }).toSet()
@@ -21,8 +25,15 @@ internal object FinalLapFanfareCompiler {
         // Offline research graphs may omit shared assets. Android always supplies the bundled source.
         val data=bytes[ASSET] ?: return base
         require(base.name!="Rainbow") { "Rainbow must keep its dedicated FinalLapFanfare" }
-        val digest=MessageDigest.getInstance("SHA-256").digest(data)
-        require(digest.joinToString("") { "%02x".format(it.toInt() and 255) }==SHA256) { "Unexpected FinalLapFF source" }
+        val digest = if (data === verifiedAssetBytes && verifiedDigest != null) {
+            verifiedDigest!!
+        } else {
+            val computed = MessageDigest.getInstance("SHA-256").digest(data)
+            require(computed.joinToString("") { "%02x".format(it.toInt() and 255) } == SHA256) { "Unexpected FinalLapFF source" }
+            verifiedDigest = computed
+            verifiedAssetBytes = data
+            computed
+        }
         val info=(BwavHeader.read(data) as? BwavHeader.Result.Ok)?.info ?: error("Unreadable FinalLapFF")
         require(info.sampleRate==48000 && info.channels==2 && info.frames.toLong()==268759L)
         require(base.spec.transportSampleRate==48000)
@@ -44,8 +55,13 @@ internal object FinalLapFanfareCompiler {
         // postExit retains the bridge's physical tail after Fast starts, not the looping Full.
         val packet=G.build(spec)
         val paths=base.assetPaths+ASSET
+        val bridgeSources = rules.flatMapTo(mutableSetOf()) { it.sources }
+        val updatedEntryPrepared = base.entryPreparedAssets.mapValues { (segment, assets) ->
+            if (segment in bridgeSources) assets + ASSET else assets
+        }
         return base.copy(spec=spec,packet=packet,assetPaths=paths,labels=base.labels+(ff to "FinalLapFF"),
             preparedAssets=base.preparedAssets+ASSET,
+            entryPreparedAssets=updatedEntryPrepared,
             standard=base.standard?.copy(packet=packet,assetPaths=paths))
     }
 }

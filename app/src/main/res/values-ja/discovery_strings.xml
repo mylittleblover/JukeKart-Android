@@ -90,4 +90,11 @@
     <string name="jukebox_up_next_temp">次に再生（予約）</string>
     <string name="jukebox_up_next_list">再生待ちリスト</string>
     <string name="jukebox_queue_empty">次の曲はありません。</string>
+    <string name="discovery_search_all">コース、カップ、作品、曲を検索</string>
+    <string name="discovery_vs_standard">今作のコース</string>
+    <string name="discovery_vs_sfc">SFC コース / ミッション</string>
+    <string name="discovery_battle_summary">全 %1$d 曲 · 通常 / ファイナル切替対応</string>
+    <string name="discovery_audition">試聴</string>
+    <string name="discovery_create_name_hint">名前を入力すると作成できます。</string>
+    <string name="discovery_official_quick">公式イベント</string>
 </resources>

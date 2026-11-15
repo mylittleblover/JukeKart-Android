@@ -48,8 +48,11 @@ internal class AudioEngine private constructor(private val handle: Long) : Sessi
     override fun setOutputGain(gainDb: Double, ceilingDb: Double): Int =
         if (closed) CLOSED else NativeAudioLibrary.setOutputGain(handle, gainDb, ceilingDb)
 
-    override fun setLayerGain(trackIndex: Int, gainDb: Double): Int =
-        if (closed) CLOSED else NativeAudioLibrary.command(handle, COMMAND_LAYER_GAIN, trackIndex, 0, gainDb, -1L)
+    override fun setLayerGain(trackIndex: Int, gainDb: Double, fadeMs: Int): Int =
+        if (closed) CLOSED else NativeAudioLibrary.command(handle, COMMAND_LAYER_GAIN, trackIndex, fadeMs.coerceIn(0, 60_000), gainDb, -1L)
+
+    fun layerGainSnapshot(trackIndex: Int): LongArray? =
+        if (closed) null else NativeAudioLibrary.layerGainSnapshot(handle, trackIndex)
 
     /** Samples the ceiling has caught, for a diagnostic line. */
     fun limitedSamples(): Long = if (closed) 0 else NativeAudioLibrary.limitedSampleCount(handle)

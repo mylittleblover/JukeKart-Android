@@ -41,6 +41,123 @@ EngineStatus EngineRuntime::seek(audio::TransportFrame target,std::uint64_t maxi
         if(streamHistory_)streamHistory_->branch({journal_->epoch,target});
         return EngineStatus::Ok;
     }
+    // Single-segment static clip graphs (such as OverlaidOpening, ChainedSequence, and Medleys) have no
+    // transitions, loops, cues, or stateful filters, so seek can reconstruct active Voices in O(clips)
+    // instead of replaying millions of 48 kHz frames through render().
+    bool staticLinearGraph=graph_ && !linear_ && !pendingCount_ &&
+        !performance_ && !automatic_ && !albumActive_ && !musicalLoopActive_ && !transition_.active && !stinger_.active &&
+        graph_->entries.empty() && !graph_->hasMusicalLoop && !graph_->hasAutomatic &&
+        graph_->segments.size()==1 && graph_->transitions.empty() && graph_->playlists.empty() &&
+        graph_->switches.empty() && graph_->groups.empty() && graph_->stingers.empty() &&
+        graph_->performances.empty() && graph_->albumFlows.empty() && graph_->events.empty() &&
+        graph_->curves.empty() && graph_->effectCurves.empty() && parameters_!=nullptr;
+    if(staticLinearGraph) {
+        const auto& seg=graph_->segments.front();
+        staticLinearGraph=!seg.hasLoop && seg.entry==0 && seg.cues.empty() && seg.envelopes.empty() &&
+            parameters_->property(seg.index,1)==1.0;
+        for(const auto& bus:graph_->buses) {
+            if(!bus.effects.empty() || parameters_->propertyEnabled(bus.index,2) ||
+               parameters_->propertyEnabled(bus.index,3) || parameters_->propertyEnabled(bus.index,4)) {
+                staticLinearGraph=false;
+                break;
+            }
+        }
+        if(staticLinearGraph) {
+            for(const auto* track:tracksBySegment_[seg.index]) {
+                if(!track || track->mode!=TrackMode::Normal || !track->subTracks.empty() ||
+                   parameters_->property(track->index,1)!=1.0 ||
+                   parameters_->propertyEnabled(track->index,2) || parameters_->propertyEnabled(track->index,3)) {
+                    staticLinearGraph=false;
+                    break;
+                }
+                for(const auto& c:track->clips) {
+                    if(c.start<0 || c.loop || !c.envelopes.empty() || !assets_[c.asset] || !assets_[c.asset]->valid()) {
+                        staticLinearGraph=false;
+                        break;
+                    }
+                }
+                if(!staticLinearGraph)break;
+            }
+        }
+        int playCount=0;
+        for(std::size_t n=0;n<journal_->size && staticLinearGraph;++n) {
+            const auto& record=journal_->records[n];
+            if(record.epoch!=journal_->epoch || record.result!=EngineStatus::Ok)continue;
+            const auto kind=record.command.kind;
+            if(kind==api::EngineCommandKind::Play && record.frame==0 && record.command.target==seg.index) {
+                ++playCount;
+            } else {
+                staticLinearGraph=kind==api::EngineCommandKind::Pause ||
+                    kind==api::EngineCommandKind::Resume || kind==api::EngineCommandKind::OutputGain;
+            }
+        }
+        staticLinearGraph=staticLinearGraph && playCount==1;
+    }
+    if(staticLinearGraph) {
+        const auto& seg=graph_->segments.front();
+        if(target.value>seg.exit)return EngineStatus::InvalidRequest;
+        const bool paused=clock_.status()==TransportStatus::Paused;
+        lastPositions_.fill(-1);
+        transition_=TransitionRun{};queuedTransition_=-1;queuedSwitch_=false;clearStinger();
+        voices_.clear();
+        for(auto& s:scenes_) { s.active=false; s.playlist.clear(); s.segment=nullptr; s.segmentEnded=true; }
+        Scene& scene=scenes_[0];
+        scene=Scene{};
+        scene.active=true;scene.segmentEnded=false;scene.segment=&seg;
+        scene.instance=static_cast<int>(++instance_&0x7fffffff);
+        scene.owner=static_cast<int>(++instance_&0x7fffffff);
+        scene.object=seg.index;scene.controlled=true;
+        scene.position=static_cast<long double>(target.value);
+        scene.musicalPosition=static_cast<long double>(target.value);
+        foreground_=&scene;current_=seg.index;
+        if(streamCache_)streamCache_->beginControlRender();
+        for(const auto* track:tracksBySegment_[seg.index]) {
+            for(const auto& c:track->clips) {
+                if(c.start>=target.value) {
+                    if(c.start==target.value && c.sourceLength>0 && assets_[c.asset]->stream && c.sourceOffset<assets_[c.asset]->frames()) {
+                        audio::StreamCursor warm;
+                        warm.bind(assets_[c.asset]->stream,assets_[c.asset]->streamedAsset);
+                        if(!warm.prepare(static_cast<double>(c.sourceOffset))) {
+                            if(streamCache_)streamCache_->endControlRender();
+                            return EngineStatus::MissingAsset;
+                        }
+                    }
+                    continue;
+                }
+                scene.clips[c.index]=true;
+                Voice voice;
+                voice.segment=seg.index;voice.track=track->index;voice.clip=c.index;voice.bus=track->bus;
+                voice.instance=scene.instance;voice.owner=scene.owner;
+                voice.envelopeSegment=&seg;voice.envelopeClip=&c;voice.segmentClipStart=c.start;
+                musicOwners(scene,voice.musicOwners);
+                voice.startFrame=c.start;voice.sourceOffset=c.sourceOffset;voice.sourceLength=c.sourceLength;
+                voice.gain=dbGain(c.gainDb);voice.fadeIn=c.fadeIn;voice.fadeOut=c.fadeOut;
+                voice.speed=1.0;voice.timelineRate=1.0;
+                voice.begin(assets_[c.asset].get(),rate_,static_cast<double>(target.value-c.start));
+                const double clipEnd=static_cast<double>(c.sourceOffset+c.sourceLength);
+                if(voice.active && voice.sourcePosition<clipEnd && voice.sourcePosition<voice.buffer->frames()) {
+                    if(voice.buffer->stream) {
+                        voice.streamCursor.bind(voice.buffer->stream,voice.buffer->streamedAsset);
+                        if(!voice.streamCursor.prepare(voice.sourcePosition)) {
+                            if(streamCache_)streamCache_->endControlRender();
+                            return EngineStatus::MissingAsset;
+                        }
+                    }
+                    if(!voices_.add(std::move(voice))) {
+                        if(streamCache_)streamCache_->endControlRender();
+                        return EngineStatus::VoiceLimit;
+                    }
+                }
+            }
+        }
+        if(streamCache_)streamCache_->endControlRender();
+        if(mixer_)mixer_->clear();
+        updateMixerProperties();
+        clock_.seek(target.value);clock_.play();if(paused)clock_.pause();
+        journal_->cursor=journal_->size;
+        if(streamHistory_)streamHistory_->branch({journal_->epoch,target});
+        return EngineStatus::Ok;
+    }
     const auto originalFrame=clock_.frame();
     const auto dropped=voices_.dropped(); const auto rejected=rejected_; const bool paused=clock_.status()==TransportStatus::Paused;
     if(streamCache_)streamCache_->beginControlRender();

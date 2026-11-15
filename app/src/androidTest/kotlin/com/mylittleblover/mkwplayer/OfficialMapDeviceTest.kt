@@ -36,7 +36,7 @@ class OfficialMapDeviceTest {
             ui.tapText("1 · Mario Bros. Circuit", contains = true)
             ui.tapText("View course details")
             ui.awaitText("Mario Bros. Circuit")
-            ui.tapText("Back")
+            ui.tapDescription("Back")
             ui.tapText("Back to route")
             ui.awaitText("Start: Mario Bros. Circuit")
         } finally {

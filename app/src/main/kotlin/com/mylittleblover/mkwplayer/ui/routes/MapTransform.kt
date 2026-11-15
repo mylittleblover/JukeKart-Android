@@ -82,9 +82,8 @@ internal class MapTransform private constructor(
             val drawnWidth = fittedWidth * zoom
             val drawnHeight = fittedHeight * zoom
             fun center(value: Float, viewport: Float, drawn: Float): Float {
-                if (drawn <= viewport - 2f * padding || drawn == 0f) return .5f
-                val limit = (viewport / 2f - padding) / drawn
-                return value.finiteOr(.5f).coerceIn(limit, 1f - limit)
+                if (drawn <= 0f || viewport <= 0f) return .5f
+                return value.finiteOr(.5f).coerceIn(0f, 1f)
             }
             val corrected = MapCamera(zoom, center(camera.centerU, width, drawnWidth), center(camera.centerV, height, drawnHeight))
             return MapTransform(

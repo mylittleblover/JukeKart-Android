@@ -50,7 +50,7 @@ class AppLanguageDeviceTest {
             ui.tapText("English")
             ui.awaitText("App language")
             assertSame(model, currentModel())
-            ui.tapText("Back")
+            ui.tapDescription("Back")
             ui.awaitText("Start: Mario Bros. Circuit")
             ui.awaitText("Finish: DK Spaceport")
             ui.capture("language-switch-map-preserved.png")

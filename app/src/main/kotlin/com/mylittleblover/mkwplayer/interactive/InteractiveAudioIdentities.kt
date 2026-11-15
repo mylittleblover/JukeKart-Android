@@ -11,7 +11,11 @@ internal class InteractiveAudioIdentities private constructor(private val rows: 
             stage.startsWith("${code}_Pattern", true) && stage.substring(code.length + 8).toIntOrNull()?.let { it in 2..5 } == true
     }
     data class Resolved(val flow: StageFlow,val bytes: Map<String,ByteArray>,val title: String=flow.name)
+    private val digestByFile: Map<String, String> = rows.entries.associate { (sha, id) -> id.fileName to sha }
+
     fun identityForDigest(sha256: String): Identity? = rows[sha256]
+
+    fun digestForFileName(fileName: String): String? = digestByFile[fileName]
     fun resolve(flow: StageFlow,bytes: Map<String,ByteArray>): Resolved? {
         fun identity(data: ByteArray)=rows[MessageDigest.getInstance("SHA-256").digest(data).joinToString("") { "%02x".format(it) }]
         val main=flow.part(StageFlow.Role.Main) ?: return null

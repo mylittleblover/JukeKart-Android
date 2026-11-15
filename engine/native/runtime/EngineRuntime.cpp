@@ -243,7 +243,15 @@ void EngineRuntime::execute(const api::EngineCommand& command,int depth) noexcep
             else if(automatic_ && command.target==automatic_->parameter)stopAutomatic(false,api::AutomaticPhase::Overridden);
             break;
         case EngineCommandKind::LayerGain:
-            if(!parameters_ || !parameters_->setLayerGain(command.target,command.number))last_=EngineStatus::InvalidRequest;
+            if(!parameters_ || command.value<-1 || command.value>60000) {
+                last_=EngineStatus::InvalidRequest;
+            } else {
+                const auto fadeMs = command.value > 0 ? command.value : 0;
+                const auto fadeFrames = fadeMs > 0
+                    ? std::max<std::int64_t>(1, static_cast<std::int64_t>(std::llround(static_cast<double>(fadeMs) * rate_ / 1000.0)))
+                    : std::int64_t{0};
+                if(!parameters_->setLayerGain(command.target,command.number,fadeFrames))last_=EngineStatus::InvalidRequest;
+            }
             break;
         case EngineCommandKind::OutputGain:
             // Master trim: `target` carries the gain in decibels as an integer tenth, `value` the ceiling the

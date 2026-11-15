@@ -100,9 +100,9 @@ internal class PlaybackSession(
         return current.setOutputGain(trim.gainDb, trim.ceilingDb)
     }
 
-    /** Set dynamic gain (dB) on a track layer in the currently loaded flow engine. */
-    fun setLayerGain(trackIndex: Int, gainDb: Double): Int? =
-        engine?.setLayerGain(trackIndex, gainDb)
+    /** Set dynamic gain (dB) on a track layer in the currently loaded flow engine, optionally fading over [fadeMs]. */
+    fun setLayerGain(trackIndex: Int, gainDb: Double, fadeMs: Int = 0): Int? =
+        engine?.setLayerGain(trackIndex, gainDb, fadeMs)
 
     /**
      * Callback timing packet from the open stream, or null when there is none.
@@ -131,6 +131,153 @@ internal class PlaybackSession(
         }?.second
         return NativeInteractiveDriver.Observation(segment,sourceFrame,raw[24]!=0L,raw[2]==2L,raw[3].toInt(),
             if(raw[7]!=0L) "Native playback: ${AudioStatusText.engine(raw[7].toInt())}" else null,raw[6],destination,canCancel=raw[24]!=0L && raw[37]==0L,stopped=raw[2]==0L,transportFrame=raw[1],fadeEndFrame=raw.getOrNull(65)?.takeIf { it>=0 })
+    }
+
+    class Prepared internal constructor(
+        internal val engine: SessionAudioEngine,
+        internal val controller: PlaybackController,
+        internal val started: PlaybackController.State,
+        internal val title: String,
+        internal val frames: Long,
+        internal val linear: Boolean,
+        internal val autoAdvance: Map<Int, Int> = emptyMap(),
+        internal val initialAutoSource: Int? = null,
+    ) {
+        fun discard() {
+            controller.release()
+        }
+    }
+
+    sealed interface PrepareResult {
+        data class Ok(val prepared: Prepared) : PrepareResult
+        data class Failed(val reason: String) : PrepareResult
+    }
+
+    /**
+     * Builds and prepares a fresh native engine off the main thread for a multi-segment or linear graph.
+     * Caller must either pass [Prepared] to [commitPrepared] on the main thread or call [Prepared.discard].
+     */
+    fun prepareFlow(
+        title: String,
+        packet: ByteArray,
+        assets: List<Pair<String, ByteArray>>,
+        frames: Long,
+        startSegment: Int,
+        streamed: Boolean = false,
+        autoAdvance: Map<Int, Int> = emptyMap(),
+        preparedAssets: Set<String> = emptySet(),
+        prequeueInitial: Boolean = false,
+        initialLayerGains: Map<Int, Double> = emptyMap(),
+        linear: Boolean = false,
+    ): PrepareResult {
+        val staged = createEngine() ?: return PrepareResult.Failed("Out of memory creating the audio engine.")
+        val stagedController = PlaybackController(staged as PlaybackEngine)
+        fun abort(reason: String): PrepareResult {
+            stagedController.release()
+            return PrepareResult.Failed(reason)
+        }
+
+        val loaded = stagedController.loadGraphOnly(packet)
+        if (loaded is PlaybackController.State.Failed) return abort(loaded.reason)
+
+        assets.forEachIndexed { index, (name, bytes) ->
+            val status = if (streamed && name !in preparedAssets) staged.bindStreamedBwav(index, bytes, name) else staged.bindBwav(index, bytes, name)
+            if (status != AudioEngine.STATUS_OK) {
+                return abort("Could not bind '$name': ${AudioStatusText.engineHint(status) ?: AudioStatusText.engine(status)}")
+            }
+        }
+
+        val started = stagedController.playSegment(startSegment)
+        if (started is PlaybackController.State.Failed) return abort(started.reason)
+
+        var autoSource: Int? = null
+        if (!linear) {
+            (if (prequeueInitial) autoAdvance[startSegment] else null)?.let { target ->
+                val queued = stagedController.playSegment(target)
+                if (queued is PlaybackController.State.Failed) return abort(queued.reason)
+                autoSource = startSegment
+            }
+        }
+
+        initialLayerGains.forEach { (trackIndex, db) ->
+            val status = staged.setLayerGain(trackIndex, db)
+            if (status != AudioEngine.STATUS_OK) {
+                return abort("Could not set layer gain for track $trackIndex: ${AudioStatusText.engine(status)}")
+            }
+        }
+
+        staged.setOutputGain(outputTrim.gainDb, outputTrim.ceilingDb)
+        stagedController.setDuration(frames)
+        return PrepareResult.Ok(
+            Prepared(
+                engine = staged,
+                controller = stagedController,
+                started = started,
+                title = title,
+                frames = frames,
+                linear = linear,
+                autoAdvance = if (linear) emptyMap() else autoAdvance.toMap(),
+                initialAutoSource = autoSource,
+            ),
+        )
+    }
+
+    /**
+     * Builds and prepares a fresh native engine off the main thread for a standalone linear track.
+     */
+    fun prepareLinear(
+        title: String,
+        audio: ByteArray,
+        assetId: String,
+        frames: Long,
+        loop: Boolean = false,
+        streamed: Boolean = true,
+        loopStart: Long? = null,
+        loopEnd: Long? = null,
+    ): PrepareResult {
+        val staged = createEngine() ?: return PrepareResult.Failed("Out of memory creating the audio engine.")
+        val stagedController = PlaybackController(staged as PlaybackEngine)
+        fun abort(reason: String): PrepareResult {
+            stagedController.release()
+            return PrepareResult.Failed(reason)
+        }
+
+        val result = stagedController.loadLinear(title, audio, assetId, loop = loop, streamed = streamed)
+        if (result is PlaybackController.State.Failed) return abort(result.reason)
+
+        staged.setOutputGain(outputTrim.gainDb, outputTrim.ceilingDb)
+        if (loop && loopStart != null && loopEnd != null && loopEnd > loopStart) {
+            val repeated = stagedController.setLinearRepeat(true, loopStart, loopEnd)
+            if (repeated is PlaybackController.State.Failed) return abort(repeated.reason)
+        }
+        stagedController.setDuration(frames)
+        return PrepareResult.Ok(
+            Prepared(
+                engine = staged,
+                controller = stagedController,
+                started = stagedController.poll(),
+                title = title,
+                frames = frames,
+                linear = true,
+            ),
+        )
+    }
+
+    /** Swaps a background-prepared engine into the active session and opens output on Main. */
+    fun commitPrepared(prepared: Prepared): State {
+        closeOutput()
+        controller?.release()
+        engine = prepared.engine
+        controller = prepared.controller
+        linearSession = prepared.linear
+        automaticTransitions = prepared.autoAdvance
+        automaticSource = prepared.initialAutoSource
+        automaticPending = null
+        prepared.engine.setOutputGain(outputTrim.gainDb, outputTrim.ceilingDb)
+        output = openOutput(prepared.engine.nativeHandle(), prepared.engine.sampleRate)
+        val published = publish(prepared.started, prepared.title, prepared.frames, prepared.engine.sampleRate)
+        _state.value = published.copy(loaded = true, linear = prepared.linear, naturalEnd = false)
+        return _state.value
     }
 
     /**

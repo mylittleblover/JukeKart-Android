@@ -19,4 +19,10 @@
     <string name="nav_course">コース</string>
     <string name="settings_library_counts">インポート済み %1$d 曲 · 再生可能 %2$d 曲</string>
     <string name="settings_import_details">インポートの詳細</string>
+    <string name="settings_output_title">出力レベル</string>
+    <string name="settings_output_hint">ゲーム元の音声は音量が控えめにマスタリングされています。ここで上げるとすべての楽曲が持ち上がり、リミッターでピークのクリップを防ぎます。</string>
+    <string name="settings_output_flat">ダイナミクスを保持（上限なし）</string>
+    <string name="settings_output_limited">ピークを上限内に抑制</string>
+    <string name="settings_output_default">デフォルト</string>
+    <string name="settings_dev_title">開発者・テスト設定</string>
 </resources>

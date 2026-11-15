@@ -47,5 +47,6 @@
     <string name="map_edit_save">ルートとして保存</string>
     <string name="map_edit_saved">保存しました</string>
     <string name="map_edit_source">接続表はゲームから書き出した Stage_Connections_Final です。</string>
+    <string name="map_edit_refusal_missing">ゲームではこれら2つのコース間の接続が定義されていません。</string>
     <string name="map_course_connections_hidden">他に %1$d 件の接続が定義されていますが、この地図には表示されていません。</string>
 </resources>

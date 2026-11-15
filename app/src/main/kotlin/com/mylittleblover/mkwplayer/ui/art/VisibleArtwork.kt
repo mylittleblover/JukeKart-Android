@@ -2,6 +2,7 @@ package com.mylittleblover.mkwplayer.ui.art
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.util.LruCache
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -17,7 +18,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -29,16 +32,26 @@ import kotlinx.coroutines.withContext
 
 internal val artworkDecoder = Dispatchers.IO.limitedParallelism(3)
 
+private data class CachedResourceArtwork(
+    val loaded: PackArtwork.Loaded,
+    val byteCount: Int,
+)
+
+private val resourceArtworkCache = object : LruCache<String, CachedResourceArtwork>(12 * 1024 * 1024) {
+    override fun sizeOf(key: String, value: CachedResourceArtwork): Int = value.byteCount.coerceAtLeast(1)
+}
+
 /** Owns the decode only while the laid-out slot intersects the clipped viewport. */
 @Composable
 internal fun ArtworkSlot(modifier: Modifier, content: @Composable (maxEdge: Int) -> Unit) {
     var maxEdge by remember { mutableStateOf(0) }
     Box(modifier.onGloballyPositioned { coordinates ->
         val bounds = coordinates.boundsInWindow()
-        val edge = coordinates.size.width
+        val edge = maxOf(coordinates.size.width, coordinates.size.height)
         maxEdge = if (bounds.width > 0f && bounds.height > 0f && edge > 0) {
-            // Round to a bucket so a small layout change does not restart a decode.
-            maxOf(192, (edge + 127) / 128 * 128)
+            // Round to a bucket so a small layout change does not restart a decode, and keep a
+            // minimum bucket high enough that 16:9 covers stay sharp inside square/small thumbnails.
+            maxOf(384, (edge + 255) / 256 * 256)
         } else 0
     }, contentAlignment = Alignment.Center) {
         content(maxEdge)
@@ -50,12 +63,22 @@ internal fun rememberResourceArtwork(resourceId: Int?, maxEdge: Int): PackArtwor
     val resources = LocalContext.current.resources
     if (resourceId == null || maxEdge == 0) return null
     return key(resources, resourceId, maxEdge) {
-        val image by produceState<PackArtwork.Loaded?>(null) {
-            value = withContext(artworkDecoder) {
-                decodeArtwork(maxEdge) { BitmapFactory.decodeResource(resources, resourceId, it) }
+        val cacheKey = "$resourceId@$maxEdge"
+        val immediate = resourceArtworkCache.get(cacheKey)?.loaded
+        if (immediate != null) {
+            immediate
+        } else {
+            val image by produceState<PackArtwork.Loaded?>(null, resourceId, maxEdge) {
+                value = resourceArtworkCache.get(cacheKey)?.loaded ?: withContext(artworkDecoder) {
+                    decodeArtwork(maxEdge) { BitmapFactory.decodeResource(resources, resourceId, it) }?.also { loaded ->
+                        val bytes = runCatching { loaded.bitmap.asAndroidBitmap().allocationByteCount }
+                            .getOrDefault(loaded.bitmap.width * loaded.bitmap.height * 4)
+                        resourceArtworkCache.put(cacheKey, CachedResourceArtwork(loaded, bytes))
+                    }
+                }
             }
+            image
         }
-        image
     }
 }
 
@@ -79,9 +102,9 @@ internal fun decodeArtwork(maxEdge: Int, decode: (BitmapFactory.Options) -> Bitm
     val width = options.outWidth
     val height = options.outHeight
     if (width <= 0 || height <= 0) return null
-    val longest = maxOf(width, height)
+    val shortest = minOf(width, height)
     var sample = 1
-    while (longest / sample / 2 >= maxEdge) sample *= 2
+    while (shortest / sample / 2 >= maxEdge) sample *= 2
     options.inJustDecodeBounds = false
     options.inSampleSize = sample
     val bitmap = decode(options) ?: return null
@@ -101,7 +124,13 @@ internal fun FadingArtwork(
     modifier: Modifier,
     contentScale: ContentScale = ContentScale.Fit,
 ) {
-    Image(bitmap, null, modifier.then(artworkFade(bitmap)), contentScale = contentScale)
+    Image(
+        bitmap,
+        null,
+        modifier.then(artworkFade(bitmap)),
+        contentScale = contentScale,
+        filterQuality = FilterQuality.High,
+    )
 }
 
 @Composable

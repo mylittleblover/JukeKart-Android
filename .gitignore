@@ -5,6 +5,7 @@ __pycache__/
 .venv/
 build/
 app/build/
+app/build-audit/
 *.iml
 .idea/
 local.properties

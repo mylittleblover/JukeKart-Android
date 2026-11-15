@@ -353,6 +353,9 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     private val interactiveIdentities by lazy {
         getApplication<Application>().assets.open("interactive_audio_identities.json").bufferedReader().use { InteractiveAudioIdentities.parse(it.readText()) }
     }
+    private val finalLapFanfareBytes: ByteArray by lazy {
+        getApplication<Application>().assets.open("audio/${com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.ASSET}").use { it.readBytes() }
+    }
 
     /** The installed pack, or null when the listener is using loose files. */
     private var pack: InstalledPack? = null
@@ -389,6 +392,18 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
     val extraCatalog: com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.Catalog by lazy {
         com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.load(getApplication())
+    }
+
+    val courseMedleyCatalog: com.mylittleblover.mkwplayer.interactive.CourseMedleyCatalog.Catalog by lazy {
+        com.mylittleblover.mkwplayer.interactive.CourseMedleyCatalog.load(getApplication())
+    }
+
+    private val localizedNames: com.mylittleblover.mkwplayer.routes.LocalizedNames? by lazy {
+        runCatching {
+            getApplication<Application>().assets.open("localized_names.json").bufferedReader().use {
+                com.mylittleblover.mkwplayer.routes.LocalizedNames.parse(it.readText())
+            }
+        }.getOrNull()
     }
 
     val packDirectory: java.io.File?
@@ -990,7 +1005,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      */
     fun openFlow(uris: List<Uri>) {
         if(nativePerformance?.isFading==true) return
-        packPlaybackRequest++
+        val request = ++packPlaybackRequest
         if (uris.isEmpty()) return
         _ui.value = _ui.value.copy(busy = true, status = "Reading files...", detail = null)
         viewModelScope.launch {
@@ -1038,8 +1053,9 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                 return@launch
             }
 
+            if (request != packPlaybackRequest) return@launch
             if(bytes.keys.any { it.startsWith("BGM_Rainbow_") }) {
-                startRainbow(bytes,rejected)
+                startRainbow(bytes,rejected,request = request)
                 return@launch
             }
             val group = StageFlowDiscovery.dominant(StageFlowDiscovery.group(parts))
@@ -1056,95 +1072,157 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                 )
                 return@launch
             }
-            startFlow(assembled.getOrThrow(), bytes, rejected)
+            startFlow(assembled.getOrThrow(), bytes, rejected, request = request)
         }
     }
 
-    private fun startFlow(flow: StageFlow, sourceBytes: Map<String, ByteArray>, rejected: List<String>,displayTitle: String=flow.name, startingStage: String?=null): Boolean {
-        if(nativePerformance?.isFading==true) return false
-        packPlaybackRequest++
-        val bytes = try {
-            val withFf = sourceBytes + (com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.ASSET to
-                getApplication<Application>().assets.open("audio/BGM_Seq_FinalLapFF.bwav").use { it.readBytes() })
-            val ks = extraCatalog.koopaSpeaker
-            val dir = pack?.directory
-            if (ks != null && dir != null && flow.name == "BGM_Stage_${ks.stageCode}") {
-                val normalFile = java.io.File(dir, "audio/${ks.normalAsset.sha256}")
-                val fastFile = java.io.File(dir, "audio/${ks.fastAsset.sha256}")
-                if (normalFile.isFile && fastFile.isFile) {
-                    withFf + mapOf(
-                        "${ks.normalAsset.stem}.bwav" to normalFile.readBytes(),
-                        "${ks.fastAsset.stem}.bwav" to fastFile.readBytes(),
-                    )
+    private data class PreparedFlowBundle(
+        val bytes: Map<String, ByteArray>,
+        val plan: InteractivePlaybackPlan?,
+        val compiled: StageFlowCompiler.Compiled,
+        val entry: Int,
+        val wantSpeaker: Boolean,
+        val prepared: PlaybackSession.Prepared,
+    )
+
+    private sealed interface FlowPrepareOutcome {
+        data class Ok(val bundle: PreparedFlowBundle) : FlowPrepareOutcome
+        data class Failed(val status: String, val detail: String?) : FlowPrepareOutcome
+    }
+
+    private suspend fun startFlow(
+        flow: StageFlow,
+        sourceBytes: Map<String, ByteArray>,
+        rejected: List<String>,
+        displayTitle: String = flow.name,
+        startingStage: String? = null,
+        request: Long = ++packPlaybackRequest,
+    ): Boolean {
+        if (nativePerformance?.isFading == true) return false
+        val previousPlanName = interactivePlan?.name
+        val previousSpeaker = speakerEnabled
+        val packDir = pack?.directory
+        val ffAsset = com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.ASSET
+
+        val outcome = withContext(Dispatchers.IO) {
+            val bytes = try {
+                val withFf = sourceBytes + (ffAsset to finalLapFanfareBytes)
+                val ks = extraCatalog.koopaSpeaker
+                if (ks != null && packDir != null && flow.name == "BGM_Stage_${ks.stageCode}") {
+                    val normalFile = java.io.File(packDir, "audio/${ks.normalAsset.sha256}")
+                    val fastFile = java.io.File(packDir, "audio/${ks.fastAsset.sha256}")
+                    if (normalFile.isFile && fastFile.isFile) {
+                        withFf + mapOf(
+                            "${ks.normalAsset.stem}.bwav" to normalFile.readBytes(),
+                            "${ks.fastAsset.stem}.bwav" to fastFile.readBytes(),
+                        )
+                    } else {
+                        withFf
+                    }
                 } else {
                     withFf
                 }
-            } else {
-                withFf
+            } catch (e: Exception) {
+                return@withContext FlowPrepareOutcome.Failed("Cannot load FinalLapFF", e.message)
             }
-        } catch(e: Exception) {
-            _ui.value=_ui.value.copy(status="Cannot load FinalLapFF",detail=e.message)
-            return false
-        }
-        val plan = try {
-            if(minfCatalog.part(flow.name.removePrefix("BGM_Stage_"),"Full")!=null) {
-                var built = InteractivePlaybackPlan.normal(flow, bytes, minfCatalog).startingAt(startingStage)
-                val ks = extraCatalog.koopaSpeaker
-                if (ks != null && flow.name == "BGM_Stage_${ks.stageCode}") {
-                    val normalBytes = bytes["${ks.normalAsset.stem}.bwav"]
-                    val fastBytes = bytes["${ks.fastAsset.stem}.bwav"]
-                    if (normalBytes != null && fastBytes != null) {
-                        built = com.mylittleblover.mkwplayer.interactive.SpeakerOverlayCompiler.extend(
-                            built,
-                            ks,
-                            normalBytes,
-                            fastBytes,
-                        )
+
+            val plan = try {
+                if (minfCatalog.part(flow.name.removePrefix("BGM_Stage_"), "Full") != null) {
+                    var built = InteractivePlaybackPlan.normal(flow, bytes, minfCatalog).startingAt(startingStage)
+                    val ks = extraCatalog.koopaSpeaker
+                    if (ks != null && flow.name == "BGM_Stage_${ks.stageCode}") {
+                        val normalBytes = bytes["${ks.normalAsset.stem}.bwav"]
+                        val fastBytes = bytes["${ks.fastAsset.stem}.bwav"]
+                        if (normalBytes != null && fastBytes != null) {
+                            built = com.mylittleblover.mkwplayer.interactive.SpeakerOverlayCompiler.extend(
+                                built,
+                                ks,
+                                normalBytes,
+                                fastBytes,
+                            )
+                        }
                     }
-                }
-                built
-            } else null
-        } catch(e: Exception) {
-            _ui.value=_ui.value.copy(status="Cannot prepare interactive playback",detail=e.message)
-            return false
+                    built
+                } else null
+            } catch (e: Exception) {
+                return@withContext FlowPrepareOutcome.Failed("Cannot prepare interactive playback", e.message)
+            }
+
+            val compiled = try {
+                plan?.standard ?: StageFlowCompiler.compileFromBytes(flow, bytes)
+            } catch (e: IllegalArgumentException) {
+                return@withContext FlowPrepareOutcome.Failed("Cannot prepare this flow", e.message)
+            }
+
+            val wantSpeaker = if (plan?.overlayTrackIndices.isNullOrEmpty() || previousPlanName != plan?.name) {
+                false
+            } else {
+                previousSpeaker
+            }
+            val initialGains = if (plan == null || plan.overlayTrackIndices.isEmpty()) {
+                emptyMap()
+            } else {
+                val db = if (wantSpeaker) 0.0 else -96.0
+                plan.overlayTrackIndices.associateWith { db }
+            }
+
+            val entry = plan?.entry ?: FlowPresentation.entrySection(compiled)
+            val packetBytes = plan?.packet ?: compiled.packet
+            val assetPaths = plan?.assetPaths ?: compiled.assetPaths
+            val frames = FlowPresentation.totalFrames(flow)
+            when (
+                val prep = session.prepareFlow(
+                    title = displayTitle,
+                    packet = packetBytes,
+                    assets = assetPaths.map { path -> path to bytes[path]!! },
+                    frames = frames,
+                    startSegment = entry,
+                    autoAdvance = plan?.automaticNext ?: emptyMap(),
+                    streamed = plan?.streamed ?: false,
+                    preparedAssets = plan?.let { it.preparedAssets + it.entryPreparedAssets[it.entry].orEmpty() } ?: emptySet(),
+                    prequeueInitial = plan?.let { it.entry in it.entryAutomaticNext } ?: false,
+                    initialLayerGains = initialGains,
+                )
+            ) {
+                is PlaybackSession.PrepareResult.Failed ->
+                    FlowPrepareOutcome.Failed("Cannot play this flow", prep.reason)
+                is PlaybackSession.PrepareResult.Ok ->
+                    FlowPrepareOutcome.Ok(PreparedFlowBundle(bytes, plan, compiled, entry, wantSpeaker, prep.prepared))
+            }
         }
-        val compiled = try {
-            plan?.standard ?: StageFlowCompiler.compileFromBytes(flow, bytes)
-        } catch (e: IllegalArgumentException) {
-            _ui.value = _ui.value.copy(
-                status = "Cannot prepare this flow",
-                detail = e.message,
-            )
+
+        val bundle = when (outcome) {
+            is FlowPrepareOutcome.Failed -> {
+                if (request == packPlaybackRequest) {
+                    _ui.value = _ui.value.copy(status = outcome.status, detail = outcome.detail)
+                }
+                return false
+            }
+            is FlowPrepareOutcome.Ok -> outcome.bundle
+        }
+
+        if (request != packPlaybackRequest || nativePerformance?.isFading == true) {
+            withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { bundle.prepared.discard() }
             return false
         }
 
-        val entry = plan?.entry ?: FlowPresentation.entrySection(compiled)
-        val packetBytes = plan?.packet ?: compiled.packet
-        val assetPaths = plan?.assetPaths ?: compiled.assetPaths
-        val state = session.loadFlow(
-            title = displayTitle,
-            packet = packetBytes,
-            assets = assetPaths.map { path -> path to bytes[path]!! },
-            frames = FlowPresentation.totalFrames(flow),
-            startSegment = entry,
-            autoAdvance = plan?.automaticNext ?: emptyMap(),
-            streamed = plan?.streamed ?: false,
-            preparedAssets = plan?.let { it.preparedAssets + it.entryPreparedAssets[it.entry].orEmpty() } ?: emptySet(),
-            prequeueInitial = plan?.let { it.entry in it.entryAutomaticNext } ?: false,
-            initialLayerGains = currentLayerGains(plan),
-        )
+        speakerEnabled = bundle.wantSpeaker
+        val state = session.commitPrepared(bundle.prepared)
         if (state.detail != null) {
             _ui.value = _ui.value.copy(status = "Cannot play this flow", detail = state.detail)
             return false
         }
 
+        val plan = bundle.plan
+        val compiled = bundle.compiled
+        val entry = bundle.entry
         linearCoordinator.yieldToExternalTransport()
         this.flow = flow
         this.interactivePlan = plan
         this.nativePerformance = null
         this.performance = null
         this.flowCompiled = compiled
-        this.flowBytes = bytes
+        this.flowBytes = bundle.bytes
         totalFrames = FlowPresentation.totalFrames(flow)
         rate = state.sampleRate
 
@@ -1191,17 +1269,60 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         return true
     }
 
-    private fun startRainbow(bytes: Map<String,ByteArray>,notes: List<String>,displayTitle: String="Rainbow", startingStage: String?=null): Boolean {
+    private sealed interface RainbowPrepareOutcome {
+        data class Ok(val plan: InteractivePlaybackPlan, val frames: Long, val prepared: PlaybackSession.Prepared) : RainbowPrepareOutcome
+        data class Failed(val status: String, val detail: String?) : RainbowPrepareOutcome
+    }
+
+    private suspend fun startRainbow(
+        bytes: Map<String,ByteArray>,
+        notes: List<String>,
+        displayTitle: String="Rainbow",
+        startingStage: String?=null,
+        request: Long = ++packPlaybackRequest,
+    ): Boolean {
         if(isSpecialStageLocked("Rainbow")) return false
         if(nativePerformance?.isFading==true) return false
-        packPlaybackRequest++
-        val plan=try { InteractivePlaybackPlan.rainbow(bytes,minfCatalog).startingAt(startingStage) } catch(e: Exception) {
-            _ui.value=_ui.value.copy(status="Cannot prepare Rainbow",detail=e.message);return false
+        val outcome = withContext(Dispatchers.IO) {
+            val plan = try {
+                InteractivePlaybackPlan.rainbow(bytes, minfCatalog).startingAt(startingStage)
+            } catch (e: Exception) {
+                return@withContext RainbowPrepareOutcome.Failed("Cannot prepare Rainbow", e.message)
+            }
+            val frames = plan.spec.segments.sumOf { it.exit }
+            when (
+                val prep = session.prepareFlow(
+                    title = displayTitle,
+                    packet = plan.packet,
+                    assets = plan.assetPaths.map { it to bytes.getValue(it) },
+                    frames = frames,
+                    startSegment = plan.entry,
+                    streamed = true,
+                    autoAdvance = plan.automaticNext,
+                    preparedAssets = plan.preparedAssets + plan.entryPreparedAssets[plan.entry].orEmpty(),
+                    prequeueInitial = plan.entry in plan.entryAutomaticNext,
+                )
+            ) {
+                is PlaybackSession.PrepareResult.Failed ->
+                    RainbowPrepareOutcome.Failed("Cannot play Rainbow", prep.reason)
+                is PlaybackSession.PrepareResult.Ok ->
+                    RainbowPrepareOutcome.Ok(plan, frames, prep.prepared)
+            }
         }
-        val frames=plan.spec.segments.sumOf { it.exit }
-        val state=session.loadFlow(displayTitle,plan.packet,plan.assetPaths.map { it to bytes.getValue(it) },frames,plan.entry,streamed=true,autoAdvance=plan.automaticNext,
-            preparedAssets=plan.preparedAssets + plan.entryPreparedAssets[plan.entry].orEmpty(),
-            prequeueInitial=plan.entry in plan.entryAutomaticNext)
+        val (plan, frames, prepared) = when (outcome) {
+            is RainbowPrepareOutcome.Failed -> {
+                if (request == packPlaybackRequest) {
+                    _ui.value = _ui.value.copy(status = outcome.status, detail = outcome.detail)
+                }
+                return false
+            }
+            is RainbowPrepareOutcome.Ok -> Triple(outcome.plan, outcome.frames, outcome.prepared)
+        }
+        if (request != packPlaybackRequest || nativePerformance?.isFading == true) {
+            withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { prepared.discard() }
+            return false
+        }
+        val state = session.commitPrepared(prepared)
         if(state.detail!=null) { _ui.value=_ui.value.copy(status="Cannot play Rainbow",detail=state.detail);return false }
         linearCoordinator.yieldToExternalTransport()
         interactivePlan=plan;nativePerformance=null;performance=null;flow=null;flowCompiled=null;flowBytes=bytes
@@ -1225,7 +1346,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      */
     fun openFlowFromFolder() {
         if(nativePerformance?.isFading==true) return
-        packPlaybackRequest++
+        val request = ++packPlaybackRequest
         val folder = java.io.File(getApplication<Application>().filesDir, FLOW_FOLDER)
         _ui.value = _ui.value.copy(busy = true, status = "Scanning folder...", detail = null)
         viewModelScope.launch {
@@ -1247,8 +1368,9 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                 return@launch
             }
 
+            if (request != packPlaybackRequest) return@launch
             if(scan.bytesByName().keys.any { it.startsWith("BGM_Rainbow_") }) {
-                startRainbow(scan.bytesByName(),scan.rejected)
+                startRainbow(scan.bytesByName(),scan.rejected,request = request)
                 return@launch
             }
             val group = StageFlowDiscovery.dominant(scan.groups())
@@ -1265,7 +1387,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                 )
                 return@launch
             }
-            startFlow(assembled.getOrThrow(), scan.bytesByName(), scan.rejected)
+            startFlow(assembled.getOrThrow(), scan.bytesByName(), scan.rejected, request = request)
         }
     }
 
@@ -1343,6 +1465,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         displayName: String,
     ) {
         this.pack = InstalledPack(manifest, directory)
+        com.mylittleblover.mkwplayer.ui.art.PackArtwork.evictAll()
         establishCup()
 
         val playable = PackPlayback.playableTracks(manifest)
@@ -1386,6 +1509,15 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
     private var packPlaybackRequest=0L
 
+    private sealed interface PackOpenOutcome {
+        data class Refused(val reason: String) : PackOpenOutcome
+        data class IdentityError(val reason: String?) : PackOpenOutcome
+        data class Ready(
+            val playable: PackPlayback.Playable,
+            val resolved: PackInteractiveSources.Resolved?,
+        ) : PackOpenOutcome
+    }
+
     /** Newest selection waits without blocking the service's foreground promotion. */
     fun openPackTrack(track: PackManifest.Track,perform: Boolean=false,startingStage: String?=null) {
         if(nativePerformance?.isFading==true) return
@@ -1393,27 +1525,46 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         viewModelScope.launch {
             PlaybackService.awaitForegroundPromotion()
             if(request!=packPlaybackRequest || nativePerformance?.isFading==true) return@launch
-            if(openPackTrackNow(track,startingStage) && perform) startPerformance()
+            if(openPackTrackNow(track,startingStage,request) && perform) startPerformance()
         }
     }
 
-    private fun openPackTrackNow(track: PackManifest.Track,startingStage: String?=null): Boolean {
+    private suspend fun openPackTrackNow(track: PackManifest.Track,startingStage: String?=null,request: Long): Boolean {
         if(nativePerformance?.isFading==true) return false
         val installed = pack ?: return false
-        return when (val prepared = PackPlayback.prepare(installed.manifest, track, installed.directory)) {
-            is PackPlayback.Result.Refused -> {
-                _ui.value = _ui.value.copy(status = "Cannot open this track", detail = prepared.reason)
+        val outcome = withContext(Dispatchers.IO) {
+            when (val prepared = PackPlayback.prepare(installed.manifest, track, installed.directory)) {
+                is PackPlayback.Result.Refused -> PackOpenOutcome.Refused(prepared.reason)
+                is PackPlayback.Result.Ok -> {
+                    val playable = prepared.playable
+                    val resolved = try {
+                        PackInteractiveSources.resolve(installed.manifest, track, installed.directory, playable, interactiveIdentities)
+                    } catch (e: Exception) {
+                        return@withContext PackOpenOutcome.IdentityError(e.message)
+                    }
+                    PackOpenOutcome.Ready(playable, resolved)
+                }
+            }
+        }
+        if (request != packPlaybackRequest || nativePerformance?.isFading == true) return false
+        return when (outcome) {
+            is PackOpenOutcome.Refused -> {
+                _ui.value = _ui.value.copy(status = "Cannot open this track", detail = outcome.reason)
                 false
             }
-            is PackPlayback.Result.Ok -> {
-                val playable = prepared.playable
-                val resolved=try { PackInteractiveSources.resolve(installed.manifest,track,installed.directory,playable,interactiveIdentities) } catch(e: Exception) {
-                    _ui.value=_ui.value.copy(status="Cannot identify interactive sources",detail=e.message);return false
-                }
-                when(resolved) {
-                    is PackInteractiveSources.Resolved.Rainbow -> startRainbow(resolved.bytes,playable.notes,resolved.title,startingStage)
-                    is PackInteractiveSources.Resolved.Normal -> startFlow(resolved.flow,resolved.bytes,playable.notes,resolved.title,startingStage)
-                    null -> startFlow(playable.flow,playable.bytes,playable.notes,startingStage=startingStage)
+            is PackOpenOutcome.IdentityError -> {
+                _ui.value = _ui.value.copy(status = "Cannot identify interactive sources", detail = outcome.reason)
+                false
+            }
+            is PackOpenOutcome.Ready -> {
+                val playable = outcome.playable
+                when (val resolved = outcome.resolved) {
+                    is PackInteractiveSources.Resolved.Rainbow ->
+                        startRainbow(resolved.bytes, playable.notes, resolved.title, startingStage, request = request)
+                    is PackInteractiveSources.Resolved.Normal ->
+                        startFlow(resolved.flow, resolved.bytes, playable.notes, resolved.title, startingStage, request = request)
+                    null ->
+                        startFlow(playable.flow, playable.bytes, playable.notes, startingStage = startingStage, request = request)
                 }
             }
         }
@@ -1482,16 +1633,48 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         interactivePlan?.let { plan ->
             if(!session.state.value.loaded) {
                 val request=++packPlaybackRequest
+                val flowTitle = _ui.value.flow?.title ?: plan.name
+                val snapshotBytes = flowBytes
+                val snapshotTotalFrames = totalFrames
+                val snapshotGains = currentLayerGains(plan)
                 viewModelScope.launch {
                     PlaybackService.awaitForegroundPromotion()
-                    if(request!=packPlaybackRequest || interactivePlan!==plan) return@launch
-                    val state=session.loadFlow(_ui.value.flow?.title ?: plan.name,plan.packet,plan.assetPaths.map { it to flowBytes.getValue(it) },
-                        totalFrames,plan.entry,streamed=plan.streamed,autoAdvance=plan.automaticNext,preparedAssets=plan.preparedAssets + plan.entryPreparedAssets[plan.entry].orEmpty(),
-                        prequeueInitial=plan.entry in plan.entryAutomaticNext,
-                        initialLayerGains=currentLayerGains(plan))
-                    if(state.detail!=null) { _ui.value=_ui.value.copy(detail=state.detail);return@launch }
-                    nativePerformance=null
-                    startPerformance()
+                    if(request!=packPlaybackRequest || interactivePlan!==plan || nativePerformance?.isFading == true) return@launch
+                    val prep = withContext(Dispatchers.IO) {
+                        session.prepareFlow(
+                            title = flowTitle,
+                            packet = plan.packet,
+                            assets = plan.assetPaths.map { it to snapshotBytes.getValue(it) },
+                            frames = snapshotTotalFrames,
+                            startSegment = plan.entry,
+                            streamed = plan.streamed,
+                            autoAdvance = plan.automaticNext,
+                            preparedAssets = plan.preparedAssets + plan.entryPreparedAssets[plan.entry].orEmpty(),
+                            prequeueInitial = plan.entry in plan.entryAutomaticNext,
+                            initialLayerGains = snapshotGains,
+                        )
+                    }
+                    when (prep) {
+                        is PlaybackSession.PrepareResult.Failed -> {
+                            if (request == packPlaybackRequest && interactivePlan === plan) {
+                                _ui.value = _ui.value.copy(detail = prep.reason)
+                            }
+                            return@launch
+                        }
+                        is PlaybackSession.PrepareResult.Ok -> {
+                            if (request != packPlaybackRequest || interactivePlan !== plan || nativePerformance?.isFading == true) {
+                                withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { prep.prepared.discard() }
+                                return@launch
+                            }
+                            val state = session.commitPrepared(prep.prepared)
+                            if (state.detail != null) {
+                                _ui.value = _ui.value.copy(detail = state.detail)
+                                return@launch
+                            }
+                            nativePerformance = null
+                            startPerformance()
+                        }
+                    }
                 }
                 return
             }
@@ -1559,7 +1742,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val db = if (speakerEnabled) 0.0 else -96.0
         if (session.state.value.loaded) {
             plan.overlayTrackIndices.forEach { trackIdx ->
-                session.setLayerGain(trackIdx, db)
+                session.setLayerGain(trackIdx, db, fadeMs = 1000)
             }
         }
         _ui.value = _ui.value.copy(
@@ -1674,8 +1857,18 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                     if (!mainFile.isFile || !fastFile.isFile) error("Missing audio files for ${track.id}")
                     val mainBytes = mainFile.readBytes()
                     val fastBytes = fastFile.readBytes()
-                    val byStem = mapOf(track.main.stem to mainBytes, track.fast.stem to fastBytes)
-                    val byPath = mapOf("${track.main.stem}.bwav" to mainBytes, "${track.fast.stem}.bwav" to fastBytes)
+                    val ffAsset = com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.ASSET
+                    val ffBytes = finalLapFanfareBytes
+                    val byStem = mapOf(
+                        track.main.stem to mainBytes,
+                        track.fast.stem to fastBytes,
+                        ffAsset to ffBytes,
+                    )
+                    val byPath = mapOf(
+                        "${track.main.stem}.bwav" to mainBytes,
+                        "${track.fast.stem}.bwav" to fastBytes,
+                        ffAsset to ffBytes,
+                    )
                     val plan = com.mylittleblover.mkwplayer.interactive.ExtraInteractiveCompilers.compileTwoStateLoopPlan(
                         track = track,
                         isBattle = isBattle,
@@ -1770,6 +1963,59 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             shuffleOverride = shuffle,
         )
         startPolling()
+    }
+
+    internal fun courseMedleysForCourse(code: String): List<Pair<com.mylittleblover.mkwplayer.interactive.CourseMedleyCatalog.Medley, Boolean>> {
+        if (isSpecialStageLocked(code)) return emptyList()
+        val dir = pack?.directory
+        val catalog = courseMedleyCatalog
+        return catalog.forCourse(code).map { medley ->
+            val playable = dir != null && com.mylittleblover.mkwplayer.interactive.CourseMedleyCompiler.resolveMedley(
+                medley = medley,
+                sampleRate = catalog.sampleRate,
+                identities = interactiveIdentities,
+                packDir = dir,
+            ) != null
+            medley to playable
+        }
+    }
+
+    fun playCourseMedley(
+        medleyId: String,
+        languageTag: String,
+        unlockedCourses: List<String>,
+        suiteLabel: String,
+        rallyLabel: String,
+    ): Boolean {
+        val dir = pack?.directory ?: return false
+        val catalog = courseMedleyCatalog
+        val unlockedSet = unlockedCourses.map { it.removeSuffix("_00") }.toSet()
+        val entries = catalog.medleys.mapNotNull { medley ->
+            if (isSpecialStageLocked(medley.courseCode)) return@mapNotNull null
+            if (unlockedSet.isNotEmpty() && medley.courseCode !in unlockedSet) return@mapNotNull null
+            val resolved = com.mylittleblover.mkwplayer.interactive.CourseMedleyCompiler.resolveMedley(
+                medley = medley,
+                sampleRate = catalog.sampleRate,
+                identities = interactiveIdentities,
+                packDir = dir,
+            ) ?: return@mapNotNull null
+            val courseName = localizedNames?.name(medley.courseCode, languageTag) ?: medley.courseCode
+            val title = if (medley.isKnockoutVariant) "$courseName · $rallyLabel" else courseName
+            val subtitle = if (medley.isKnockoutVariant) "$suiteLabel · $rallyLabel" else suiteLabel
+            LinearQueue.Entry(
+                key = "medley:${medley.id}",
+                title = title,
+                subtitle = subtitle,
+                durationMs = medley.durationMs,
+                artworkName = extraCatalog.courseArtwork[medley.courseCode],
+                courseMedley = resolved,
+            )
+        }
+        val startIndex = entries.indexOfFirst { it.key == "medley:$medleyId" }
+        if (startIndex < 0) return false
+        playExtraLinearQueue(entries, startIndex, LinearQueue.RepeatMode.LIST, shuffle = false)
+        requestNotificationPermissionIfNeeded()
+        return true
     }
 
     internal val initialEntryChoices: Map<Int,String>
@@ -2047,7 +2293,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val segment=plan.spec.segments.singleOrNull { it.index==driver.current }
         val label=plan.labels[driver.current] ?: "Waiting"
         val pending=driver.pending?.let { " → ${plan.labels[it]} (queued)" }.orEmpty()
-        _ui.value=_ui.value.copy(detail=if(fromAction) error else driver.diagnostic ?: _ui.value.detail,flow=current.copy(
+        val updated = _ui.value.copy(detail=if(fromAction) error else driver.diagnostic ?: _ui.value.detail,flow=current.copy(
             activeSegment=driver.current,performing=!driver.finished,
             performanceStage=if(driver.finished) "Finished" else label+pending,
             stageKey=if(driver.finished) "Finished" else label,
@@ -2058,6 +2304,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             sourceFrame=observation?.sourceFrame,sourceFrames=segment?.exit,loopStart=segment?.loop?.start,loopEnd=segment?.loop?.end,
             voiceCount=observation?.voices ?: 0,transportRate=plan.spec.transportSampleRate,fading=driver.isFading,
             fadeRemainingFrames=observation?.fadeEndFrame?.let { end -> observation.transportFrame?.let { (end-it).coerceAtLeast(0) } }))
+        if (updated != _ui.value) _ui.value = updated
     }
     private fun publish(state: PlaybackSession.State) {
         creditListening(state)
@@ -2071,7 +2318,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         // not expose it, so an absent packet stays NO DATA rather than being invented.
         val timing = TimingDiagnosis.read(session.timingSnapshot())
 
-        _ui.value = _ui.value.copy(
+        val updated = _ui.value.copy(
             status = when {
                 state.detail != null -> "Failed"
                 state.playing -> "Playing"
@@ -2092,6 +2339,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             totalFrames = state.totalFrames.takeIf { it > 0L } ?: totalFrames,
             sampleRate = state.sampleRate.takeIf { it > 0 } ?: rate,
         )
+        if (updated != _ui.value) _ui.value = updated
     }
 
     fun pause() {

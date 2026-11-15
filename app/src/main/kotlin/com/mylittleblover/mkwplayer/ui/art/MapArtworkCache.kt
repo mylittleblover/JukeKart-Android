@@ -23,7 +23,10 @@ internal object MapArtworkCache {
     )
 
     suspend fun load(context: Context): ImageBitmap? = withContext(Dispatchers.IO) {
-        BitmapFactory.decodeResource(context.applicationContext.resources, R.drawable.world_map)?.asImageBitmap()
+        val opts = BitmapFactory.Options().apply { inMutable = true }
+        val raw = BitmapFactory.decodeResource(context.applicationContext.resources, R.drawable.world_map, opts)
+            ?: return@withContext null
+        featherWorldMapEdges(raw).asImageBitmap()
     }
 
     suspend fun loadRouteSprites(context: Context): RouteSprites? = withContext(Dispatchers.IO) {
@@ -114,8 +117,10 @@ internal object MapArtworkCache {
     }
 
     /**
-     * Converts a `500x500` square `Map_Light_*_s` mask (0 = bright corridor, 255 = outside) into a cool
-     * dimming veil cropped vertically (`40..460`, i.e., `2400 / 2857`) to match `world_map` (`2857x2400`).
+     * Converts a `500x500` square `Map_Light_*_s` mask (`0` = highlighted corridor, `255` = outside)
+     * into a cutout alpha mask (`255` = clear the dim veil, `0` = keep full dim veil) cropped
+     * vertically (`40..460`, i.e., `2400 / 2857`) to match `world_map` (`2857x2400`).
+     * A narrow outer feather ensures even a bright highlight halo never cuts abruptly at the map edge.
      */
     private fun convertHighlightMask(src: Bitmap): ImageBitmap {
         val w = src.width
@@ -124,11 +129,67 @@ internal object MapArtworkCache {
         val cropH = ((fullH * 2400f) / 2857f).roundToInt().coerceIn(1, fullH - cropTop)
         val pixels = IntArray(w * cropH)
         src.getPixels(pixels, 0, w, 0, cropTop, w, cropH)
-        for (i in pixels.indices) {
-            val luma = (pixels[i] ushr 16) and 0xFF
-            val veilAlpha = ((luma / 255f) * 145f).roundToInt().coerceIn(0, 145)
-            pixels[i] = (veilAlpha shl 24) or (6 shl 16) or (12 shl 8) or 26
+        val edgePx = 6f
+        for (y in 0 until cropH) {
+            val edgeY = smoothEdge(y.toFloat(), cropH.toFloat(), edgePx)
+            val rowOffset = y * w
+            for (x in 0 until w) {
+                val idx = rowOffset + x
+                val luma = (pixels[idx] ushr 16) and 0xFF
+                val cutout = (255 - luma) / 255f
+                val edgeX = smoothEdge(x.toFloat(), w.toFloat(), edgePx)
+                val outA = (cutout * edgeX * edgeY * 255f).roundToInt().coerceIn(0, 255)
+                pixels[idx] = outA shl 24
+            }
         }
         return Bitmap.createBitmap(pixels, w, cropH, Bitmap.Config.ARGB_8888).asImageBitmap()
+    }
+
+    /** Softens the outer perimeter of `world_map` so out-of-bounds panning/zooming melts into the sea. */
+    private fun featherWorldMapEdges(src: Bitmap): Bitmap {
+        val mutable = if (src.isMutable && src.config == Bitmap.Config.ARGB_8888) src else {
+            src.copy(Bitmap.Config.ARGB_8888, true).also { src.recycle() }
+        }
+        val w = mutable.width
+        val h = mutable.height
+        val featherPx = minOf(w, h) * 0.04f
+        val row = IntArray(w)
+        val rowEdge = FloatArray(w) { x -> smoothEdge(x.toFloat(), w.toFloat(), featherPx) }
+        for (y in 0 until h) {
+            val ey = smoothEdge(y.toFloat(), h.toFloat(), featherPx)
+            if (ey < 1f) {
+                mutable.getPixels(row, 0, w, 0, y, w, 1)
+                for (x in 0 until w) {
+                    val a = ((rowEdge[x] * ey) * 255f).roundToInt().coerceIn(0, 255)
+                    row[x] = (a shl 24) or (row[x] and 0x00FFFFFF)
+                }
+                mutable.setPixels(row, 0, w, 0, y, w, 1)
+            } else {
+                val margin = featherPx.toInt().coerceAtMost(w / 2)
+                if (margin > 0) {
+                    mutable.getPixels(row, 0, margin, 0, y, margin, 1)
+                    for (x in 0 until margin) {
+                        val a = (rowEdge[x] * 255f).roundToInt().coerceIn(0, 255)
+                        row[x] = (a shl 24) or (row[x] and 0x00FFFFFF)
+                    }
+                    mutable.setPixels(row, 0, margin, 0, y, margin, 1)
+                    val rightStart = w - margin
+                    mutable.getPixels(row, 0, margin, rightStart, y, margin, 1)
+                    for (i in 0 until margin) {
+                        val a = (rowEdge[rightStart + i] * 255f).roundToInt().coerceIn(0, 255)
+                        row[i] = (a shl 24) or (row[i] and 0x00FFFFFF)
+                    }
+                    mutable.setPixels(row, 0, margin, rightStart, y, margin, 1)
+                }
+            }
+        }
+        return mutable
+    }
+
+    private fun smoothEdge(pos: Float, length: Float, margin: Float): Float {
+        if (margin <= 0f) return 1f
+        val d = minOf(pos + 0.5f, length - pos - 0.5f).coerceIn(0f, margin)
+        val t = d / margin
+        return t * t * (3f - 2f * t)
     }
 }

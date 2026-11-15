@@ -46,6 +46,7 @@ internal class LinearQueue(
         val loopEnd: Long? = null,
         val overlaidOpening: com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.OverlaidOpening? = null,
         val chainedSequence: com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.ChainedSequence? = null,
+        val courseMedley: com.mylittleblover.mkwplayer.interactive.CourseMedleyCompiler.ResolvedMedley? = null,
     )
 
     data class Snapshot(

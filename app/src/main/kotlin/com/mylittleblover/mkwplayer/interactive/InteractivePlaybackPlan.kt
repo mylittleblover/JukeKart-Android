@@ -60,8 +60,24 @@ internal data class InteractivePlaybackPlan(
             val next=listOf(StageFlow.Role.Pre,StageFlow.Role.PreShort).mapNotNull { roles[it]?.let { id -> id to main } }.toMap()
             val labels=roles.entries.associate { it.value to it.key.name }+
                 compiled.segmentByOutro.entries.associate { it.value to "Outro%02d".format(it.key) }
+            val preparedAssets = setOfNotNull(
+                flow.part(StageFlow.Role.Bridge)?.fileName,
+                flow.part(StageFlow.Role.Main)?.fileName,
+            )
+            val entryPreparedAssets = buildMap {
+                roles[StageFlow.Role.Pre]?.let { id ->
+                    flow.part(StageFlow.Role.Pre)?.fileName?.let { put(id, setOf(it)) }
+                }
+                roles[StageFlow.Role.PreShort]?.let { id ->
+                    flow.part(StageFlow.Role.PreShort)?.fileName?.let { put(id, setOf(it)) }
+                }
+                roles[StageFlow.Role.Fast]?.let { id ->
+                    flow.part(StageFlow.Role.Fast)?.fileName?.let { put(id, setOf(it)) }
+                }
+            }
             val base=InteractivePlaybackPlan(flow.name,prepared.spec,compiled.packet,compiled.assetPaths,entry,next,
-                compiled.segmentByOutro,roles[StageFlow.Role.Fast],labels,compiled)
+                compiled.segmentByOutro,roles[StageFlow.Role.Fast],labels,compiled,
+                streamed=true,preparedAssets=preparedAssets,entryPreparedAssets=entryPreparedAssets)
             val enriched = FinalLapFanfareCompiler.extend(
                 DonkeyRegionCompiler.extend(FullVersionCompiler.extend(base,flow,bytes,catalog),flow,bytes,catalog),bytes)
             return DirectBridgeCompiler.normal(enriched, flow, catalog)
