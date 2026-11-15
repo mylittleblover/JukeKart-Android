@@ -43,6 +43,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -172,7 +173,7 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
                                 style = MaterialTheme.typography.bodySmall, maxLines = 1)
                             val fraction = if (flow?.sourceFrame != null && flow.sourceFrames != null && flow.sourceFrames > 0)
                                 (flow.sourceFrame.toDouble() / flow.sourceFrames).toFloat().coerceIn(0f, 1f) else session.progress.coerceIn(0f, 1f)
-                            LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+                            com.mylittleblover.mkwplayer.ui.SmoothProgressIndicator(fraction, modifier = Modifier.fillMaxWidth())
                         }
                         val label = stringResource(if (session.canPause) R.string.interactive_pause else R.string.interactive_resume)
                         FilledIconButton(onClick = onToggle, enabled = session.canPause || session.canResume,
@@ -209,6 +210,22 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
 
 @Composable
 internal fun DiscoveryMedia(catalog: BrowseCatalog?, unlocked: Boolean, language: String,
+    category: Int, onCategory: (Int) -> Unit, query: String, onQuery: (String) -> Unit,
+    recentIds: List<String>, onCourse: (String) -> Unit, onCup: (String) -> Unit) {
+    val categoryStateHolder = rememberSaveableStateHolder()
+    androidx.compose.animation.AnimatedContent(category, transitionSpec = {
+        com.mylittleblover.mkwplayer.ui.AppMotion.page(if (targetState < 0) -1 else 1)
+    }, label = "media-category") { shown ->
+        categoryStateHolder.SaveableStateProvider(shown) {
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                DiscoveryMediaContent(catalog, unlocked, language, shown, onCategory, query, onQuery, recentIds, onCourse, onCup)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, language: String,
                             category: Int, onCategory: (Int) -> Unit, query: String, onQuery: (String) -> Unit,
                             recentIds: List<String>, onCourse: (String) -> Unit, onCup: (String) -> Unit) {
     androidx.activity.compose.BackHandler(enabled = category >= 0) { onCategory(-1) }
@@ -420,7 +437,9 @@ internal fun DiscoveryPlaylist(playlist: com.mylittleblover.mkwplayer.library.Us
     var newName by rememberSaveable { mutableStateOf("") }
     val visible = catalog?.courses(unlocked).orEmpty()
     var courseQuery by rememberSaveable { mutableStateOf("") }
-    if (choosing) ModalBottomSheet(onDismissRequest = { choosing = false; courseQuery = "" }) {
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    if (choosing) ModalBottomSheet(sheetState = sheet, onDismissRequest = { choosing = false; courseQuery = "" }) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.discovery_choose_course), style = MaterialTheme.typography.headlineSmall)
             OutlinedTextField(courseQuery, { courseQuery = it }, modifier = Modifier.fillMaxWidth(),
@@ -431,7 +450,7 @@ internal fun DiscoveryPlaylist(playlist: com.mylittleblover.mkwplayer.library.Us
                 if (matches.isEmpty()) item { Text(stringResource(R.string.discovery_empty), Modifier.padding(vertical = 16.dp)) }
                 items(matches, key = { it }) { code ->
                     ListItem(headlineContent = { Text(catalog?.displayName(code, language) ?: code) },
-                        trailingContent = { IconButton(onClick = { onAdd(code); choosing = false; courseQuery = "" }) {
+                        trailingContent = { IconButton(onClick = { onAdd(code); scope.launch { sheet.hide(); choosing = false; courseQuery = "" } }) {
                             Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.discovery_add_course))
                         } })
                 }

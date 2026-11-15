@@ -11,6 +11,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -32,14 +33,16 @@ internal fun AppSettingsScreen(
     sourceCount: Int? = null, playableCount: Int? = null, importProgress: String = "", importDetail: String? = null,
 ) {
     var choosingLanguage by rememberSaveable { mutableStateOf(false) }
-    if (choosingLanguage) ModalBottomSheet(onDismissRequest = { choosingLanguage = false }) {
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    if (choosingLanguage) ModalBottomSheet(sheetState = sheet, onDismissRequest = { choosingLanguage = false }) {
         Column(Modifier.fillMaxWidth().selectableGroup().padding(bottom = 24.dp)) {
             Text(stringResource(R.string.app_language_title), Modifier.padding(24.dp), style = MaterialTheme.typography.headlineSmall)
             AppLanguage.entries.forEach { choice ->
                 ListItem(headlineContent = { Text(stringResource(choice.labelResource)) },
                     trailingContent = { RadioButton(selected = language == choice, onClick = null) },
                     modifier = Modifier.selectable(selected = language == choice, role = Role.RadioButton,
-                        onClick = { choosingLanguage = false; if (language != choice) onLanguage(choice) }).heightIn(min = 56.dp))
+                        onClick = { scope.launch { sheet.hide(); choosingLanguage = false; if (language != choice) onLanguage(choice) } }).heightIn(min = 56.dp))
             }
         }
     }

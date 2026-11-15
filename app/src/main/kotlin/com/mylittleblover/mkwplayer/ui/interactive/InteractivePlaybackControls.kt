@@ -2,6 +2,8 @@ package com.mylittleblover.mkwplayer.ui.interactive
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Flag
@@ -29,6 +31,7 @@ import com.mylittleblover.mkwplayer.R
 import com.mylittleblover.mkwplayer.audio.EngineSnapshot
 import com.mylittleblover.mkwplayer.player.PlayerViewModel
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 /** A read-only view of Native source/transport clocks; no seek gesture or UI timer. */
 @Composable
@@ -37,7 +40,7 @@ internal fun InteractivePlaybackTimeline(position: String, flow: PlayerViewModel
         val frame = flow.sourceFrame
         val length = flow.sourceFrames
         if (frame != null && frame >= 0 && length != null && length > 0) {
-            LinearProgressIndicator(progress = { (frame.toDouble() / length).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
+            com.mylittleblover.mkwplayer.ui.SmoothProgressIndicator((frame.toDouble() / length).toFloat(), modifier = Modifier.fillMaxWidth())
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(if (frame != null && frame >= 0) EngineSnapshot.formatPosition(frame, flow.transportRate) else position, style = MaterialTheme.typography.labelMedium)
@@ -99,6 +102,8 @@ internal fun InteractiveStopBar(canStop: Boolean, canFade: Boolean, fading: Bool
 internal fun InteractiveEntryChooser(choices: Map<Int, String>, selected: Int?, enabled: Boolean, onSelect: (Int) -> Unit) {
     if (choices.isEmpty()) return
     var showSheet by rememberSaveable { mutableStateOf(false) }
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
     LaunchedEffect(enabled) { if (!enabled) showSheet = false }
     val selectedName = stageText(choices[selected] ?: choices.values.first())
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -112,7 +117,7 @@ internal fun InteractiveEntryChooser(choices: Map<Int, String>, selected: Int?, 
             }
         }
     }
-    if (showSheet && enabled) ModalBottomSheet(onDismissRequest = { showSheet = false }) {
+    if (showSheet && enabled) ModalBottomSheet(sheetState = sheet, onDismissRequest = { showSheet = false }) {
         Column(Modifier.fillMaxWidth().heightIn(max = 480.dp).verticalScroll(rememberScrollState())
             .selectableGroup().padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(stringResource(R.string.stage_start_choose), Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
@@ -121,7 +126,7 @@ internal fun InteractiveEntryChooser(choices: Map<Int, String>, selected: Int?, 
                 ListItem(headlineContent = { Text(stageText(label)) },
                     trailingContent = { RadioButton(selected = id == selected, onClick = null) },
                     modifier = Modifier.selectable(selected = id == selected, role = Role.RadioButton,
-                        onClick = { if (id != selected) onSelect(id); showSheet = false }).heightIn(min = 56.dp))
+                        onClick = { if (id != selected) onSelect(id); scope.launch { sheet.hide(); showSheet = false } }).heightIn(min = 56.dp))
             }
         }
     }
@@ -158,20 +163,27 @@ internal fun InteractiveStructure(flow: PlayerViewModel.FlowUi) {
 @Composable
 internal fun InteractiveActionBar(flow: PlayerViewModel.FlowUi, onAdvance: () -> Unit,
     onFast: () -> Unit, onCancel: () -> Unit, onEnd: () -> Unit) {
-    val actions = buildList {
-        if (flow.canAdvance) add(Triple(Icons.Filled.SkipNext, R.string.interactive_action_next, onAdvance))
-        if (flow.canFast) add(Triple(Icons.Filled.Speed, R.string.interactive_action_fast, onFast))
-        if (flow.canEnd) add(Triple(Icons.Filled.Flag, R.string.interactive_action_end, onEnd))
-        if (flow.canCancelPending) add(Triple(Icons.AutoMirrored.Filled.Undo, R.string.interactive_action_cancel, onCancel))
-    }
-    if (actions.isEmpty()) return
+    val actions = listOf(
+        Triple(Icons.Filled.SkipNext, R.string.interactive_action_next, onAdvance) to (flow.canAdvance && flow.selectedRegion != 5),
+        Triple(Icons.Filled.Speed, R.string.interactive_action_fast, onFast) to flow.canFast,
+        Triple(Icons.Filled.Flag, R.string.interactive_action_end, onEnd) to (flow.canEnd && flow.selectedRegion != 5),
+        Triple(Icons.AutoMirrored.Filled.Undo, R.string.interactive_action_cancel, onCancel) to flow.canCancelPending)
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        actions.forEach { (icon, label, action) ->
-            OutlinedButton(onClick = action, modifier = Modifier.weight(1f).fillMaxHeight().heightIn(min = 56.dp),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)) {
-                Icon(icon, null, Modifier.size(if (actions.size > 2) 18.dp else 22.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(label), style = MaterialTheme.typography.labelLarge, maxLines = 2)
+        actions.forEach { (actionInfo, visible) ->
+            key(actionInfo.second) {
+                val weight by animateFloatAsState(if (visible) 1f else 0f,
+                    tween(180, easing = com.mylittleblover.mkwplayer.ui.AppMotion.easeOut), label = "interactive-action")
+                if (visible || weight > .001f) {
+                    val (icon, label, action) = actionInfo
+                    OutlinedButton(onClick = action, enabled = visible,
+                        modifier = Modifier.weight(weight.coerceAtLeast(.001f)).fillMaxHeight().heightIn(min = 56.dp)
+                            .graphicsLayer { alpha = weight; clip = true },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)) {
+                        Icon(icon, null, Modifier.size(20.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(label), style = MaterialTheme.typography.labelLarge, maxLines = 2)
+                    }
+                }
             }
         }
     }

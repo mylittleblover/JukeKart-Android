@@ -98,6 +98,18 @@ internal class NavState(
         }
     }
 
+    /** A proper stack prefix is a back operation, regardless of which back affordance was used. */
+    fun motionFrom(old: NavState): Int {
+        if (tab != old.tab) return if (tab.order > old.tab.order) 1 else -1
+        val before = old.snapshot().drop(2)
+        val after = snapshot().drop(2)
+        return when {
+            after == before -> 0
+            after.size < before.size && before.take(after.size) == after -> -1
+            else -> 1
+        }
+    }
+
     companion object {
         fun restore(state: List<String>): NavState {
             val tab = when (state.firstOrNull()) {

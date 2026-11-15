@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -51,6 +52,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -105,6 +107,7 @@ internal fun MkwApp(
 ) {
     var nav by rememberSaveable(stateSaver = listSaver<NavState, String>(save = { it.snapshot() }, restore = { NavState.restore(it) })) { mutableStateOf(NavState()) }
     val mapState = rememberSaveable(saver = WorldMapState.Saver) { WorldMapState() }
+    val pageStateHolder = rememberSaveableStateHolder()
     var mediaCategory by rememberSaveable { mutableIntStateOf(-1) }
     var mediaQuery by rememberSaveable { mutableStateOf("") }
 
@@ -234,10 +237,12 @@ internal fun MkwApp(
                 }
             }
             AnimatedContent(targetState = nav.snapshot(), modifier = Modifier.weight(1f).fillMaxSize(),
-                transitionSpec = { (fadeIn(tween(180)) + slideInVertically(tween(180)) { it / 32 }) togetherWith ExitTransition.None },
+                transitionSpec = { com.mylittleblover.mkwplayer.ui.AppMotion.page(NavState.restore(targetState).motionFrom(NavState.restore(initialState))) },
                 label = "page-transition") { snapshot ->
             val page = NavState.restore(snapshot)
             val detail = page.detail
+            pageStateHolder.SaveableStateProvider(snapshot.joinToString("") { "${it.length}:$it" }) {
+            androidx.compose.material3.Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             when {
                 detail == NavState.Detail.Settings -> AppSettingsScreen(
                     language = language, onLanguage = { AppLanguageSettings.select(context, it) },
@@ -315,6 +320,8 @@ internal fun MkwApp(
                         onPlaylist = { nav = nav.open(NavState.Detail.Playlist(it)) },
                         onCup = { nav = nav.open(NavState.Detail.Cup(it)) })
                 }
+            }
+            }
             }
             }
         }
@@ -563,7 +570,7 @@ private fun ConsolePage(
                 }
                 item {
                     Card(Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Column(Modifier.animateContentSize(tween(220)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             com.mylittleblover.mkwplayer.ui.interactive.InteractiveEntryChooser(
                                 choices = model.initialEntryChoices, selected = model.selectedEntrySegment,
                                 enabled = !ui.canStop && !ui.busy, onSelect = model::selectInitialEntry)
@@ -682,7 +689,7 @@ private fun MiniPlayer(title: String, courseCode: String?, ui: PlayerViewModel.U
             val length = flow?.sourceFrames
             val progress = if (frame != null && frame >= 0 && length != null && length > 0)
                 (frame.toDouble() / length).toFloat().coerceIn(0f, 1f) else ui.progress.coerceIn(0f, 1f)
-            androidx.compose.material3.LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+            com.mylittleblover.mkwplayer.ui.SmoothProgressIndicator(progress, modifier = Modifier.fillMaxWidth())
         }
     }
 }
@@ -696,7 +703,7 @@ private fun SingleTrackPlayer(model: PlayerViewModel, ui: PlayerViewModel.Ui) {
             com.mylittleblover.mkwplayer.ui.art.CoursePlaceholder(model.currentStageCode, Modifier.fillMaxSize())
         }
         Text(ui.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        androidx.compose.material3.LinearProgressIndicator(progress = { ui.progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
+        com.mylittleblover.mkwplayer.ui.SmoothProgressIndicator(ui.progress, modifier = Modifier.fillMaxWidth())
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(ui.position); Text(ui.total) }
         val label = androidx.compose.ui.res.stringResource(if (ui.canPause) R.string.interactive_pause else R.string.interactive_resume)
         androidx.compose.material3.FilledIconButton(onClick = { if (ui.canPause) model.pause() else model.resume() },

@@ -202,8 +202,8 @@ private fun TransportBlock(
             }
 
             if (transport.canSeek) {
-                LinearProgressIndicator(
-                    progress = { transport.fraction },
+                com.mylittleblover.mkwplayer.ui.SmoothProgressIndicator(
+                    progress = transport.fraction,
                     modifier = Modifier.fillMaxWidth(),
                     color = Tokens.Palette.navy700,
                     trackColor = Tokens.Palette.cyan400,

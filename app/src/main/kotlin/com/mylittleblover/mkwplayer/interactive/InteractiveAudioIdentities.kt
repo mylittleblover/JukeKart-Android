@@ -6,7 +6,10 @@ import java.security.MessageDigest
 
 /** Content identity survives the pack's translated titles and digest-based cache filenames. */
 internal class InteractiveAudioIdentities private constructor(private val rows: Map<String,Identity>) {
-    data class Identity(val stage: String,val role: String,val fileName: String)
+    data class Identity(val stage: String,val role: String,val fileName: String) {
+        fun belongsToCourse(code: String): Boolean = stage.equals(code, true) ||
+            stage.startsWith("${code}_Pattern", true) && stage.substring(code.length + 8).toIntOrNull()?.let { it in 2..5 } == true
+    }
     data class Resolved(val flow: StageFlow,val bytes: Map<String,ByteArray>,val title: String=flow.name)
     fun identityForDigest(sha256: String): Identity? = rows[sha256]
     fun resolve(flow: StageFlow,bytes: Map<String,ByteArray>): Resolved? {

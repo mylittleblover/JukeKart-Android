@@ -272,7 +272,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val stage = installed.manifest.stages.singleOrNull { it.code.removeSuffix("_00").equals(logical, true) } ?: return emptyList()
         val identities = stage.tracks.flatMap { installed.manifest.track(it)?.parts.orEmpty() }
             .mapNotNull { interactiveIdentities.identityForDigest(it.asset.sha256) }
-            .filter { it.stage.equals(logical, true) }
+            .filter { it.belongsToCourse(logical) }
         if (logical.equals("Rainbow", true)) {
             return listOf("Area1_Pre", "Area1_Bridge", "Area1", "Area2", "Area3_Pre", "Area3", "Final_Pre", "Final")
                 .filter { label -> identities.any { it.fileName == "BGM_Rainbow_${label}.bwav" ||
@@ -283,8 +283,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             .filter { it.stage.equals(logical, true) }.map { it.role }.toSet()
         val groupedRoles = identities.map { it.role }.toSet()
         val basic = listOf("Pre", "PreShort", "Bridge", "Main", "Fast").filter { role ->
-            (if (role == "Fast") role in groupedRoles else role in primaryRoles) &&
-                !(logical.equals("DonkeyKong", true) && role == "Fast")
+            (if (role == "Fast") role in groupedRoles else role in primaryRoles)
         }
         val extra = if (logical.equals("DonkeyKong", true)) (2..5).mapNotNull { number ->
             "Region $number".takeIf { identities.any { it.fileName == "BGM_Stage_DonkeyKong_Pattern$number.bwav" } }

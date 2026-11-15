@@ -31,7 +31,7 @@ internal data class InteractivePlaybackPlan(
             listOf("Area1", "Area2", "Area3_Pre", "Area3", "Final_Pre", "Final").mapNotNull { label -> labels.entries.singleOrNull { it.value == label }?.key }).distinct()
         val allowed=listOf(StageFlow.Role.Pre,StageFlow.Role.PreShort)+
             listOfNotNull(directBridge?.let { StageFlow.Role.Bridge })+listOf(StageFlow.Role.Main)+
-            if(regions.isEmpty()) listOf(StageFlow.Role.Fast) else emptyList()
+            listOf(StageFlow.Role.Fast)
         return (allowed.mapNotNull { if (it == StageFlow.Role.Bridge) directBridge else roles[it] } + regions.toSortedMap().values + versions.flatMap { listOfNotNull(it.main, it.fast) }).distinct()
     }
 

@@ -18,7 +18,7 @@ class DonkeyRegionPlanTest {
         assertEquals(5,plan.regions.size)
         assertTrue(plan.standard!!.segmentByRole.getValue(com.mylittleblover.mkwplayer.library.StageFlow.Role.PreShort) in plan.initialSegments)
         assertTrue(plan.regions.getValue(1) in plan.initialSegments)
-        assertFalse(plan.fast in plan.initialSegments, "Donkey Fast must follow Pattern 5")
+        assertTrue(plan.fast in plan.initialSegments, "Final Lap is an explicitly selectable starting point")
         plan.standard.segmentByRole[com.mylittleblover.mkwplayer.library.StageFlow.Role.Bridge]?.let { assertFalse(it in plan.initialSegments) }
         assertTrue(plan.streamed)
         for((number,source) in plan.regions) {

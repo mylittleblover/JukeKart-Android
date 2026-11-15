@@ -1,5 +1,6 @@
 package com.mylittleblover.mkwplayer.ui.routes
 
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
@@ -128,8 +129,11 @@ internal fun OfficialMapScreen(
             }
         }
     }
+    val pickerSheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val stopSheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetScope = rememberCoroutineScope()
     if (picker) {
-        ModalBottomSheet(onDismissRequest = { picker = false }) {
+        ModalBottomSheet(sheetState = pickerSheet, onDismissRequest = { picker = false }) {
             Text(stringResource(R.string.map_official_routes), Modifier.padding(horizontal = 24.dp, vertical = 12.dp), style = MaterialTheme.typography.headlineSmall)
             LazyColumn(Modifier.fillMaxWidth().heightIn(max = 560.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
                 for (kind in OfficialRouteKind.entries) {
@@ -143,7 +147,7 @@ internal fun OfficialMapScreen(
                             supportingContent = { Text(stringResource(R.string.map_route_stops, item.stops.size)) },
                             modifier = Modifier.clickable(role = Role.Button) {
                                 val points = item.stops.mapNotNull { anchors.stageTolerant(it.stageCode)?.let { p -> Offset(p.u, p.v) } }
-                                state.selectRoute(item.id, points); stops = false; picker = false
+                                state.selectRoute(item.id, points); stops = false; sheetScope.launch { pickerSheet.hide(); picker = false }
                             },
                         )
                     }
@@ -152,7 +156,7 @@ internal fun OfficialMapScreen(
         }
     }
     if (stops && route != null) {
-        ModalBottomSheet(onDismissRequest = { stops = false }) {
+        ModalBottomSheet(sheetState = stopSheet, onDismissRequest = { stops = false }) {
             Text(route.displayName(languageTag), Modifier.padding(horizontal = 24.dp, vertical = 12.dp), style = MaterialTheme.typography.headlineSmall)
             Text(stringResource(R.string.map_route_readonly), Modifier.padding(horizontal = 24.dp), style = MaterialTheme.typography.bodySmall)
             LazyColumn(Modifier.fillMaxWidth().heightIn(max = 560.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
@@ -160,7 +164,7 @@ internal fun OfficialMapScreen(
                     ListItem(
                         headlineContent = { Text(stringResource(R.string.map_route_stop, stop.ordinal, name(stop.stageCode))) },
                         supportingContent = if (stop == route.start || stop == route.end) ({ Text(stringResource(if (stop == route.start) R.string.map_start_badge else R.string.map_finish_badge)) }) else null,
-                        modifier = Modifier.clickable(role = Role.Button) { state.selectCourse(stop.stageCode); stops = false },
+                        modifier = Modifier.clickable(role = Role.Button) { state.selectCourse(stop.stageCode); sheetScope.launch { stopSheet.hide(); stops = false } },
                     )
                 }
             }

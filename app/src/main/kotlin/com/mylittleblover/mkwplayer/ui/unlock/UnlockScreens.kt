@@ -270,8 +270,8 @@ internal fun CeremonyScreen(
         }
 
         // Read-only by construction: no gesture modifier of any kind is attached to this bar.
-        LinearProgressIndicator(
-            progress = { view.progress.fraction },
+        com.mylittleblover.mkwplayer.ui.SmoothProgressIndicator(
+            progress = view.progress.fraction,
             modifier = Modifier.fillMaxWidth(),
             color = Tokens.Palette.yellow500,
             trackColor = Tokens.Palette.navy700,
