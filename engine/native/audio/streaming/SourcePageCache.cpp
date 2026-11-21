@@ -12,13 +12,44 @@ SourcePageCache::SourcePageCache(std::size_t maximumPcmBytes,std::size_t maximum
     :pageCount_(std::min(MaximumPages,maximumPcmBytes/PagePcmBytes)),maximumEncodedBytes_(maximumEncodedBytes) {
     if(pageCount_<2)fail(SourceStatus::ResourceLimit);
     pages_=std::make_unique<Page[]>(pageCount_);
+    for(auto& tag:pageTags_)tag.store(0ULL,std::memory_order_relaxed);
+    for(auto& hint:slotHints_)hint.store(0,std::memory_order_relaxed);
     static_assert(std::atomic<std::uint32_t>::is_always_lock_free,"Page leases must be lock-free");
     worker_=std::thread([this] {work();});
+}
+void SourcePageCache::publishSlotTag(std::size_t slot,int asset,std::int64_t page) noexcept {
+    const auto tag=packTag(asset,page);
+    pageTags_[slot].store(tag,std::memory_order_relaxed);
+    if(tag) {
+        const auto base=hintBucket(asset,page);
+        for(std::size_t p=0;p<4;++p) {
+            const auto idx=(base+p)&(HintBuckets-1);
+            const auto existing=slotHints_[idx].load(std::memory_order_relaxed);
+            if(existing==0 || existing==static_cast<std::int16_t>(slot+1) || pageTags_[static_cast<std::size_t>(existing-1)].load(std::memory_order_relaxed)==0) {
+                slotHints_[idx].store(static_cast<std::int16_t>(slot+1),std::memory_order_relaxed);
+                return;
+            }
+        }
+        slotHints_[base].store(static_cast<std::int16_t>(slot+1),std::memory_order_relaxed);
+    }
+}
+void SourcePageCache::clearSlotTag(std::size_t slot) noexcept {
+    const auto prevKey=pages_[slot].key;
+    pageTags_[slot].store(0ULL,std::memory_order_relaxed);
+    if(prevKey.asset>=0 && prevKey.page>=0) {
+        const auto base=hintBucket(prevKey.asset,prevKey.page);
+        for(std::size_t p=0;p<4;++p) {
+            const auto idx=(base+p)&(HintBuckets-1);
+            if(slotHints_[idx].load(std::memory_order_relaxed)==static_cast<std::int16_t>(slot+1)) {
+                slotHints_[idx].store(0,std::memory_order_relaxed);
+            }
+        }
+    }
 }
 SourcePageCache::~SourcePageCache() {stopping_.store(true,std::memory_order_release);if(worker_.joinable())worker_.join();}
 void SourcePageCache::pauseWorker() noexcept {
     paused_.store(true,std::memory_order_release);
-    while(!idle_.load(std::memory_order_acquire))std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    while(!idle_.load(std::memory_order_acquire))std::this_thread::sleep_for(std::chrono::microseconds(100));
 }
 void SourcePageCache::resumeWorker() noexcept {paused_.store(false,std::memory_order_release);}
 SourceStatus SourcePageCache::bind(int asset,std::unique_ptr<AudioFrameSource> source,std::size_t encodedBytes,const SourceSamplePosition* warm,std::size_t count) noexcept {
@@ -40,10 +71,12 @@ SourceStatus SourcePageCache::bind(int asset,std::unique_ptr<AudioFrameSource> s
         if(keyCount==pageCount_)return false;
         keys[keyCount++]=key;return true;
     };
-    if(count==0){if(!append(0) || !append(1))return SourceStatus::ResourceLimit;}
+    if(count==0){for(std::int64_t p=0;p<4;++p){if(!append(p) && p>=2)return SourceStatus::ResourceLimit;}}
     for(std::size_t n=0;n<count;++n) {
         const auto page=warm[n].value/static_cast<std::int64_t>(FramesPerPage);
         if(!append(page) || !append(page+1))return SourceStatus::ResourceLimit;
+        append(page+2);
+        append(page+3);
     }
     std::unique_ptr<Page[]> staged;
     try{staged=std::make_unique<Page[]>(keyCount);}catch(...){return SourceStatus::ResourceLimit;}
@@ -64,15 +97,16 @@ SourceStatus SourcePageCache::bind(int asset,std::unique_ptr<AudioFrameSource> s
     pauseWorker();
     for(std::size_t n=0;n<pageCount_;++n)if(pages_[n].users.load()!=0){resumeWorker();return SourceStatus::InvalidRequest;}
     // Audio is stopped and the worker acknowledged pause: control owns all pages.
-    for(std::size_t n=0;n<pageCount_;++n)if(pages_[n].key.asset==asset) {pages_[n].key={};cached_.fetch_sub(1,std::memory_order_relaxed);}
+    for(std::size_t n=0;n<pageCount_;++n)if(pages_[n].key.asset==asset) {clearSlotTag(n);pages_[n].key={};cached_.fetch_sub(1,std::memory_order_relaxed);}
     requests_.clearStopped();completed_.clearStopped();pendingCount_=0;
     encodedBytes_=encodedBytes_-sources_[asset].encodedBytes+encodedBytes;
     if(!sources_[asset].frames)++sourceCount_;
     sources_[asset]={std::move(source),encodedBytes};
     for(std::size_t n=0;n<keyCount;++n) {
-        auto& page=pages_[cursor_];cursor_=(cursor_+1)%pageCount_;
-        if(page.key.asset>=0)cached_.fetch_sub(1,std::memory_order_relaxed);
+        const auto slot=cursor_;cursor_=(cursor_+1)%pageCount_;auto& page=pages_[slot];
+        if(page.key.asset>=0){clearSlotTag(slot);cached_.fetch_sub(1,std::memory_order_relaxed);}
         page.pcm=staged[n].pcm;page.channels=staged[n].channels;page.key=staged[n].key;
+        publishSlotTag(slot,page.key.asset,page.key.page);
         increment(decoded_);cached_.fetch_add(1,std::memory_order_relaxed);
     }
     resumeWorker();return SourceStatus::Ok;
@@ -94,7 +128,7 @@ SourceStatus SourcePageCache::setSourceControls(int asset,std::uint64_t mute,std
     for(std::size_t n=0;n<pageCount_;++n)if(pages_[n].users.load()!=0){resumeWorker();return SourceStatus::InvalidRequest;}
     const auto status=groups ? sources_[asset].frames->setStreamGroups(static_cast<std::uint32_t>(mute),static_cast<std::uint32_t>(solo)) : sources_[asset].frames->setModuleChannels(mute,solo);
     if(status==SourceStatus::Ok) {
-        for(std::size_t n=0;n<pageCount_;++n)if(pages_[n].key.asset==asset){pages_[n].key={};cached_.fetch_sub(1,std::memory_order_relaxed);}
+        for(std::size_t n=0;n<pageCount_;++n)if(pages_[n].key.asset==asset){clearSlotTag(n);pages_[n].key={};cached_.fetch_sub(1,std::memory_order_relaxed);}
         requests_.clearStopped();completed_.clearStopped();pendingCount_=0;
     }
     resumeWorker();return status;
@@ -103,7 +137,7 @@ void SourcePageCache::unbind(int asset) noexcept {
     if(asset<0 || asset>=4096 || !sources_[asset].frames)return;
     pauseWorker();
     for(std::size_t n=0;n<pageCount_;++n)if(pages_[n].users.load()!=0){resumeWorker();return;}
-    for(std::size_t n=0;n<pageCount_;++n)if(pages_[n].key.asset==asset){pages_[n].key={};cached_.fetch_sub(1,std::memory_order_relaxed);}
+    for(std::size_t n=0;n<pageCount_;++n)if(pages_[n].key.asset==asset){clearSlotTag(n);pages_[n].key={};cached_.fetch_sub(1,std::memory_order_relaxed);}
     requests_.clearStopped();completed_.clearStopped();pendingCount_=0;
     encodedBytes_-=sources_[asset].encodedBytes;--sourceCount_;sources_[asset]={};resumeWorker();
 }
@@ -130,13 +164,22 @@ SourceStatus SourcePageCache::prepareLinearRepeat(int asset,std::optional<Source
     resumeWorker();return SourceStatus::Ok;
 }
 int SourcePageCache::acquire(int asset,std::int64_t page) noexcept {
+    const auto tag=packTag(asset,page);if(!tag)return -1;
     const Key key{asset,page};
+    const auto base=hintBucket(asset,page);
+    for(std::size_t p=0;p<4;++p) {
+        const auto hint=slotHints_[(base+p)&(HintBuckets-1)].load(std::memory_order_relaxed);
+        if(hint<=0)continue;
+        const auto s=static_cast<std::size_t>(hint-1);
+        if(s>=pageCount_ || pageTags_[s].load(std::memory_order_relaxed)!=tag)continue;
+        const auto users=pages_[s].users.fetch_add(1,std::memory_order_acquire);
+        if(!(users&Writing) && pages_[s].key==key)return static_cast<int>(s);
+        release(static_cast<int>(s));
+    }
     for(std::size_t n=0;n<pageCount_;++n) {
-        // Reader reservations never fail because another reader briefly changes
-        // the count. A writing reservation is released without reading any payload.
+        if(pageTags_[n].load(std::memory_order_relaxed)!=tag)continue;
         const auto users=pages_[n].users.fetch_add(1,std::memory_order_acquire);
-        if(users&Writing){release(static_cast<int>(n));continue;}
-        if(pages_[n].key==key)return static_cast<int>(n);
+        if(!(users&Writing) && pages_[n].key==key)return static_cast<int>(n);
         release(static_cast<int>(n));
     }
     return -1;
@@ -148,7 +191,7 @@ float SourcePageCache::read(int slot,SourceSamplePosition position,int channel) 
 }
 SourceSamplePosition SourcePageCache::duration(int asset) const noexcept {return asset>=0 && asset<4096 && sources_[asset].frames ? sources_[asset].frames->metadata().duration : SourceSamplePosition{};}
 void SourcePageCache::collectCompleted() noexcept {
-    Key key;for(std::size_t n=0;n<128 && completed_.pop(key);++n) {
+    Key key;for(std::size_t n=0;n<256 && completed_.pop(key);++n) {
         for(std::size_t i=0;i<pendingCount_;++i)if(pending_[i]==key){pending_[i]=pending_[--pendingCount_];break;}
     }
 }
@@ -174,7 +217,7 @@ SourceStatus SourcePageCache::load(Key key) noexcept {
         if(repeatAsset_>=0 && page.key.asset==repeatAsset_ && page.key.page>=repeatFirst_ && page.key.page<=repeatLast_)continue;
         std::uint32_t idle=0;
         if(!page.users.compare_exchange_strong(idle,Writing,std::memory_order_acquire,std::memory_order_relaxed))continue;
-        if(page.key.asset>=0)cached_.fetch_sub(1,std::memory_order_relaxed);
+        if(page.key.asset>=0){clearSlotTag(slot);cached_.fetch_sub(1,std::memory_order_relaxed);}
         page.key={};auto& source=*sources_[key.asset].frames;
         const SourceSamplePosition position{key.page*static_cast<std::int64_t>(FramesPerPage)};
         auto status=source.position().value==position.value?SourceStatus::Ok:source.seek(position);
@@ -186,7 +229,7 @@ SourceStatus SourcePageCache::load(Key key) noexcept {
             for(std::size_t i=0;i<expected*static_cast<std::size_t>(source.metadata().channels) && status==SourceStatus::Ok;++i)if(!std::isfinite(page.pcm[i]))status=SourceStatus::MalformedSource;
         }
         if(status==SourceStatus::Ok) {
-            page.key=key;page.channels=source.metadata().channels;increment(decoded_);cached_.fetch_add(1,std::memory_order_relaxed);
+            page.key=key;page.channels=source.metadata().channels;publishSlotTag(slot,key.asset,key.page);increment(decoded_);cached_.fetch_add(1,std::memory_order_relaxed);
         } else {increment(failures_);lastFailure_.store(static_cast<int>(status),std::memory_order_relaxed);}
         // Readers may briefly reserve while Writing is set. Subtract only the
         // writer bit, retaining those readers' reservations until they release.
@@ -196,16 +239,16 @@ SourceStatus SourcePageCache::load(Key key) noexcept {
 }
 void SourcePageCache::work() noexcept {
     while(!stopping_.load(std::memory_order_acquire)) {
-        if(paused_.load(std::memory_order_acquire)) {idle_.store(true,std::memory_order_release);std::this_thread::sleep_for(std::chrono::milliseconds(1));continue;}
+        if(paused_.load(std::memory_order_acquire)) {idle_.store(true,std::memory_order_release);std::this_thread::sleep_for(std::chrono::microseconds(250));continue;}
         idle_.store(false,std::memory_order_release);
         if(paused_.load(std::memory_order_acquire))continue;
         Key key;
         if(requests_.pop(key)){
             load(key);
-            // At most 128 outstanding requests; the acknowledgment ring holds all 128.
+            // At most 256 outstanding requests; the acknowledgment ring holds all 256.
             if(!completed_.push(key)){increment(failures_);lastFailure_.store(static_cast<int>(SourceStatus::ResourceLimit),std::memory_order_relaxed);}
         }
-        else std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        else std::this_thread::sleep_for(std::chrono::microseconds(500));
     }
     idle_.store(true,std::memory_order_release);
 }
@@ -239,9 +282,13 @@ bool StreamCursor::prepare(double position,std::optional<SourceSamplePosition> n
         }
     }
     if(!cache_->controlRendering() && !prefetched_){const auto duration=cache_->duration(asset_).value;
-        const auto first=(page+1)*static_cast<std::int64_t>(SourcePageCache::FramesPerPage)>=duration || cache_->request(asset_,page+1);
-        const auto second=(page+2)*static_cast<std::int64_t>(SourcePageCache::FramesPerPage)>=duration || cache_->request(asset_,page+2);
-        prefetched_=cache_->prefetchLinearRepeat(asset_,page) && first && second;}
+        bool allPrefetched=cache_->prefetchLinearRepeat(asset_,page);
+        for(std::int64_t ahead=1;ahead<=4;++ahead) {
+            if((page+ahead)*static_cast<std::int64_t>(SourcePageCache::FramesPerPage)<duration) {
+                allPrefetched&=cache_->request(asset_,page+ahead);
+            }
+        }
+        prefetched_=allPrefetched;}
 
     if(nextPage!=page && slots_[1]<0)slots_[1]=cache_->acquire(asset_,nextPage);
     if(slots_[0]<0 || (nextPage!=page && slots_[1]<0)) {

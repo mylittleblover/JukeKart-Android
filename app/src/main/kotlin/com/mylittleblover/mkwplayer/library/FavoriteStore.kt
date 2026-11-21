@@ -28,4 +28,24 @@ internal class FavoriteStore(private val file: File) {
             Collections.unmodifiableSet(updated.toSet())
         }
     }
+
+    fun replaceAll(ids: Collection<String>): Result<Set<String>> = synchronized(MetadataFile.lock(file)) {
+        runCatching {
+            val clean = linkedSetOf<String>()
+            ids.forEach { if (it.isNotBlank()) clean += it.trim() }
+            val root = JSONObject().put("schemaVersion", 1).put("ids", JSONArray(clean.toList()))
+            MetadataFile.write(file, root.toString())
+            Collections.unmodifiableSet(clean.toSet())
+        }
+    }
+
+    fun mergeAll(ids: Collection<String>): Result<Set<String>> = synchronized(MetadataFile.lock(file)) {
+        runCatching {
+            val updated = read().getOrThrow().toMutableSet()
+            ids.forEach { if (it.isNotBlank()) updated += it.trim() }
+            val root = JSONObject().put("schemaVersion", 1).put("ids", JSONArray(updated.toList()))
+            MetadataFile.write(file, root.toString())
+            Collections.unmodifiableSet(updated.toSet())
+        }
+    }
 }

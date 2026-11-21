@@ -85,6 +85,15 @@ internal object CourseMedleyCompiler {
             G.Track(index = 200 + idx, segment = 100, clips = listOf(gClip))
         }
 
+        val clipEnvelopes = medley.clips.mapIndexedNotNull { idx, clip ->
+            if (clip.volumePoints.isEmpty()) null
+            else G.TimelineEnvelope(
+                targetIndex = 300 + idx,
+                target = G.EnvelopeTarget.VolumeDb,
+                points = clip.volumePoints,
+            )
+        }
+
         val totalFrames = maxOf(medley.totalFrames, maxEnd)
         val segment = G.Segment(index = 100, entry = 0L, exit = totalFrames)
         val assetSpecs = uniqueAssets.values.map { it.first }
@@ -94,6 +103,7 @@ internal object CourseMedleyCompiler {
             tracks = tracks,
             transitions = emptyList(),
             transportSampleRate = sampleRate,
+            clipEnvelopes = clipEnvelopes,
         )
         return ExtraInteractiveCompilers.CompiledLinearGraph(
             packet = G.build(spec),

@@ -51,4 +51,29 @@ class PlaylistStoreTest {
         assertNull(afterClear.configAt(0).presetId)
         assertEquals(PresetRefs.SYSTEM_KNOCKOUT, afterClear.configAt(1).presetId)
     }
+
+    @Test fun mixedLibraryItemsPersistWithPlaylistItemRef() {
+        val course = PlaylistItemRef.parse("RainbowRoad_00")
+        assertTrue(course is PlaylistItemRef.Course)
+        assertEquals("RainbowRoad", (course as PlaylistItemRef.Course).logicalCode)
+
+        val jb = PlaylistItemRef.Jukebox("mk8/track_01")
+        val sfc = PlaylistItemRef.SfcTrack("sfc_mc1")
+        val battle = PlaylistItemRef.BattleTrack("battle_stadium")
+        val extra = PlaylistItemRef.ExtraTrack("Title_00")
+        assertEquals(jb, PlaylistItemRef.parse(jb.raw))
+        assertEquals(sfc, PlaylistItemRef.parse(sfc.raw))
+        assertEquals(battle, PlaylistItemRef.parse(battle.raw))
+        assertEquals(extra, PlaylistItemRef.parse(extra.raw))
+
+        val file = Files.createTempDirectory("mkw-playlists-mixed").resolve("playlists.json").toFile()
+        val store = PlaylistStore(file)
+        val plId = store.create("All Tracks Mix").getOrThrow().single().id
+        listOf("RainbowRoad", jb.raw, sfc.raw, battle.raw, extra.raw).forEach {
+            store.addCourse(plId, it).getOrThrow()
+        }
+        val reloaded = PlaylistStore(file).read().getOrThrow().single()
+        assertEquals(listOf("RainbowRoad", jb.raw, sfc.raw, battle.raw, extra.raw), reloaded.courseIds)
+        assertEquals(extra, reloaded.itemAt(4))
+    }
 }

@@ -159,4 +159,30 @@ class CourseMedleyCompilerTest {
             nonZeroFades,
         )
     }
+
+    @Test
+    fun defaultMedleysStartFromPreWithoutPreShortAndPreserveChocoMountainPhase() {
+        val cat = catalog()
+        val minf = MinfCatalog.parse(File("src/main/assets/interactive_minf.json").readText())
+        for (medley in cat.medleys) {
+            assertTrue(
+                medley.clips.none { it.stem.contains("Pre_Short") },
+                "Default medley ${medley.id} must not contain Pre_Short",
+            )
+            val firstClip = medley.clips.first()
+            assertEquals(0L, firstClip.start, "First clip of ${medley.id} must start at frame 0")
+            assertEquals(0L, firstClip.sourceOffset, "Expected sourceOffset 0 for ${medley.id}")
+            if (medley.courseCode == "ChocoMountain") {
+                assertEquals(191_400L, CourseFlowRecipeBuilder.resolveIncomingPhase(medley, minf))
+            }
+        }
+    }
+
+    @Test
+    fun knockoutVariantExistsOnlyForDonkeyKong() {
+        val cat = catalog()
+        val knockoutCourses = cat.medleys.filter { it.isKnockoutVariant }.map { it.courseCode }.distinct()
+        assertEquals(listOf("DonkeyKong"), knockoutCourses)
+    }
 }
+

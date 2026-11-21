@@ -82,15 +82,15 @@ internal fun rememberResourceArtwork(resourceId: Int?, maxEdge: Int): PackArtwor
     }
 }
 
-/** Keep the layout stable after releasing the off-screen bitmap. */
+/** Keep the layout stable after releasing the off-screen bitmap, and reset cleanly across track skips. */
 @Composable
 internal fun rememberArtworkRatio(id: Any?, artwork: PackArtwork.Loaded?, fallback: Float): Float {
-    var ratio by remember(id, fallback) { mutableStateOf(fallback) }
-    val actual = artwork?.aspectRatio
-    LaunchedEffect(actual) {
+    var ratio by remember(id, fallback) { androidx.compose.runtime.mutableFloatStateOf(fallback) }
+    val actual = artwork?.aspectRatio?.takeIf { it.isFinite() && it > 0f }
+    LaunchedEffect(id, fallback, actual) {
         if (actual != null) ratio = actual
     }
-    return ratio
+    return actual ?: ratio
 }
 
 internal fun decodeArtwork(maxEdge: Int, decode: (BitmapFactory.Options) -> Bitmap?): PackArtwork.Loaded? {

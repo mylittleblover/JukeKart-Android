@@ -891,6 +891,36 @@ class Phase4ImportAndInvalidationTest {
                 contextKind = LinearSessionStore.ContextKind.JUKEBOX_ALL,
             )
             assertTrue(LibraryInvalidation.isSavedSessionStillValid(validSnapshot, env))
+
+            // Special Cup hidden extras (`opening_special`, `special_cup_appears`, etc.) are blocked when Rainbow is locked.
+            val hiddenExtraEntry = LinearSessionStore.SavedEntry(
+                key = "extra:opening_special",
+                title = "Opening (Special Cup)",
+                sourceType = LinearSessionStore.SourceType.EXTRA,
+            )
+            val lockedExtraSnapshot = LinearSessionStore.Snapshot(
+                frozenBase = listOf(hiddenExtraEntry),
+                current = hiddenExtraEntry,
+                currentBaseIndex = 0,
+                contextKind = LinearSessionStore.ContextKind.EXTRA,
+                contextId = "opening_special",
+            )
+            val lockedEnv = env.copy(isStageHidden = { code -> code == "Rainbow" })
+            assertFalse(LibraryInvalidation.isSavedSessionStillValid(lockedExtraSnapshot, lockedEnv))
+            assertTrue(LibraryInvalidation.isSavedSessionStillValid(lockedExtraSnapshot, env))
+
+            // Non-Special Cup openings (e.g. Mushroom Cup, Knockout Tour) stay allowed even while locked.
+            val visibleExtraEntry = LinearSessionStore.SavedEntry(
+                key = "extra:opening_knockout",
+                title = "Opening (Knockout Tour)",
+                sourceType = LinearSessionStore.SourceType.EXTRA,
+            )
+            val visibleExtraSnapshot = lockedExtraSnapshot.copy(
+                frozenBase = listOf(visibleExtraEntry),
+                current = visibleExtraEntry,
+                contextId = "opening_knockout",
+            )
+            assertTrue(LibraryInvalidation.isSavedSessionStillValid(visibleExtraSnapshot, lockedEnv))
         } finally {
             root.deleteRecursively()
         }

@@ -177,19 +177,19 @@ struct Voice {
     }
 };
 class VoiceManager {
-    std::array<Voice,128> voices_{}; std::uint64_t dropped_{};
+    std::array<Voice,128> voices_{}; std::uint64_t dropped_{}; std::size_t activeLimit_{}; void refreshLimit() noexcept { while(activeLimit_>0 && !voices_[activeLimit_-1].active) --activeLimit_; }
 public:
-    Voice* add(const Voice& voice) noexcept { for(auto& slot:voices_) if(!slot.active) { slot=voice; return &slot; } ++dropped_; return nullptr; }
-    Voice* add(Voice&& voice) noexcept {for(auto& slot:voices_)if(!slot.active){slot=std::move(voice);return &slot;}++dropped_;return nullptr;}
-    void clear() noexcept { for(auto& voice:voices_) {voice.active=false;voice.streamCursor.reset();} }
-    void releaseInactive() noexcept {for(auto& voice:voices_)if(!voice.active)voice.streamCursor.reset();}
-    std::size_t count() const noexcept { std::size_t n=0; for(const auto& voice:voices_) n+=voice.active; return n; }
+    Voice* add(const Voice& voice) noexcept { for(std::size_t i=0;i<voices_.size();++i) if(!voices_[i].active) { voices_[i]=voice; if(i+1>activeLimit_) activeLimit_=i+1; return &voices_[i]; } ++dropped_; return nullptr; }
+    Voice* add(Voice&& voice) noexcept {for(std::size_t i=0;i<voices_.size();++i)if(!voices_[i].active){voices_[i]=std::move(voice);if(i+1>activeLimit_)activeLimit_=i+1;return &voices_[i];}++dropped_;return nullptr;}
+    void clear() noexcept { for(std::size_t i=0;i<activeLimit_;++i) {voices_[i].active=false;voices_[i].streamCursor.reset();} activeLimit_=0; }
+    void releaseInactive() noexcept {for(std::size_t i=0;i<activeLimit_;++i)if(!voices_[i].active)voices_[i].streamCursor.reset();refreshLimit();} std::size_t activeLimit() const noexcept { return activeLimit_; }
+    std::size_t count() const noexcept { std::size_t n=0; for(std::size_t i=0;i<activeLimit_;++i) n+=voices_[i].active; return n; }
     std::uint64_t dropped() const noexcept { return dropped_; }
     void restoreDropped(std::uint64_t value) noexcept { dropped_=value; }
     std::array<Voice,128>& slots() noexcept { return voices_; }
     const std::array<Voice,128>& slots() const noexcept { return voices_; }
     void fadeInstance(int instance,Frame start,Frame end,Shape shape) noexcept {
-        for(auto& voice:voices_) if(voice.active && voice.instance==instance) { voice.fadeStart=start; voice.fadeEnd=end; voice.fadeShape=shape; }
+        for(std::size_t i=0;i<activeLimit_;++i) if(voices_[i].active && voices_[i].instance==instance) { voices_[i].fadeStart=start; voices_[i].fadeEnd=end; voices_[i].fadeShape=shape; }
     }
 };
 }

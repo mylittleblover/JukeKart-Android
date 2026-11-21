@@ -35,6 +35,8 @@ class InteractivePlaybackPlanTest {
                 assertEquals(p.directBridge, bridgeEntry.entry)
                 assertTrue(p.entry in bridgeEntry.initialSegments)
                 assertTrue(p.next.values.all { it in p.labels })
+                assertTrue(p.overlayDefaultEnabled)
+                assertTrue(p.overlayTrackIndices.isNotEmpty())
             } else {
                 assertNotNull(p.fast,"${dir.name}: importer lost Fast arrangement")
                 assertNotNull(p.standard)

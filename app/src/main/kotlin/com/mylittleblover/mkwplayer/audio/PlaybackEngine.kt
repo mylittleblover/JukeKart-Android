@@ -1,4 +1,4 @@
-﻿package com.mylittleblover.mkwplayer.audio
+package com.mylittleblover.mkwplayer.audio
 
 /**
  * The engine operations a playback session needs, as an interface.
@@ -17,6 +17,7 @@ internal interface PlaybackEngine {
     fun loadGraph(packet: ByteArray): Int
     fun bindBwav(assetIndex: Int, bytes: ByteArray, assetId: String): Int
     fun loadLinearBwav(bytes: ByteArray, assetId: String, loop: Boolean = false, streamed: Boolean = true): Int = 1
+    fun loadLinearFile(file: java.io.File, assetId: String, loop: Boolean = false, streamed: Boolean = true): Int = 1
     fun setLinearRepeat(enabled: Boolean, begin: Long = -1L, end: Long = -1L): Int = 1
     fun sourceSnapshot(slot: Int): LongArray? = null
     fun play(target: Int): Int
@@ -41,6 +42,8 @@ internal class NativePlaybackEngine(private val engine: AudioEngine) : PlaybackE
         engine.bindBwav(assetIndex, bytes, assetId)
     override fun loadLinearBwav(bytes: ByteArray, assetId: String, loop: Boolean, streamed: Boolean): Int =
         engine.loadLinearBwav(bytes, assetId, loop, streamed)
+    override fun loadLinearFile(file: java.io.File, assetId: String, loop: Boolean, streamed: Boolean): Int =
+        engine.loadLinearFile(file, assetId, loop, streamed)
     override fun setLinearRepeat(enabled: Boolean, begin: Long, end: Long): Int =
         engine.setLinearRepeat(enabled, begin, end)
     override fun sourceSnapshot(slot: Int): LongArray? = engine.sourceSnapshot(slot)

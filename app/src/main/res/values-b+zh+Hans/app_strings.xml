@@ -41,4 +41,142 @@
     <string name="settings_import_cleared_continue">因数据变更使进度失效，已清理"继续收听"。</string>
     <string name="settings_import_dismiss">知道了</string>
     <string name="settings_no_delete_hint">多次导入的 .mkwpack 将增量合并至内部曲库，同时仅运行单个导入任务。</string>
+    <string name="settings_switch_fade_title">音乐段切换淡出时长</string>
+    <string name="settings_switch_fade_hint">切换时在退出点之后往后留出的淡出收尾时长；默认为 0（不淡出）。</string>
+    <string name="settings_switch_fade_off">不淡出（0 秒）</string>
+    <string name="settings_switch_fade_seconds_fmt">退出点后淡出 %1$s 秒</string>
+    <string name="settings_switch_fade_custom_label">自定义秒数（0 – 30）</string>
+    <string name="settings_switch_fade_apply">应用</string>
+    <string name="settings_perfect_beat_title">完美节拍</string>
+    <string name="settings_perfect_beat_hint">开启后，触发最后一圈等立刻切换的事件时将等待至拍点 = 1 处再退出。</string>
+    <string name="unlock_banner_title">神秘赛道已解锁</string>
+    <string name="unlock_banner_enter">进入演出</string>
+    <string name="unlock_notif_channel">隐藏内容解锁提醒</string>
+    <string name="unlock_notif_title">神秘赛道已解锁</string>
+    <string name="unlock_notif_body">彩虹之路已达成解锁条件，点击进入解锁演出。</string>
+    <string name="media_course_locked_badge">未解锁赛道</string>
+    <string name="media_course_locked_name">？？？</string>
+    <string name="media_course_locked_progress">已收听 %1$d / %2$d 首赛道</string>
+    <string name="media_course_locked_hint">未解锁赛道 · %1$s</string>
+
+    <string name="widget_label">MKW 播放器控制</string>
+    <string name="widget_description">显示当前曲目及播放控制按钮。</string>
+    <string name="widget_artwork_desc">曲目封面</string>
+    <string name="widget_prev_desc">上一首</string>
+    <string name="widget_play_pause_desc">播放或暂停</string>
+    <string name="widget_next_desc">下一首</string>
+    <string name="tile_default_label">MKW 播放器</string>
+    <string name="tile_playing">正在播放</string>
+    <string name="tile_paused">已暂停</string>
+    <string name="tile_idle">点按打开</string>
+
+    <string name="sleep_timer_title">睡眠定时</string>
+    <string name="sleep_timer_off">已关闭</string>
+    <string name="sleep_timer_minutes_fmt">%1$d 分钟</string>
+    <string name="sleep_timer_after_track">播完当前曲停止</string>
+    <string name="sleep_timer_after_track_hint">当前单曲播放完毕后将自动停止。</string>
+    <string name="sleep_timer_remaining_fmt">%1$s 后停止</string>
+    <string name="sleep_timer_extend_5m">+5 分钟</string>
+    <string name="sleep_timer_cancel">取消定时</string>
+    <string name="sleep_timer_custom_min">自定义分钟数 (1–480)</string>
+    <string name="sleep_timer_start">开始</string>
+
+    <string name="interactive_timer_title">互动定时切换 / 停止</string>
+    <string name="interactive_timer_button">定时切换</string>
+    <string name="interactive_timer_hint">仅在互动播放期间倒计时，暂停时同步暂停，倒计时结束自动触发事件或停止。</string>
+    <string name="interactive_timer_paused_badge">已暂停 · %1$s</string>
+    <string name="interactive_timer_remaining_fmt">%1$s · %2$s</string>
+    <string name="interactive_timer_action_label">触发事件</string>
+    <string name="interactive_timer_action_stop_now">立即停止</string>
+    <string name="interactive_timer_action_fade_stop_fmt">淡出停止 (%1$d 秒)</string>
+    <string name="interactive_timer_action_advance">切换到下一阶段</string>
+    <string name="interactive_timer_action_fast">切换冲刺/快速版本</string>
+    <string name="interactive_timer_action_outro">触发最近尾奏并结束</string>
+    <string name="interactive_timer_action_outro_num_fmt">触发第 %1$d 个尾奏</string>
+    <string name="interactive_timer_action_region_fmt">切换区域：%1$s</string>
+    <string name="interactive_timer_action_version_fmt">切换版本：%1$s</string>
+    <string name="interactive_timer_action_speaker">切换扬声器轨道</string>
+    <string name="interactive_timer_duration_label">定时时长</string>
+    <string name="interactive_timer_custom_seconds">自定义秒数</string>
+    <string name="interactive_timer_start">启动定时</string>
+    <string name="interactive_timer_cancel">取消定时</string>
+    <string name="interactive_timer_sec_fmt">%1$d 秒</string>
+    <string name="interactive_timer_min_fmt">%1$d 分钟</string>
+
+    <string name="speed_pitch_title">倍速与变调</string>
+    <string name="speed_pitch_button">倍速 / 变调</string>
+    <string name="speed_label">播放倍速</string>
+    <string name="pitch_label">音调调整</string>
+    <string name="preserve_pitch_label">变速不变调</string>
+    <string name="speed_pitch_reset">重置为 1.00x / 0 半音</string>
+    <string name="speed_pitch_semitones_fmt">%1$+.1f 半音</string>
+
+    <string name="ab_loop_set_a">设 A 点</string>
+    <string name="ab_loop_set_b">设 B 点</string>
+    <string name="ab_loop_clear">清除 A-B</string>
+    <string name="ab_loop_badge_a">起点 A %1$s</string>
+    <string name="ab_loop_badge_ab">A-B 循环 %1$s – %2$s</string>
+
+    <string name="eq_title">均衡器与音效</string>
+    <string name="eq_enabled">启用 5 段均衡器</string>
+    <string name="eq_preset_label">音效预设</string>
+    <string name="eq_preset_flat">原声平直</string>
+    <string name="eq_preset_bass_boost">低音增强</string>
+    <string name="eq_preset_racing">竞速模式</string>
+    <string name="eq_preset_vocal">清晰人声</string>
+    <string name="eq_preset_electronic">电子电音</string>
+    <string name="eq_preset_acoustic">原声乐器</string>
+    <string name="eq_preset_treble">高频明亮</string>
+    <string name="eq_preset_custom">自定义</string>
+    <string name="eq_bass_boost">重低音增强 (%1$d%%)</string>
+    <string name="eq_loudness_gain">响度自适应增益 (%1$+.1f dB)</string>
+    <string name="eq_reset">重置音效</string>
+    <string name="eq_db_fmt">%1$+.1f dB</string>
+
+    <string name="settings_visualizer_title">实时音频频谱可视化</string>
+    <string name="settings_visualizer_hint">在播放器界面显示跟随音频实时跳动的频谱柱状条。</string>
+    <string name="settings_eq_title">均衡器与音效设置</string>
+    <string name="settings_eq_hint">5 段均衡器、多种预设、低音增强、响度增益与柔和限幅。</string>
+    <string name="settings_eq_summary_on">已开启 · %1$s</string>
+    <string name="settings_eq_summary_off">原声直通</string>
+
+    <string name="settings_backup_title">数据备份与导出</string>
+    <string name="settings_backup_hint">支持完整导出或恢复播放列表、收藏、流程预设、路线、播放统计与音效配置，也可导出通用 M3U 歌单。</string>
+    <string name="settings_backup_export">导出完整备份 (.json)</string>
+    <string name="settings_backup_import">导入恢复备份</string>
+    <string name="settings_backup_m3u">导出 M3U 歌单</string>
+    <string name="settings_backup_mode_title">选择恢复方式</string>
+    <string name="settings_backup_mode_merge">合并到当前数据</string>
+    <string name="settings_backup_mode_merge_hint">保留现有数据，追加并合并备份中的新增或更新项。</string>
+    <string name="settings_backup_mode_replace">完全覆盖恢复</string>
+    <string name="settings_backup_mode_replace_hint">用备份完整替换播放列表、收藏、预设、路线、统计与设置。</string>
+    <string name="settings_backup_export_ok">备份导出成功</string>
+    <string name="settings_backup_import_ok_fmt">已恢复 %1$d 个播放列表、%2$d 个收藏、%3$d 个预设、%4$d 条路线</string>
+    <string name="settings_backup_m3u_ok">M3U 歌单导出成功</string>
+    <string name="settings_backup_m3u_empty">当前没有可导出的播放列表</string>
+    <string name="settings_backup_failed">操作失败：%1$s</string>
+
+    <string name="sort_label">排序</string>
+    <string name="sort_default">默认顺序</string>
+    <string name="sort_name_asc">名称 (A–Z)</string>
+    <string name="sort_duration_desc">按时长</string>
+    <string name="sort_most_played">按播放次数</string>
+    <string name="sort_ost_index">原声带编号</string>
+    <string name="play_count_fmt">%1$d 次播放</string>
+
+    <string name="smart_playlists_title">智能歌单</string>
+    <string name="smart_most_played">最多播放</string>
+    <string name="smart_most_played_subtitle">根据历史收听次数排序</string>
+    <string name="smart_most_played_empty">播放任意赛道或曲目后即可在此查看常听排行。</string>
+    <string name="smart_favorites_mix">我的收藏精选</string>
+    <string name="smart_favorites_mix_subtitle">一键播放所有已收藏的赛道与曲目</string>
+    <string name="smart_favorites_mix_empty">点击红心收藏喜欢的赛道或曲目即可生成精选。</string>
+
+    <string name="queue_clear_upcoming">清空待播列表</string>
+    <string name="queue_drag_reorder_hint">长按手柄拖拽排序</string>
+    <string name="swipe_action_play_next">下一首播放</string>
+    <string name="swipe_action_favorite">收藏</string>
+    <string name="swipe_action_unfavorite">取消收藏</string>
+    <string name="swipe_action_remove">移出列表</string>
+    <string name="playlist_drag_hint">按住右侧手柄拖拽即可调整曲目顺序</string>
 </resources>

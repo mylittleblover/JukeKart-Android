@@ -25,4 +25,22 @@ internal class RecentCourseStore(private val file: File) {
             next
         }
     }
+
+    fun replaceAll(courseIds: List<String>): Result<List<String>> = synchronized(MetadataFile.lock(file)) {
+        runCatching {
+            val next = courseIds.map { it.trim() }.filter { it.isNotEmpty() }.distinct().take(50)
+            MetadataFile.write(file, JSONObject().put("schemaVersion", 1).put("courseIds", JSONArray(next)).toString())
+            next
+        }
+    }
+
+    fun mergeAll(courseIds: List<String>): Result<List<String>> = synchronized(MetadataFile.lock(file)) {
+        runCatching {
+            val existing = read().getOrThrow()
+            val incoming = courseIds.map { it.trim() }.filter { it.isNotEmpty() }
+            val next = (existing + incoming).distinct().take(50)
+            MetadataFile.write(file, JSONObject().put("schemaVersion", 1).put("courseIds", JSONArray(next)).toString())
+            next
+        }
+    }
 }

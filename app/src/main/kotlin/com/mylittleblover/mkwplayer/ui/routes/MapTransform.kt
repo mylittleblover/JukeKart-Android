@@ -44,7 +44,12 @@ internal class MapTransform private constructor(
         return create(viewportWidth, viewportHeight, imageAspect, next, fitPadding).camera
     }
 
-    fun fitTo(points: List<Offset>, padding: Float): MapCamera {
+    fun fitTo(
+        points: List<Offset>,
+        padding: Float,
+        maxZoom: Float = MAX_ZOOM,
+        scaleMultiplier: Float = 1f,
+    ): MapCamera {
         val valid = points.filter { it.x.isFinite() && it.y.isFinite() && it.x in 0f..1f && it.y in 0f..1f }
         if (valid.isEmpty() || drawnWidth <= 0f || drawnHeight <= 0f) return camera
         val minU = valid.minOf { it.x }; val maxU = valid.maxOf { it.x }
@@ -54,7 +59,9 @@ internal class MapTransform private constructor(
         val height = (viewportHeight - 2f * inset).coerceAtLeast(1f)
         val horizontal = if (maxU > minU) width / ((maxU - minU) * drawnWidth / camera.zoom) else Float.POSITIVE_INFINITY
         val vertical = if (maxV > minV) height / ((maxV - minV) * drawnHeight / camera.zoom) else Float.POSITIVE_INFINITY
-        val zoom = min(horizontal, vertical).finiteOr(3f).coerceIn(MIN_ZOOM, MAX_ZOOM)
+        val clampedMax = maxZoom.coerceIn(MIN_ZOOM, MAX_ZOOM)
+        val mult = scaleMultiplier.finiteOr(1f).coerceIn(0.4f, 1f)
+        val zoom = (min(horizontal, vertical).finiteOr(2.4f) * mult).coerceIn(MIN_ZOOM, clampedMax)
         return create(viewportWidth, viewportHeight, imageAspect,
             MapCamera(zoom, (minU + maxU) / 2f, (minV + maxV) / 2f), fitPadding).camera
     }

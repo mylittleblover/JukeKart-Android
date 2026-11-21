@@ -129,6 +129,37 @@ internal class PlaybackController(private val engine: PlaybackEngine) {
         return state
     }
 
+    /** Loads and starts a single non-graph linear source directly from a File without full-file ByteArray copy. */
+    fun loadLinearFromFile(
+        title: String,
+        file: java.io.File,
+        assetId: String,
+        loop: Boolean = false,
+        streamed: Boolean = true,
+    ): State {
+        if (state is State.Playing || state is State.Paused) {
+            engine.stop()
+        }
+        val loaded = engine.loadLinearFile(file, assetId, loop = loop, streamed = streamed)
+        if (loaded != AudioEngine.STATUS_OK) {
+            return fail("Could not read the audio: ${describe(loaded)}")
+        }
+        linearMode = true
+        linearRepeating = loop
+        userStopped = false
+        sawActivePlayback = false
+        reportedNaturalEnd = false
+        this.title = title
+        this.sampleRate = engine.sampleRate
+
+        val started = engine.play(AudioEngine.PLAY_LINEAR)
+        if (started != AudioEngine.STATUS_OK) {
+            return fail("Could not start playback: ${describe(started)}")
+        }
+        state = State.Ready(title, totalFrames = 0, sampleRate = this.sampleRate)
+        return state
+    }
+
     /** Updates linear single-track repeat state while the output consumer is released. */
     fun setLinearRepeat(enabled: Boolean, begin: Long = 0L, end: Long = totalFrames): State {
         if (!linearMode) return state
@@ -190,6 +221,23 @@ internal class PlaybackController(private val engine: PlaybackEngine) {
         userStopped = false
         reportedNaturalEnd = false
         val status = engine.play(segment)
+        if (status != AudioEngine.STATUS_OK) {
+            return fail("Could not play section $segment: ${describe(status)}")
+        }
+        return poll()
+    }
+
+    /**
+     * Queues a transition target segment, returning null instead of failing if the engine reports
+     * [AudioEngine.STATUS_DEADLINE_MISS] (e.g. a seek landed past the pre-entry overlap lead).
+     */
+    fun tryQueueSegment(segment: Int): State? {
+        userStopped = false
+        reportedNaturalEnd = false
+        val status = engine.play(segment)
+        if (status == AudioEngine.STATUS_DEADLINE_MISS) {
+            return null
+        }
         if (status != AudioEngine.STATUS_OK) {
             return fail("Could not play section $segment: ${describe(status)}")
         }

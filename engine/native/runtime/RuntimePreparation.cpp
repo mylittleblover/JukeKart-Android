@@ -16,7 +16,18 @@ bool EngineRuntime::collectPreparationPages(int index,Frame position,std::array<
                 const auto whole=static_cast<std::int64_t>(sample);
                 std::optional<audio::SourceSamplePosition> neighbor;
                 if(clip.loop)neighbor=audio::SourceSamplePosition{std::min(buffer->frames()-1,static_cast<std::int64_t>(ClipPlayback::position(*clip.loop,clip.sourceOffset,std::floor(progress)+1)))};
-                required[count++]={buffer->stream,buffer->streamedAsset,{whole},static_cast<double>(sample-whole),neighbor};return true;
+                required[count++]={buffer->stream,buffer->streamedAsset,{whole},static_cast<double>(sample-whole),neighbor};
+                // Prefetch up to 7 additional ahead pages (~341ms total at 48kHz) so streamed openings do not underrun on entry.
+                const auto framesPerPage=static_cast<std::int64_t>(audio::SourcePageCache::FramesPerPage);
+                const auto basePage=whole/framesPerPage;
+                const auto maxPos=std::min(buffer->frames()-1,clip.sourceOffset+clip.sourceLength-1);
+                for(int ahead=1;ahead<5 && count+4<required.size();++ahead) {
+                    const auto nextFrame=(basePage+ahead)*framesPerPage;
+                    if(nextFrame>maxPos)break;
+                    if(clip.loop && nextFrame>=clip.loop->end.value)break;
+                    required[count++]={buffer->stream,buffer->streamedAsset,{nextFrame},0.0,std::nullopt};
+                }
+                return true;
             };
             const int selected=track.mode==TrackMode::Switch ? selectSwitchSubTrack(track,parameters_->values()[track.group]) : -1;
             if(track.mode==TrackMode::Normal){for(const auto& clip:track.clips)if(!append(clip))return false;}
@@ -29,23 +40,52 @@ bool EngineRuntime::collectPreparationPages(int index,Frame position,std::array<
         }
         return true;
     }
-EngineStatus EngineRuntime::prepareTransitionPages(const TransitionRun& run) noexcept {
+EngineStatus EngineRuntime::prepareTransitionPages(TransitionRun& run) noexcept {
     if(!transitionPreparation_)return EngineStatus::Ok;
+    const auto syncRev=parameters_ ? parameters_->syncRevision() : 0;
+    const auto paramRev=parameters_ ? parameters_->parameterRevision() : 0;
+    if(run.preparedPagesValid && run.preparedRule==run.rule && run.preparedRevision==run.revision && run.preparedSegment==run.segment && run.preparedPosition==run.position && run.preparedBridgeStarted==run.bridgeStarted && run.preparedDestStarted==run.destinationStarted && run.preparedSyncRev==syncRev && run.preparedParamRev==paramRev) return EngineStatus::Ok;
     std::array<audio::PreparationSet::Requirement,128> required{};std::size_t count=0;
-    if(!collectPreparationPages(run.segment,run.rule->preEntry ? 0 : run.position,required,count))return EngineStatus::ResourceLimit;
-    if(run.rule->bridge>=0) {
+    std::size_t bridgeInputs=0;
+    if(run.rule->bridge>=0 && !run.bridgeStarted) {
         const auto* bridge=find(graph_->segments,run.rule->bridge);
-        if(!collectPreparationPages(bridge->index,run.rule->preEntry ? 0 : bridge->entry,required,count))return EngineStatus::ResourceLimit;
+        if(!collectPreparationPages(bridge->index,(run.rule->timeline || run.rule->preEntry) ? 0 : bridge->entry,required,count))return EngineStatus::ResourceLimit;
+        bridgeInputs=count;
     }
-    return transitionPreparation_->configure(required.data(),count) ? EngineStatus::Ok : EngineStatus::ResourceLimit;
+    if(!run.destinationStarted) {
+        if(!collectPreparationPages(run.segment,run.rule->preEntry ? 0 : run.position,required,count))return EngineStatus::ResourceLimit;
+    }
+    run.bridgePreparationInputCount=bridgeInputs;
+    if(!transitionPreparation_->configure(required.data(),count)) return EngineStatus::ResourceLimit;
+    run.preparedPagesValid=true; run.preparedRule=run.rule; run.preparedRevision=run.revision; run.preparedSegment=run.segment; run.preparedPosition=run.position; run.preparedBridgeStarted=run.bridgeStarted; run.preparedDestStarted=run.destinationStarted; run.preparedSyncRev=syncRev; run.preparedParamRev=paramRev;
+    return EngineStatus::Ok;
 }
 bool EngineRuntime::transitionPagesReady() noexcept {
     auto& run=transition_;
     if(!transitionPreparation_ || run.preparationDecided)return true;
+    const bool staggered=run.rule->bridge>=0 && run.preStart>run.bridgeStart && run.bridgePreparationGeneration!=0;
+    if(staggered && !run.bridgeStarted && !run.bridgePreparationDecided) {
+        auto result=prepareTransitionPages(run);
+        const auto now=clock_.frame();
+        const auto deadline=std::max(run.requested,std::min({run.sourceSync,run.bridgeStart,
+            run.source->departure ? run.source->departureStart : run.sourceSync}));
+        const bool allReady=result==EngineStatus::Ok && transitionPreparation_->ready();
+        const bool bridgeReady=result==EngineStatus::Ok && (allReady || transitionPreparation_->readyRange(0,run.bridgePreparationInputCount));
+        if(now<deadline && result==EngineStatus::Ok)return true;
+        const bool needsHistory=run.bridgePreparationInputCount!=0 || result!=EngineStatus::Ok;
+        if(result==EngineStatus::Ok && !bridgeReady)result=EngineStatus::DeadlineMiss;
+        bool historicalDecision=false;
+        result=recordPreparationDecision(run.bridgePreparationGeneration,result,needsHistory,historicalDecision);
+        run.bridgePreparationDecided=true;
+        if(result==EngineStatus::Ok)return true;
+        last_=result;if(!historicalDecision)++rejected_;cancelTransition();return false;
+    }
     auto result=prepareTransitionPages(run);
     const auto now=clock_.frame();
-    const auto deadline=std::max(run.requested,std::min({run.sourceSync,run.preStart,run.bridge ? run.bridgeStart : run.preStart,
-        run.source->departure ? run.source->departureStart : run.sourceSync}));
+    const auto deadline=staggered
+        ? std::max(run.requested,run.preStart)
+        : std::max(run.requested,std::min({run.sourceSync,run.preStart,run.bridge ? run.bridgeStart : run.preStart,
+            run.source->departure ? run.source->departureStart : run.sourceSync}));
     const bool ready=result==EngineStatus::Ok && transitionPreparation_->ready();
     if(now<deadline && result==EngineStatus::Ok)return true;
     const bool needsHistory=transitionPreparation_->size()!=0 || result!=EngineStatus::Ok;

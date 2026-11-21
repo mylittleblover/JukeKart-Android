@@ -429,7 +429,10 @@ void EngineRuntime::schedule(Scene& scene) noexcept {
     scene.musicalPosition+=parameters_->property(segment.index,1);
 }
 void EngineRuntime::updateMixerProperties() noexcept {
-    if(!mixer_ || !parameters_) return;
+    if(!mixer_ || !parameters_ || !graph_ || graph_->buses.empty()) return;
+    const auto paramRev=parameters_->parameterRevision();
+    if(lastMixerGraph_==graph_.get() && lastMixerParamRev_==paramRev) return;
+    lastMixerGraph_=graph_.get(); lastMixerParamRev_=paramRev;
     for(const auto& bus:graph_->buses) {
         for(const auto& effect:bus.effects)mixer_->effectParameters(effect.index,parameters_->effectParameters(effect));
         double gain=parameters_->property(bus.index,0);
@@ -505,7 +508,8 @@ void EngineRuntime::render(float* output,std::size_t frames) noexcept {
             const StreamHistory::Point availabilityAt{journal_->epoch,{clock_.frame()}};
             const auto historicalMissing=streamHistory_ && streamHistory_->known(availabilityAt) ? streamHistory_->expected(availabilityAt) : StreamHistory::Mask{};
             StreamHistory::Mask actualMissing;
-            for(std::size_t slot=0;slot<voices_.slots().size();++slot) {
+            const auto voiceLimit=voices_.activeLimit();
+            for(std::size_t slot=0;slot<voiceLimit;++slot) {
                 auto& voice=voices_.slots()[slot];if(!voice.active)continue;
                 const double gain=parameters_ ? dbGain(parameters_->property(voice.track,0)) : 1;
                 const double speed=parameters_ ? parameters_->property(voice.track,1)/voice.speed : 1;

@@ -343,4 +343,49 @@ internal object ExtraMusicCatalog {
         }
         return tokens.all { token -> haystack.any { it.contains(token, ignoreCase = true) } }
     }
+
+    /**
+     * Extra tracks directly tied to Special Cup / Rainbow Road that stay hidden until Rainbow Road
+     * & Special Cup are unlocked. (`BigTree` and `SFCMarioCircuit` remain visible because they appear
+     * in Knockout Tour.)
+     */
+    val HIDDEN_UNTIL_SPECIAL_UNLOCKED_IDS: Set<String> = setOf(
+        "opening_special",
+        "victory_lap_rainbow",
+        "results_rainbow",
+        "special_cup_appears",
+        "rainbow_fl_fanfare",
+        "staff_credits",
+        "nm_special_092",
+        "nm_special_111",
+        "nm_special_119",
+    )
+
+    fun isVisible(id: String, specialUnlocked: Boolean): Boolean =
+        specialUnlocked || id !in HIDDEN_UNTIL_SPECIAL_UNLOCKED_IDS
+
+    fun extraIdFromEntryKey(key: String): String? {
+        if (key.startsWith("extra:")) return key.removePrefix("extra:")
+        val marker = ":opening:"
+        val idx = key.indexOf(marker)
+        return if (idx >= 0) key.substring(idx + marker.length) else null
+    }
+
+    fun openingIdForOfficialRoute(
+        routeId: String,
+        kind: com.mylittleblover.mkwplayer.routes.OfficialRouteKind,
+    ): String? = when (kind) {
+        com.mylittleblover.mkwplayer.routes.OfficialRouteKind.RALLY -> "opening_knockout"
+        com.mylittleblover.mkwplayer.routes.OfficialRouteKind.GRAND_PRIX -> when (routeId) {
+            "mushroom_cup" -> "opening_mushroom"
+            "flower_cup" -> "opening_flower"
+            "star_cup" -> "opening_star"
+            "shell_cup" -> "opening_shell"
+            "banana_cup" -> "opening_banana"
+            "leaf_cup" -> "opening_leaf"
+            "lightning_cup" -> "opening_lightning"
+            "special_cup" -> "opening_special"
+            else -> null
+        }
+    }
 }

@@ -155,4 +155,21 @@ class PlaybackSessionTest {
         assertNotNull(state.detail, "a refusal must explain itself")
         assertTrue(state.detail!!.isNotBlank())
     }
+
+    @Test
+    fun uninterruptibleCeremonyBlocksControlCallsAndClearsOnRelease() {
+        val session = PlaybackSession(createEngine = { null }, openOutput = { _, _ -> null })
+        val initial = session.state.value
+        session.uninterruptible = true
+
+        assertEquals(initial, session.pause())
+        assertEquals(initial, session.stop())
+        assertEquals(initial, session.seek(1234L))
+        val fadeMsg = session.fadeStop(2.0)
+        assertNotNull(fadeMsg)
+        assertTrue(fadeMsg.contains("Ceremony", ignoreCase = true))
+
+        session.release()
+        assertFalse(session.uninterruptible)
+    }
 }

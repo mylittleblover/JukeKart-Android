@@ -92,6 +92,8 @@ class LinearHandoverPlannerTest {
         )
         assertEquals(mapOf(100 to 101), compiled.autoAdvance)
         assertEquals(2, compiled.windows.size)
+        assertEquals(0L, compiled.windows[0].originTransportFrame)
+        assertEquals(210_000L, compiled.windows[1].originTransportFrame)
         assertTrue(GraphProbe.inspect(compiled.packet) is GraphProbe.Result.Ok)
     }
 }

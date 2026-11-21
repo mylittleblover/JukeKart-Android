@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -49,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mylittleblover.mkwplayer.R
+import com.mylittleblover.mkwplayer.routes.OfficialRouteKind
 import com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog
 import com.mylittleblover.mkwplayer.ui.art.PackArtwork
 import com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog
@@ -64,6 +68,16 @@ internal fun RoadJukeboxCatalog.EdgeMusicResolution.isMissingOrIncomplete(): Boo
         this is RoadJukeboxCatalog.EdgeMusicResolution.SubstituteMissing
 
 @Composable
+internal fun candidateTierLabel(tier: RoadJukeboxCatalog.CandidateTier?): String? = when (tier) {
+    RoadJukeboxCatalog.CandidateTier.GRAND_PRIX -> stringResource(R.string.route_tier_gp)
+    RoadJukeboxCatalog.CandidateTier.EXCLUSIVE_ORDER -> stringResource(R.string.route_tier_exclusive)
+    RoadJukeboxCatalog.CandidateTier.THEMED_BOOSTED -> stringResource(R.string.route_tier_boosted)
+    RoadJukeboxCatalog.CandidateTier.MAIN_ORDER -> stringResource(R.string.route_tier_main)
+    RoadJukeboxCatalog.CandidateTier.NIGHT_ORDER -> stringResource(R.string.route_tier_night)
+    null -> null
+}
+
+@Composable
 internal fun edgeResolutionSummary(
     resolution: RoadJukeboxCatalog.EdgeMusicResolution,
     language: String,
@@ -73,9 +87,23 @@ internal fun edgeResolutionSummary(
         if (override != null) {
             stringResource(R.string.route_edge_music_override, override.localizedDisplayName(language))
         } else {
-            stringResource(R.string.route_edge_music_auto)
+            val boostedCount = resolution.candidateTiers.values.count {
+                it == RoadJukeboxCatalog.CandidateTier.EXCLUSIVE_ORDER ||
+                    it == RoadJukeboxCatalog.CandidateTier.THEMED_BOOSTED
+            }
+            when {
+                resolution.candidates.isNotEmpty() && boostedCount > 0 ->
+                    stringResource(R.string.route_edge_music_auto_weighted, resolution.candidates.size, boostedCount)
+                resolution.candidates.isNotEmpty() ->
+                    stringResource(R.string.route_edge_music_auto_count, resolution.candidates.size)
+                else -> stringResource(R.string.route_edge_music_auto)
+            }
         }
     }
+    is RoadJukeboxCatalog.EdgeMusicResolution.SpecialRoadApproach ->
+        stringResource(R.string.route_edge_music_to_rainbow)
+    is RoadJukeboxCatalog.EdgeMusicResolution.KnockoutTourDirect ->
+        stringResource(R.string.route_edge_music_knockout_direct)
     is RoadJukeboxCatalog.EdgeMusicResolution.KnownPoolIncomplete,
     is RoadJukeboxCatalog.EdgeMusicResolution.SubstituteMissing ->
         stringResource(R.string.route_edge_music_incomplete_pool)
@@ -85,6 +113,49 @@ internal fun edgeResolutionSummary(
         stringResource(R.string.route_edge_music_pool_empty)
     is RoadJukeboxCatalog.EdgeMusicResolution.DisabledByUser ->
         stringResource(R.string.route_edge_music_muted)
+}
+
+@Composable
+internal fun RoadMusicRuleModeSelector(
+    selectedMode: RoadJukeboxCatalog.RoadMusicRuleMode,
+    officialKind: OfficialRouteKind?,
+    onSelectMode: (RoadJukeboxCatalog.RoadMusicRuleMode) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val autoLabel = when (officialKind) {
+        OfficialRouteKind.GRAND_PRIX -> stringResource(R.string.route_rule_auto_gp)
+        OfficialRouteKind.RALLY -> stringResource(R.string.route_rule_auto_rally)
+        null -> stringResource(R.string.route_rule_auto_vs)
+    }
+    val options = listOf(
+        com.mylittleblover.mkwplayer.ui.interactive.DrawerOption(
+            value = RoadJukeboxCatalog.RoadMusicRuleMode.AUTO,
+            label = autoLabel,
+        ),
+        com.mylittleblover.mkwplayer.ui.interactive.DrawerOption(
+            value = RoadJukeboxCatalog.RoadMusicRuleMode.GRAND_PRIX,
+            label = stringResource(R.string.route_rule_gp),
+        ),
+        com.mylittleblover.mkwplayer.ui.interactive.DrawerOption(
+            value = RoadJukeboxCatalog.RoadMusicRuleMode.VS_DAY,
+            label = stringResource(R.string.route_rule_vs_day),
+        ),
+        com.mylittleblover.mkwplayer.ui.interactive.DrawerOption(
+            value = RoadJukeboxCatalog.RoadMusicRuleMode.VS_NIGHT,
+            label = stringResource(R.string.route_rule_vs_night),
+        ),
+    )
+    val selectedLabel = options.firstOrNull { it.value == selectedMode }?.label ?: autoLabel
+    com.mylittleblover.mkwplayer.ui.interactive.SelectionDrawerRow(
+        label = stringResource(R.string.route_rule_mode_label),
+        selectedLabel = selectedLabel,
+        sheetTitle = stringResource(R.string.route_rule_mode_label),
+        options = options,
+        selectedValue = selectedMode,
+        onSelect = onSelectMode,
+        modifier = modifier,
+        compact = true,
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -108,8 +179,11 @@ internal fun RouteEdgeMusicPickerSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var query by rememberSaveable(leg.index, legTitle) { mutableStateOf("") }
     val hasKnownPool = leg.resolution.hasKnownPool()
+    val isSpecialApproach = leg.resolution is RoadJukeboxCatalog.EdgeMusicResolution.SpecialRoadApproach
+    val isKnockoutDirect = leg.resolution is RoadJukeboxCatalog.EdgeMusicResolution.KnockoutTourDirect
     val showAllInstalledFallback = !hasKnownPool && allowCustomSubstitute
     val substituteTag = stringResource(R.string.route_custom_substitute_tag)
+    val tiersByKey = (leg.resolution as? RoadJukeboxCatalog.EdgeMusicResolution.KnownPoolComplete)?.candidateTiers.orEmpty()
 
     val selectableTracks: List<Pair<JukeboxCatalog.TrackItem, JukeboxCatalog.Game?>> = remember(
         leg,
@@ -178,7 +252,11 @@ internal fun RouteEdgeMusicPickerSheet(
                             label = { Text(substituteTag) },
                         )
                         Text(
-                            stringResource(R.string.route_edge_music_pool_empty),
+                            if (isSpecialApproach) {
+                                stringResource(R.string.route_edge_music_to_rainbow)
+                            } else {
+                                stringResource(R.string.route_edge_music_pool_empty)
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                             modifier = Modifier.weight(1f),
@@ -235,10 +313,11 @@ internal fun RouteEdgeMusicPickerSheet(
                 if (selectableTracks.isEmpty()) {
                     item {
                         Text(
-                            if (leg.resolution.isMissingOrIncomplete()) {
-                                stringResource(R.string.route_edge_music_incomplete_pool)
-                            } else {
-                                stringResource(R.string.route_edge_music_pool_empty)
+                            when {
+                                isSpecialApproach -> stringResource(R.string.route_edge_music_to_rainbow)
+                                isKnockoutDirect -> stringResource(R.string.route_edge_music_knockout_direct)
+                                leg.resolution.isMissingOrIncomplete() -> stringResource(R.string.route_edge_music_incomplete_pool)
+                                else -> stringResource(R.string.route_edge_music_pool_empty)
                             },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -253,7 +332,9 @@ internal fun RouteEdgeMusicPickerSheet(
                             currentSelectedKey == item.track.primary.sha256
                         )
                     val artworkName = item.ostIndex?.let { "t_%03d.webp".format(Locale.ROOT, it) }
+                    val tierText = candidateTierLabel(tiersByKey[item.key])
                     val sub = buildList {
+                        tierText?.let(::add)
                         game?.localizedName(language)?.takeIf { it.isNotBlank() }?.let(::add)
                         item.localizedArrangement(language)?.takeIf { it.isNotBlank() }?.let(::add)
                         if (showAllInstalledFallback) add(substituteTag)

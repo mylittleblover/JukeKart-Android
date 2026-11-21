@@ -9,4 +9,18 @@
     <string name="settings_unlock_test_unlock">解放する（テスト）</string>
     <string name="settings_unlock_test_lock">解放を取り消す（テスト）</string>
     <string name="settings_unlock_test_restore">通常の進捗に戻す</string>
+    <string name="settings_dev_taps_remaining">あと %1$d 回タップすると開発者オプションが開きます</string>
+    <string name="settings_dev_unlocked">開発者オプションを有効にしました</string>
+    <string name="settings_dev_already_unlocked">開発者オプションはすでに有効です</string>
+    <string name="settings_unlock_test_ceremony_btn">スペシャルカップ解放演出を再生</string>
+    <string name="settings_unlock_test_vfx_btn">解放エフェクトを再生</string>
+    <string name="settings_unlock_test_notif_btn">スペシャルカップ解放通知を表示</string>
+    <string name="unlock_ceremony_badge">SPECIAL CUP UNLOCKED</string>
+    <string name="unlock_ceremony_title">スペシャルカップ登場！</string>
+    <string name="unlock_ceremony_subtitle">解放ファンファーレをお楽しみください。曲の終了後に操作できるようになります。</string>
+    <string name="unlock_ceremony_locked_hint">解放演出中 · 停止や曲の切り替えはできません</string>
+    <string name="unlock_congrats_title">スペシャルカップ解放！</string>
+    <string name="unlock_congrats_body">対象となるすべてのコースを再生しました。スペシャルカップ、レインボーロード、および関連楽曲が利用可能になりました。</string>
+    <string name="unlock_congrats_enter">スペシャルカップへ</string>
+    <string name="unlock_congrats_close">閉じる</string>
 </resources>

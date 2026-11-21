@@ -59,10 +59,13 @@ bool NativeOutput::openLocked() {
     oboe::AudioStreamBuilder builder;
     builder.setDirection(oboe::Direction::Output)->setFormat(oboe::AudioFormat::Float)
         ->setChannelCount(2)->setPerformanceMode(oboe::PerformanceMode::LowLatency)
-        ->setSharingMode(oboe::SharingMode::Shared)->setDataCallback(callback_)->setErrorCallback(callback_);
+        ->setSharingMode(oboe::SharingMode::Shared)->setUsage(oboe::Usage::Media)->setContentType(oboe::ContentType::Music)->setDataCallback(callback_)->setErrorCallback(callback_);
     if(requestedRate_) builder.setSampleRate(requestedRate_);
     auto result=builder.openStream(stream_);
     if(result!=oboe::Result::OK) { state_->lastError_=static_cast<int>(result); stream_.reset(); return false; }
+    const auto burst=std::max<std::int32_t>(stream_->getFramesPerBurst(),192);
+    const auto cap=stream_->getBufferCapacityInFrames();
+    if(cap>0) stream_->setBufferSizeInFrames(std::min<std::int32_t>(cap,std::max<std::int32_t>(burst*4,1024)));
     rate_=stream_->getSampleRate();
     if(!callback_->callbackLifetime_.open()) {state_->lastError_=static_cast<int>(oboe::Result::ErrorInvalidState);closeLocked();return false;}
     callback_->acceptedStream_.store(stream_.get(),std::memory_order_release);result=stream_->requestStart();

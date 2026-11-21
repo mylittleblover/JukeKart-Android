@@ -27,6 +27,8 @@ internal data class UnlockUi(
     val visible: Boolean,
     /** Why the cup is not visible yet, for a detail view; null once it is. */
     val hiddenReason: String?,
+    val completedCount: Int = 0,
+    val eligibleCount: Int = 0,
 ) {
     companion object {
         /**
@@ -74,6 +76,8 @@ internal data class UnlockUi(
                 // entry would announce that there is something to unlock.
                 visible = state.entitled,
                 hiddenReason = if (state.entitled) null else UnlockPresentation.emptyLabel(),
+                completedCount = completed,
+                eligibleCount = eligibleCount,
             )
         }
     }

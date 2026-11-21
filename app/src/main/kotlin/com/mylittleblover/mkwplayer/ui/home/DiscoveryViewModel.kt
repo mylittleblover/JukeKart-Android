@@ -66,6 +66,7 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
     private val day = MutableStateFlow(LocalDate.now())
     private val _state = MutableStateFlow(State())
     val state = _state.asStateFlow()
+    val playStats = com.mylittleblover.mkwplayer.library.PlayStatsRepository.stats
     private val dateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) { refreshDate() }
     }
@@ -80,6 +81,7 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
         updateRecent { recent.read() }
         reloadPresets()
         updateCustomRoutes { customRouteStore.read() }
+        com.mylittleblover.mkwplayer.library.PlayStatsRepository.reload(application)
         viewModelScope.launch {
             while (isActive) {
                 refreshDate()
@@ -96,6 +98,14 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
     }
     fun updateEligible(values: List<RecommendationCandidate>) { candidates.value = values.toList() }
     fun refreshDate() { day.value = LocalDate.now() }
+    fun reloadAllAfterBackup() {
+        reloadFavorites()
+        updatePlaylists { playlists.read() }
+        updateRecent { recent.read() }
+        reloadPresets()
+        updateCustomRoutes { customRouteStore.read() }
+        com.mylittleblover.mkwplayer.library.PlayStatsRepository.reload(getApplication())
+    }
     fun reloadFavorites() {
         viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
             favoriteOperations.withLock {
@@ -140,8 +150,11 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
         }
     }
     fun createPlaylist(name: String) = updatePlaylists { playlists.create(name) }
+    fun createPlaylistAndAdd(name: String, codes: List<String>) = updatePlaylists { playlists.createWithCourses(name, codes) }
     fun addToPlaylist(id: String, code: String) = updatePlaylists { playlists.addCourse(id, code) }
+    fun addManyToPlaylist(id: String, codes: List<String>) = updatePlaylists { playlists.addCourses(id, codes) }
     fun removeFromPlaylist(id: String, index: Int) = updatePlaylists { playlists.removeCourse(id, index) }
+    fun removeManyFromPlaylist(id: String, indices: Collection<Int>) = updatePlaylists { playlists.removeCourses(id, indices) }
     fun renamePlaylist(id: String, name: String) = updatePlaylists { playlists.rename(id, name) }
     fun moveInPlaylist(id: String, from: Int, to: Int) = updatePlaylists { playlists.moveCourse(id, from, to) }
     fun setPlaylistNativeTransitionDefault(id: String, enabled: Boolean) = updatePlaylists {
@@ -250,6 +263,8 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
         stops: List<com.mylittleblover.mkwplayer.routes.CustomRouteStop>,
         edges: List<com.mylittleblover.mkwplayer.routes.CustomRouteEdgeConfig>,
         loopWholeRoute: Boolean,
+        roadRuleMode: com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RoadMusicRuleMode =
+            com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RoadMusicRuleMode.AUTO,
         onComplete: (Result<com.mylittleblover.mkwplayer.routes.CustomRoute>) -> Unit = {},
     ) {
         viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
@@ -260,9 +275,9 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
                             IllegalStateException("Stage connections catalog unavailable"),
                         )
                         if (routeId == null) {
-                            customRouteStore.create(name, stops, edges, conn, loopWholeRoute)
+                            customRouteStore.create(name, stops, edges, conn, loopWholeRoute, roadRuleMode)
                         } else {
-                            customRouteStore.saveDraftOver(routeId, name, stops, edges, conn, loopWholeRoute)
+                            customRouteStore.saveDraftOver(routeId, name, stops, edges, conn, loopWholeRoute, roadRuleMode)
                         }
                     }
                 }
@@ -295,6 +310,10 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
     fun setCustomRouteEdgeMusic(id: String, edgeIndex: Int, playMusic: Boolean, selectedJukeboxKey: String?) =
         updateCustomRoutes { customRouteStore.setEdgeMusic(id, edgeIndex, playMusic, selectedJukeboxKey) }
     fun setCustomRouteLoop(id: String, loop: Boolean) = updateCustomRoutes { customRouteStore.setLoopWholeRoute(id, loop) }
+    fun setCustomRouteRuleMode(
+        id: String,
+        mode: com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RoadMusicRuleMode,
+    ) = updateCustomRoutes { customRouteStore.setRoadRuleMode(id, mode) }
 
     fun duplicatePreset(id: String, newName: String) {
         viewModelScope.launch {

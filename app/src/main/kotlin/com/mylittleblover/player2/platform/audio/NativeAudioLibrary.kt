@@ -59,6 +59,10 @@ internal object NativeAudioLibrary {
      * sources and modules -- and never feeds back into the transport clock.
      */
     external fun setOutputGain(handle: Long, gainDb: Double, ceilingDb: Double): Int
+    external fun setPlaybackRate(handle: Long, speed: Double, pitchSemitones: Double): Int
+    external fun setMasterDsp(handle: Long, eqEnabled: Boolean, bands5: DoubleArray, bassBoostDb: Double, loudnessDb: Double): Int
+    external fun setVisualizerEnabled(handle: Long, enabled: Boolean)
+    external fun visualizerSpectrum(handle: Long, outBands: FloatArray): Boolean
 
     /** How many samples the ceiling has caught on this engine, for diagnostics. */
     external fun limitedSampleCount(handle: Long): Long

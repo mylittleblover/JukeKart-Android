@@ -35,6 +35,7 @@ internal object LibraryInvalidation {
         val customRoutes: List<CustomRoute>,
         val extraCatalog: ExtraMusicCatalog.Catalog? = null,
         val isStageHidden: (String) -> Boolean = { false },
+        val routeMusicCatalog: RoadJukeboxCatalog.RouteMusicCatalog? = null,
     ) {
         val playableStageCodes: Set<String> by lazy {
             val manifest = mergedManifest ?: return@lazy emptySet()
@@ -87,6 +88,7 @@ internal object LibraryInvalidation {
                 isStagePlayable = env::isStagePlayable,
                 isStageHidden = env.isStageHidden,
                 isJukeboxReadable = env::isJukeboxReadable,
+                wikiCatalog = env.routeMusicCatalog,
             )
             if (!report.canPlay || !route.hasValidTopology(env.stageConnections)) {
                 route to report
@@ -134,6 +136,7 @@ internal object LibraryInvalidation {
                     isStagePlayable = env::isStagePlayable,
                     isStageHidden = env.isStageHidden,
                     isJukeboxReadable = env::isJukeboxReadable,
+                    wikiCatalog = env.routeMusicCatalog,
                 )
                 if (!report.canPlay) {
                     return ActivePlaybackStopDecision(
@@ -141,7 +144,27 @@ internal object LibraryInvalidation {
                         report.blockingReason ?: "Active official route became invalid after library update.",
                     )
                 }
-                if (!edgeEntriesMatchReport(allQueueEntries.map { it.key to it.sourceTrackKey }, report)) {
+                val alternateReports = if (env.routeMusicCatalog != null) {
+                    listOf(
+                        RoadJukeboxCatalog.RoadMusicRuleMode.VS_DAY,
+                        RoadJukeboxCatalog.RoadMusicRuleMode.VS_NIGHT,
+                    ).map { mode ->
+                        RoadJukeboxCatalog.inspectOfficialRoute(
+                            route = route,
+                            connections = env.stageConnections,
+                            pool = env.roadPool,
+                            installedJukebox = items,
+                            isStagePlayable = env::isStagePlayable,
+                            isStageHidden = env.isStageHidden,
+                            isJukeboxReadable = env::isJukeboxReadable,
+                            wikiCatalog = env.routeMusicCatalog,
+                            ruleMode = mode,
+                        )
+                    }
+                } else {
+                    emptyList()
+                }
+                if (!edgeEntriesMatchReport(allQueueEntries.map { it.key to it.sourceTrackKey }, report, alternateReports)) {
                     return ActivePlaybackStopDecision(
                         true,
                         "Active route road candidates or stage sources changed after library update.",
@@ -160,6 +183,7 @@ internal object LibraryInvalidation {
                     isStagePlayable = env::isStagePlayable,
                     isStageHidden = env.isStageHidden,
                     isJukeboxReadable = env::isJukeboxReadable,
+                    wikiCatalog = env.routeMusicCatalog,
                 )
                 if (!report.canPlay || !route.hasValidTopology(env.stageConnections)) {
                     return ActivePlaybackStopDecision(
@@ -213,9 +237,30 @@ internal object LibraryInvalidation {
                     isStagePlayable = env::isStagePlayable,
                     isStageHidden = env.isStageHidden,
                     isJukeboxReadable = env::isJukeboxReadable,
+                    wikiCatalog = env.routeMusicCatalog,
                 )
                 if (!report.canPlay) return false
-                if (!edgeEntriesMatchReport(snapshot.frozenBase.map { it.key to it.sourceTrackKey }, report)) return false
+                val alternateReports = if (env.routeMusicCatalog != null) {
+                    listOf(
+                        RoadJukeboxCatalog.RoadMusicRuleMode.VS_DAY,
+                        RoadJukeboxCatalog.RoadMusicRuleMode.VS_NIGHT,
+                    ).map { mode ->
+                        RoadJukeboxCatalog.inspectOfficialRoute(
+                            route = route,
+                            connections = env.stageConnections,
+                            pool = env.roadPool,
+                            installedJukebox = items,
+                            isStagePlayable = env::isStagePlayable,
+                            isStageHidden = env.isStageHidden,
+                            isJukeboxReadable = env::isJukeboxReadable,
+                            wikiCatalog = env.routeMusicCatalog,
+                            ruleMode = mode,
+                        )
+                    }
+                } else {
+                    emptyList()
+                }
+                if (!edgeEntriesMatchReport(snapshot.frozenBase.map { it.key to it.sourceTrackKey }, report, alternateReports)) return false
             }
 
             LinearSessionStore.ContextKind.CUSTOM_ROUTE -> {
@@ -228,6 +273,7 @@ internal object LibraryInvalidation {
                     isStagePlayable = env::isStagePlayable,
                     isStageHidden = env.isStageHidden,
                     isJukeboxReadable = env::isJukeboxReadable,
+                    wikiCatalog = env.routeMusicCatalog,
                 )
                 if (!report.canPlay || !route.hasValidTopology(env.stageConnections)) return false
                 if (!edgeEntriesMatchReport(snapshot.frozenBase.map { it.key to it.sourceTrackKey }, report)) return false
@@ -255,15 +301,19 @@ internal object LibraryInvalidation {
     private fun edgeEntriesMatchReport(
         keyAndTrackPairs: List<Pair<String, String?>>,
         report: RoadJukeboxCatalog.RouteValidationReport,
+        alternateReports: List<RoadJukeboxCatalog.RouteValidationReport> = emptyList(),
     ): Boolean {
-        val allowedRoadKeysByEdge = report.legs.associate { leg ->
-            val allowed = when (val res = leg.resolution) {
-                is RoadJukeboxCatalog.EdgeMusicResolution.KnownPoolComplete ->
-                    res.candidates.map { it.track.key }.toSet()
-                is RoadJukeboxCatalog.EdgeMusicResolution.CustomSubstitute -> setOf(res.track.track.key)
-                else -> emptySet()
+        val allowedRoadKeysByEdge = mutableMapOf<Int, MutableSet<String>>()
+        for (rep in listOf(report) + alternateReports) {
+            for (leg in rep.legs) {
+                val set = allowedRoadKeysByEdge.getOrPut(leg.index) { mutableSetOf() }
+                when (val res = leg.resolution) {
+                    is RoadJukeboxCatalog.EdgeMusicResolution.KnownPoolComplete ->
+                        set.addAll(res.candidates.map { it.track.key })
+                    is RoadJukeboxCatalog.EdgeMusicResolution.CustomSubstitute -> set.add(res.track.track.key)
+                    else -> Unit
+                }
             }
-            leg.index to allowed
         }
         val marker = ":edge:"
         for ((entryKey, sourceTrackKey) in keyAndTrackPairs) {
@@ -299,8 +349,29 @@ internal object LibraryInvalidation {
             env.isStagePlayable(code)
         }
         LinearSessionStore.SourceType.EXTRA -> {
-            val dir = env.mergedDirectory ?: return false
-            assetSha256 == null || File(dir, "audio/$assetSha256").isFile
+            val dir = env.mergedDirectory
+            val extraId = ExtraMusicCatalog.extraIdFromEntryKey(key)
+            if (dir == null || (extraId != null && !ExtraMusicCatalog.isVisible(extraId, !env.isStageHidden("Rainbow")))) {
+                false
+            } else {
+                val extraItem = if (extraId != null && env.extraCatalog != null) {
+                    env.extraCatalog.otherMusic.firstOrNull { it.id == extraId }
+                } else {
+                    null
+                }
+                when (extraItem) {
+                    is ExtraMusicCatalog.OtherMusicItem.OverlaidOpening -> {
+                        File(dir, "audio/${extraItem.op.sha256}").isFile &&
+                            File(dir, "audio/${extraItem.telop.sha256}").isFile
+                    }
+                    is ExtraMusicCatalog.OtherMusicItem.ChainedSequence -> {
+                        extraItem.parts.isNotEmpty() && extraItem.parts.all { part ->
+                            File(dir, "audio/${part.asset.sha256}").isFile
+                        }
+                    }
+                    else -> assetSha256 == null || File(dir, "audio/$assetSha256").isFile
+                }
+            }
         }
     }
 }

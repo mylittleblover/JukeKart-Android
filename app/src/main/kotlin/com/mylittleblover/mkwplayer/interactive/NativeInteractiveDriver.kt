@@ -32,6 +32,45 @@ internal class NativeInteractiveDriver(
     private var heardVoices=false
     private var previousError: String?=null
     private var previousFailures=0L
+    private val segmentsById: Map<Int, G.Segment> = spec.segments.associateBy { it.index }
+    private val transitionsByEdge: Map<Long, G.Transition?> = buildMap {
+        for (t in spec.transitions) {
+            for (src in t.sources) {
+                for (dst in t.destinations) {
+                    val key = (src.toLong() shl 32) or (dst.toLong() and 0xFFFFFFFFL)
+                    put(key, if (containsKey(key)) null else t)
+                }
+            }
+        }
+    }
+    private val outroTargetSet: Set<Int> = (outros.values + outroVariants.values.flatten()).toSet()
+    private val outroRulesBySource: Map<Int, List<G.Transition>> = buildMap<Int, MutableList<G.Transition>> {
+        for (t in spec.transitions) {
+            val singleDest = t.destinations.singleOrNull()
+            if (singleDest != null && singleDest in outroTargetSet) {
+                for (src in t.sources) {
+                    getOrPut(src) { ArrayList(2) }.add(t)
+                }
+            }
+        }
+    }
+    private val fastVersionIds: Set<Int> = versions.mapNotNull { it.fast }.toSet()
+    private val versionByAnyId: Map<Int, InteractivePlaybackPlan.Version?> = buildMap {
+        for (v in versions) {
+            v.main?.let { id -> put(id, if (containsKey(id)) null else v) }
+            v.fast?.let { id -> put(id, if (containsKey(id)) null else v) }
+        }
+    }
+    private val fastTargetByMainId: Map<Int, Int?> = buildMap {
+        for (v in versions) {
+            v.main?.let { id -> put(id, if (containsKey(id)) null else v.fast) }
+        }
+    }
+    private val regionBySegment: Map<Int, Int?> = buildMap {
+        for ((num, seg) in regions) {
+            put(seg, if (containsKey(seg)) null else num)
+        }
+    }
     private val available: Boolean get()=!isFading && pending==null && observation?.transitioning==false && observation?.paused==false && !finished &&
         !(currentVersion!=null && (observation?.voices ?: 0)>1)
     val canCancelPending: Boolean get()=current !in mandatoryAutomaticSources && !isFading && pending!=null && observation?.canCancel==true && !cancellationRequested
@@ -44,26 +83,28 @@ internal class NativeInteractiveDriver(
     }
     val canAdvance: Boolean get()=available && (next[current]!=null || current in advanceViaOutro && outroRules().isNotEmpty())
     val canEnd: Boolean get()=available && current !in advanceViaOutro && outroRules().isNotEmpty()
-    val currentRegion: Int? get()=regions.entries.singleOrNull { it.value==current }?.key
+    val currentRegion: Int? get()=regionBySegment[current]
     val availableRegions: Set<Int> get()=if(!available) emptySet() else regions.filter { (_,target) -> target!=current && rule(target)!=null }.keys
     fun selectRegion(number: Int): String? {
         val target=regions[number] ?: return "No such region"
         return submit(target)
     }
-    val currentVersion: Int? get()=versions.singleOrNull { current==it.main || current==it.fast }?.number
-    val isFast: Boolean get()=current==fast || versions.any { current==it.fast }
-    private val fastTarget: Int? get()=versions.singleOrNull { current==it.main }?.fast ?: fast
-    val availableVersions: Set<Int> get()=if(!available) emptySet() else versions.filter { v ->
-        val target=if(isFast) v.fast else v.main
-        target!=null && target!=current && rule(target)!=null
-    }.map { it.number }.toSet()
+    val currentVersion: Int? get()=versionByAnyId[current]?.number
+    val isFast: Boolean get()=current==fast || current in fastVersionIds
+    private val fastTarget: Int? get()=fastTargetByMainId[current] ?: fast
+    val availableVersions: Set<Int> get()=if(!available) emptySet() else buildSet {
+        for (v in versions) {
+            val target = if (isFast) v.fast else v.main
+            if (target != null && target != current && rule(target) != null) add(v.number)
+        }
+    }
     val canFast: Boolean get()=available && fastTarget?.let { rule(it)!=null }==true
     val finished: Boolean get()=heardVoices && observation?.let { it.voices==0 && (it.stopped || isFading && it.fadeEndFrame!=null) && !it.paused && !it.transitioning && pending==null }==true
 
     fun observe(value: Observation) {
         observation=value
         if(value.voices>0) heardVoices=true
-        if(spec.segments.any { it.index==value.segment }) current=value.segment
+        if(value.segment in segmentsById) current=value.segment
         if(!isFading && value.destination!=null && value.destination!=current) pending=value.destination
         val newFailure=value.error!=null && (value.error!=previousError || value.failureCount!=previousFailures)
         if(newFailure) { diagnostic=value.error;cancellationRequested=false }
@@ -73,9 +114,9 @@ internal class NativeInteractiveDriver(
         if((pending==current && !value.transitioning) || newFailure) pending=null
         previousError=value.error;previousFailures=value.failureCount
     }
-    private fun rule(target: Int)=spec.transitions.singleOrNull { current in it.sources && target in it.destinations }
-    private val outroTargets: Set<Int> get()=(outros.values+outroVariants.values.flatten()).toSet()
-    private fun outroRules()=spec.transitions.filter { current in it.sources && it.destinations.singleOrNull() in outroTargets }
+    private fun edgeKey(source: Int, target: Int): Long = (source.toLong() shl 32) or (target.toLong() and 0xFFFFFFFFL)
+    private fun rule(target: Int): G.Transition? = transitionsByEdge[edgeKey(current, target)]
+    private fun outroRules(): List<G.Transition> = outroRulesBySource[current].orEmpty()
     private fun submit(target: Int): String? {
         if(!available) return "Waiting for the Native transition"
         if(rule(target)==null) return "No source transition for this section"
@@ -92,7 +133,7 @@ internal class NativeInteractiveDriver(
     fun takeOutro(): String? {
         if(!available) return "Waiting for the Native transition"
         val position=observation?.sourceFrame ?: return "Waiting for the source playback position"
-        val segment=spec.segments.single { it.index==current }
+        val segment=segmentsById.getValue(current)
         val options=outroRules().flatMap { transition ->
             segment.cues.filter { it.name==transition.sourceCue }.mapNotNull { cue ->
                 val delay=if(cue.frame>position) cue.frame-position else segment.loop?.let { loop ->

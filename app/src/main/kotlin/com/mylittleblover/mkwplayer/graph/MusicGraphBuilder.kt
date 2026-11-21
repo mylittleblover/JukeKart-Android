@@ -57,6 +57,23 @@ object MusicGraphBuilder {
         Linear(0), Hold(1), SCurve(2), EaseIn(3), EaseOut(4);
     }
 
+    /** EnvelopeTarget from TimelineEnvelope.hpp. */
+    enum class EnvelopeTarget(val wire: Int) {
+        VolumeDb(0), LowPassHz(2), HighPassHz(3);
+    }
+
+    data class EnvelopePoint(
+        val frame: Long,
+        val value: Double,
+        val shape: Shape = Shape.Linear,
+    )
+
+    data class TimelineEnvelope(
+        val targetIndex: Int,
+        val target: EnvelopeTarget = EnvelopeTarget.VolumeDb,
+        val points: List<EnvelopePoint>,
+    )
+
     /** EndBehavior: how a musical loop stops. */
     enum class EndBehavior(val wire: Int) {
         Natural(0), Immediate(1), Fade(2), Ending(3);
@@ -178,6 +195,8 @@ object MusicGraphBuilder {
          * builder.
          */
         val identities: List<String>? = null,
+        val segmentEnvelopes: List<TimelineEnvelope> = emptyList(),
+        val clipEnvelopes: List<TimelineEnvelope> = emptyList(),
     )
 
     /**
@@ -298,23 +317,53 @@ object MusicGraphBuilder {
         GraphWire.writeByteValue(body, 0)   // hasAutomatic
 
         val timed = spec.transitions.filter { it.timeline != null }
-        if (timed.isNotEmpty()) {
-            require(spec.musicalLoop == null) { "Timeline graph requires an explicit segment loop" }
-            repeat(4) { GraphWire.writeI32(body, 0) } // v10 effects, v11 album, v12/v13 envelopes
-            GraphWire.writeI32(body, timed.size)
-            timed.forEach { t ->
-                val p = t.timeline!!
-                require(p.bridgeStart != Long.MIN_VALUE && p.destinationStart != Long.MIN_VALUE)
-                require(p.destinationSource >= 0 && p.destinationCommit >= 0 && p.destinationCommit >= p.destinationStart)
-                require(t.bridge < 0 || p.destinationCommit >= p.bridgeStart)
-                GraphWire.writeI32(body, t.index)
-                GraphWire.writeLong(body, p.bridgeStart)
-                GraphWire.writeLong(body, p.destinationStart)
-                GraphWire.writeLong(body, p.destinationCommit)
-                GraphWire.writeLong(body, p.destinationSource)
+        val wireVersion = when {
+            timed.isNotEmpty() -> 14
+            spec.clipEnvelopes.isNotEmpty() -> 13
+            spec.segmentEnvelopes.isNotEmpty() -> 12
+            else -> VERSION
+        }
+        if (wireVersion > VERSION) {
+            GraphWire.writeI32(body, 0) // v10 effectCurves
+            GraphWire.writeI32(body, 0) // v11 albumFlows
+            if (wireVersion >= 12) writeEnvelopes(body, spec.segmentEnvelopes)
+            if (wireVersion >= 13) writeEnvelopes(body, spec.clipEnvelopes)
+            if (wireVersion >= 14) {
+                require(spec.musicalLoop == null) { "Timeline graph requires an explicit segment loop" }
+                GraphWire.writeI32(body, timed.size)
+                timed.forEach { t ->
+                    val p = t.timeline!!
+                    require(p.bridgeStart != Long.MIN_VALUE && p.destinationStart != Long.MIN_VALUE)
+                    require(p.destinationSource >= 0 && p.destinationCommit >= 0 && p.destinationCommit >= p.destinationStart)
+                    require(t.bridge < 0 || p.destinationCommit >= p.bridgeStart)
+                    GraphWire.writeI32(body, t.index)
+                    GraphWire.writeLong(body, p.bridgeStart)
+                    GraphWire.writeLong(body, p.destinationStart)
+                    GraphWire.writeLong(body, p.destinationCommit)
+                    GraphWire.writeLong(body, p.destinationSource)
+                }
             }
         }
-        return GraphWire.envelope(body.toByteArray(), if(timed.isEmpty()) VERSION else 14)
+        return GraphWire.envelope(body.toByteArray(), wireVersion)
+    }
+
+    private fun writeEnvelopes(out: ByteArrayOutputStream, envelopes: List<TimelineEnvelope>) {
+        GraphWire.writeI32(out, envelopes.size)
+        envelopes.forEach { env ->
+            GraphWire.writeI32(out, env.targetIndex)
+            GraphWire.writeI32(out, env.target.wire)
+            GraphWire.writeI32(out, env.points.size)
+            var prevFrame = -1L
+            env.points.forEach { point ->
+                require(point.frame >= 0L && point.frame > prevFrame) {
+                    "envelope points must have strictly increasing non-negative frames (got ${point.frame} after $prevFrame)"
+                }
+                prevFrame = point.frame
+                GraphWire.writeLong(out, point.frame)
+                GraphWire.writeDouble(out, point.value)
+                GraphWire.writeI32(out, point.shape.wire)
+            }
+        }
     }
 
     // ---------------------------------------------------------------- sections

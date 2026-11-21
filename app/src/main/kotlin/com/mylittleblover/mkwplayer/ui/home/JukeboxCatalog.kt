@@ -210,6 +210,10 @@ internal object JukeboxCatalog {
         val packByKey: Map<String, File> = emptyMap(),
         val itemsByKey: Map<String, TrackItem> = games.flatMap { it.items }.associateBy { it.key },
     ) {
+        val allItems: List<Pair<TrackItem, Game>> by lazy(LazyThreadSafetyMode.PUBLICATION) {
+            games.flatMap { game -> game.items.map { item -> item to game } }
+        }
+
         val isEmpty: Boolean get() = games.isEmpty()
 
         /** How many jukebox tracks the installed packs carry. */

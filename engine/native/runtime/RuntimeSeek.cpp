@@ -41,19 +41,42 @@ EngineStatus EngineRuntime::seek(audio::TransportFrame target,std::uint64_t maxi
         if(streamHistory_)streamHistory_->branch({journal_->epoch,target});
         return EngineStatus::Ok;
     }
-    // Single-segment static clip graphs (such as OverlaidOpening, ChainedSequence, and Medleys) have no
-    // transitions, loops, cues, or stateful filters, so seek can reconstruct active Voices in O(clips)
-    // instead of replaying millions of 48 kHz frames through render().
+    // Single-segment static clip graphs (such as OverlaidOpening, ChainedSequence, and Medleys) and
+    // initial segments of static linear chains (such as CourseMedleyChain) before any destination/bridge
+    // transition starts have no loops, cues, or stateful filters, so seek can reconstruct active Voices
+    // in O(clips) instead of replaying millions of 48 kHz frames through render().
+    const bool singleSegmentStatic=!transition_.active && graph_ && graph_->segments.size()==1 && graph_->transitions.empty();
+    bool otherSceneActive=false;
+    for(std::size_t s=1;s<scenes_.size();++s) {
+        if(scenes_[s].active) { otherSceneActive=true; break; }
+    }
+    bool exitOnlyChain=graph_ && graph_->segments.size()>=2 && target.value<graph_->segments.front().exit;
+    if(exitOnlyChain) {
+        const auto seg0Id=graph_->segments.front().index;
+        for(const auto& t:graph_->transitions) {
+            if(std::find(t.sources.begin(),t.sources.end(),seg0Id)!=t.sources.end() && (t.bridge>=0 || t.preEntry || t.sync!=SyncPoint::ExitCue || t.sourceCue.has_value() || t.fadeOut.beats>0 || t.fadeIn.beats>0)) { exitOnlyChain=false; break; }
+        }
+    }
+    const bool initialChainSegmentStatic=graph_ && graph_->segments.size()>=1 &&
+        ((foreground_==&scenes_[0] && foreground_->active && foreground_->segment==&graph_->segments.front() &&
+          scenes_[0].loopCount==0 && !otherSceneActive &&
+          (!transition_.active || (!transition_.sourceLeft && !transition_.destinationStarted &&
+              !transition_.bridgeStarted && transition_.source==&scenes_[0]))) ||
+         exitOnlyChain);
     bool staticLinearGraph=graph_ && !linear_ && !pendingCount_ &&
-        !performance_ && !automatic_ && !albumActive_ && !musicalLoopActive_ && !transition_.active && !stinger_.active &&
+        !performance_ && !automatic_ && !albumActive_ && !musicalLoopActive_ && !stinger_.active &&
+        (singleSegmentStatic || initialChainSegmentStatic) &&
         graph_->entries.empty() && !graph_->hasMusicalLoop && !graph_->hasAutomatic &&
-        graph_->segments.size()==1 && graph_->transitions.empty() && graph_->playlists.empty() &&
-        graph_->switches.empty() && graph_->groups.empty() && graph_->stingers.empty() &&
-        graph_->performances.empty() && graph_->albumFlows.empty() && graph_->events.empty() &&
-        graph_->curves.empty() && graph_->effectCurves.empty() && parameters_!=nullptr;
+        graph_->playlists.empty() && graph_->switches.empty() && graph_->groups.empty() &&
+        graph_->stingers.empty() && graph_->performances.empty() && graph_->albumFlows.empty() &&
+        graph_->events.empty() && graph_->curves.empty() && graph_->effectCurves.empty() && parameters_!=nullptr;
     if(staticLinearGraph) {
         const auto& seg=graph_->segments.front();
-        staticLinearGraph=!seg.hasLoop && seg.entry==0 && seg.cues.empty() && seg.envelopes.empty() &&
+        auto volumeOnly=[](const auto& envelopes) noexcept {
+            for(const auto& e:envelopes)if(e.target()!=EnvelopeTarget::VolumeDb)return false;
+            return true;
+        };
+        staticLinearGraph=!seg.hasLoop && seg.entry==0 && seg.cues.empty() && volumeOnly(seg.envelopes) &&
             parameters_->property(seg.index,1)==1.0;
         for(const auto& bus:graph_->buses) {
             if(!bus.effects.empty() || parameters_->propertyEnabled(bus.index,2) ||
@@ -71,7 +94,7 @@ EngineStatus EngineRuntime::seek(audio::TransportFrame target,std::uint64_t maxi
                     break;
                 }
                 for(const auto& c:track->clips) {
-                    if(c.start<0 || c.loop || !c.envelopes.empty() || !assets_[c.asset] || !assets_[c.asset]->valid()) {
+                    if(c.start<0 || c.loop || !volumeOnly(c.envelopes) || !assets_[c.asset] || !assets_[c.asset]->valid()) {
                         staticLinearGraph=false;
                         break;
                     }
@@ -86,6 +109,9 @@ EngineStatus EngineRuntime::seek(audio::TransportFrame target,std::uint64_t maxi
             const auto kind=record.command.kind;
             if(kind==api::EngineCommandKind::Play && record.frame==0 && record.command.target==seg.index) {
                 ++playCount;
+            } else if(!singleSegmentStatic &&
+                (kind==api::EngineCommandKind::Play || kind==api::EngineCommandKind::CancelPendingTransition)) {
+                // Prequeued/cancelled unstarted handover transitions do not alter analytical state of segment 0.
             } else {
                 staticLinearGraph=kind==api::EngineCommandKind::Pause ||
                     kind==api::EngineCommandKind::Resume || kind==api::EngineCommandKind::OutputGain;
@@ -98,6 +124,7 @@ EngineStatus EngineRuntime::seek(audio::TransportFrame target,std::uint64_t maxi
         if(target.value>seg.exit)return EngineStatus::InvalidRequest;
         const bool paused=clock_.status()==TransportStatus::Paused;
         lastPositions_.fill(-1);
+        cancelTransition(false);
         transition_=TransitionRun{};queuedTransition_=-1;queuedSwitch_=false;clearStinger();
         voices_.clear();
         for(auto& s:scenes_) { s.active=false; s.playlist.clear(); s.segment=nullptr; s.segmentEnded=true; }

@@ -6,6 +6,8 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.Map
@@ -40,8 +42,18 @@ internal fun tabTitle(tab: Tab): String = stringResource(when (tab) {
 })
 
 @Composable
-internal fun AppHeader(title: String, canBack: Boolean, showSettings: Boolean, onBack: () -> Unit, onSettings: () -> Unit) {
+internal fun AppHeader(
+    title: String,
+    canBack: Boolean,
+    showSettings: Boolean,
+    onBack: () -> Unit,
+    onSettings: () -> Unit,
+    sleepTimerRemainingMs: Long? = null,
+    sleepAfterCurrentTrack: Boolean = false,
+    onSleepTimer: (() -> Unit)? = null,
+) {
     val settingsLabel = stringResource(R.string.settings_title)
+    val sleepLabel = stringResource(R.string.sleep_timer_title)
     Surface(color = MaterialTheme.colorScheme.surface) {
         Column {
             Row(
@@ -61,6 +73,31 @@ internal fun AppHeader(title: String, canBack: Boolean, showSettings: Boolean, o
                     Text("/", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (onSleepTimer != null) {
+                    val timerActive = sleepAfterCurrentTrack || (sleepTimerRemainingMs != null && sleepTimerRemainingMs > 0L)
+                    if (timerActive) {
+                        FilterChip(
+                            selected = true,
+                            onClick = onSleepTimer,
+                            leadingIcon = { Icon(Icons.Filled.Bedtime, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                            label = {
+                                Text(
+                                    text = if (sleepAfterCurrentTrack) {
+                                        "1♪"
+                                    } else {
+                                        com.mylittleblover.mkwplayer.ui.components.formatCountdownMs(sleepTimerRemainingMs ?: 0L)
+                                    },
+                                    maxLines = 1,
+                                    style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+                                )
+                            },
+                        )
+                    } else {
+                        IconButton(onClick = onSleepTimer, modifier = Modifier.size(44.dp).semantics { contentDescription = sleepLabel }) {
+                            Icon(Icons.Outlined.Bedtime, contentDescription = null)
+                        }
+                    }
+                }
                 if (showSettings) {
                     IconButton(onClick = onSettings, modifier = Modifier.size(48.dp).semantics { contentDescription = settingsLabel }) {
                         Icon(Icons.Outlined.Settings, contentDescription = null)

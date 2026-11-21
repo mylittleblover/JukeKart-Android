@@ -199,4 +199,29 @@ class BwavHeaderTest {
             assertTrue(rejected(case).isNotBlank())
         }
     }
+
+    @Test
+    fun readFileParsesValidHeaderFromDiskWithoutReadingAudioBody() {
+        val tempDir = java.nio.file.Files.createTempDirectory("bwav-hdr-test-").toFile()
+        try {
+            val file = java.io.File(tempDir, "sample.bwav")
+            val header = builder(channels = 4, rate = 48000, frames = 2000, loopStart = 200, loopEnd = 1800)
+            val body = ByteArray(4096) { 0x5A }
+            file.writeBytes(header + body)
+
+            val result = BwavHeader.readFile(file)
+            assertTrue(result is BwavHeader.Result.Ok, "expected Ok, got $result")
+            val info = result.info
+            assertEquals(4, info.channels)
+            assertEquals(48000, info.sampleRate)
+            assertEquals(2000, info.frames)
+            assertEquals(200, info.loopStart)
+            assertEquals(1800, info.loopEnd)
+
+            val missing = BwavHeader.readFile(java.io.File(tempDir, "missing.bwav"))
+            assertTrue(missing is BwavHeader.Result.Rejected)
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
 }

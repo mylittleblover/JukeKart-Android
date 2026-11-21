@@ -56,6 +56,7 @@ internal class LinearQueue(
         val medleyId: String? = null,
         val sourceTrackKey: String? = null,
         val roadCandidateVariants: List<Entry> = emptyList(),
+        val roadCandidateWeights: List<Int> = emptyList(),
     )
 
     data class Snapshot(
@@ -145,10 +146,71 @@ internal class LinearQueue(
         tempNextQueue.addFirst(entry)
     }
 
+    /** Inserts [entries] at the front of the temporary queue preserving list order. */
+    fun enqueueNextBatch(entries: List<Entry>) {
+        if (entries.isEmpty()) return
+        if (currentEntry == null && frozenBase.isEmpty()) {
+            startSession(entries, 0)
+            return
+        }
+        for (i in entries.lastIndex downTo 0) {
+            tempNextQueue.addFirst(entries[i])
+        }
+    }
+
+    /** Appends [entry] to the end of the current playback queue. */
+    fun enqueueEnd(entry: Entry) = enqueueEndBatch(listOf(entry))
+
+    /** Appends [entries] to the end of the current playback queue. */
+    fun enqueueEndBatch(entries: List<Entry>) {
+        if (entries.isEmpty()) return
+        if (currentEntry == null && frozenBase.isEmpty()) {
+            startSession(entries, 0)
+            return
+        }
+        val baseStart = frozenBase.size
+        frozenBase = frozenBase + entries
+        entries.forEachIndexed { offset, entry ->
+            upcomingBase.addLast(entry to (baseStart + offset))
+        }
+    }
+
     /** Removes a pending item from the temporary "Play next" queue (#67). */
     fun removeTempAt(index: Int): Boolean {
         if (index !in tempNextQueue.indices) return false
         tempNextQueue.removeAt(index)
+        return true
+    }
+
+    /** Removes a pending item from the upcoming base queue. */
+    fun removeUpcomingAt(index: Int): Boolean {
+        if (index !in upcomingBase.indices) return false
+        upcomingBase.removeAt(index)
+        return true
+    }
+
+    /** Reorders an item within the temporary "Play next" queue. */
+    fun moveTemp(from: Int, to: Int): Boolean {
+        if (from !in tempNextQueue.indices || to !in tempNextQueue.indices || from == to) return false
+        val item = tempNextQueue.removeAt(from)
+        tempNextQueue.add(to, item)
+        return true
+    }
+
+    /** Reorders an item within the upcoming base queue. */
+    fun moveUpcoming(from: Int, to: Int): Boolean {
+        if (from !in upcomingBase.indices || to !in upcomingBase.indices || from == to) return false
+        val item = upcomingBase.removeAt(from)
+        upcomingBase.add(to, item)
+        return true
+    }
+
+    /** Clears all upcoming items while keeping the currently active track intact. */
+    fun clearUpcoming(): Boolean {
+        if (tempNextQueue.isEmpty() && upcomingBase.isEmpty() && forwardHistory.isEmpty()) return false
+        tempNextQueue.clear()
+        upcomingBase.clear()
+        forwardHistory.clear()
         return true
     }
 
@@ -381,8 +443,28 @@ internal class LinearQueue(
     private fun resolveRoundEntry(template: Entry): Entry {
         val pool = template.roadCandidateVariants
         if (pool.isEmpty()) return template
-        val picked = pool[random.nextInt(pool.size)]
-        return picked.copy(roadCandidateVariants = pool)
+        val weights = template.roadCandidateWeights
+        val picked = if (weights.size == pool.size && weights.any { it > 0 }) {
+            val totalWeight = weights.sumOf { it.coerceAtLeast(0) }
+            if (totalWeight > 0) {
+                var roll = random.nextInt(totalWeight)
+                var chosenIdx = pool.lastIndex
+                for (i in pool.indices) {
+                    val w = weights[i].coerceAtLeast(0)
+                    if (roll < w) {
+                        chosenIdx = i
+                        break
+                    }
+                    roll -= w
+                }
+                pool[chosenIdx]
+            } else {
+                pool[random.nextInt(pool.size)]
+            }
+        } else {
+            pool[random.nextInt(pool.size)]
+        }
+        return picked.copy(roadCandidateVariants = pool, roadCandidateWeights = weights)
     }
 
     private fun rebuildUpcomingAfterStart(startIndex: Int) {

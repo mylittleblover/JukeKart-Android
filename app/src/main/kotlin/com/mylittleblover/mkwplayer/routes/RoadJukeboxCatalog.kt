@@ -109,6 +109,190 @@ internal object RoadJukeboxCatalog {
         }
     }
 
+    enum class RoadMusicRuleMode {
+        AUTO,
+        GRAND_PRIX,
+        VS_DAY,
+        VS_NIGHT,
+        ;
+
+        companion object {
+            fun fromStored(raw: String?): RoadMusicRuleMode =
+                entries.firstOrNull { it.name.equals(raw?.trim(), ignoreCase = true) } ?: AUTO
+        }
+    }
+
+    enum class EffectiveRuleMode {
+        GRAND_PRIX,
+        VS_DAY,
+        VS_NIGHT,
+        KNOCKOUT_DIRECT,
+    }
+
+    enum class CandidateTier {
+        GRAND_PRIX,
+        EXCLUSIVE_ORDER,
+        THEMED_BOOSTED,
+        MAIN_ORDER,
+        NIGHT_ORDER,
+    }
+
+    /**
+     * Bundled MarioWiki Route music ruleset (`assets/route_music_catalog.json`).
+     *
+     * Models:
+     * - Grand Prix per-edge pools (23 Jukebox edges + `Central -> Rainbow` special approach)
+     * - VS Race Daytime (Main order interlaced 4:1 with origin theme / course-exclusive order)
+     * - VS Race Nighttime (independent Night order across all routes)
+     */
+    data class RouteMusicCatalog(
+        val schemaVersion: Int = 1,
+        val themesByStage: Map<String, String> = emptyMap(),
+        val exclusiveOriginCourses: Set<String> = emptySet(),
+        val specialEdges: Map<EdgeKey, SpecialEdgeRule> = emptyMap(),
+        val gpEdges: Map<EdgeKey, List<String>> = emptyMap(),
+        val tracks: List<TrackRule> = emptyList(),
+    ) {
+        data class SpecialEdgeRule(
+            val from: String,
+            val to: String,
+            val stem: String,
+            val title: String,
+        )
+
+        data class TrackRule(
+            val jukeboxCode: String,
+            val anyOriginDay: Boolean,
+            val anyOriginNight: Boolean,
+            val dayThemes: Set<String>,
+            val dayCourses: Set<String>,
+            val likelyDayThemes: Set<String>,
+            val likelyDayCourses: Set<String>,
+        )
+
+        data class RankedCandidate(
+            val jukeboxCode: String,
+            val tier: CandidateTier,
+            val weight: Int,
+        )
+
+        fun specialFor(from: String, to: String): SpecialEdgeRule? =
+            specialEdges[EdgeKey(from.trim().removeSuffix("_00"), to.trim().removeSuffix("_00"))]
+
+        fun resolveRuleCandidates(
+            from: String,
+            to: String,
+            mode: EffectiveRuleMode,
+        ): List<RankedCandidate> {
+            val cleanFrom = from.trim().removeSuffix("_00")
+            val cleanTo = to.trim().removeSuffix("_00")
+            return when (mode) {
+                EffectiveRuleMode.KNOCKOUT_DIRECT -> emptyList()
+                EffectiveRuleMode.GRAND_PRIX -> {
+                    val refs = gpEdges[EdgeKey(cleanFrom, cleanTo)].orEmpty()
+                    refs.map { RankedCandidate(it, CandidateTier.GRAND_PRIX, weight = 1) }
+                }
+                EffectiveRuleMode.VS_DAY -> {
+                    val originTheme = themesByStage[cleanFrom]
+                    val ranked = mutableListOf<RankedCandidate>()
+                    for (t in tracks) {
+                        val isExclusive = (originTheme != null && originTheme in t.dayThemes) ||
+                            (cleanFrom in t.dayCourses)
+                        val isLikelyBoost = (originTheme != null && originTheme in t.likelyDayThemes) ||
+                            (cleanFrom in t.likelyDayCourses)
+                        when {
+                            isExclusive -> ranked += RankedCandidate(t.jukeboxCode, CandidateTier.EXCLUSIVE_ORDER, weight = 4)
+                            isLikelyBoost -> ranked += RankedCandidate(t.jukeboxCode, CandidateTier.THEMED_BOOSTED, weight = 4)
+                            t.anyOriginDay -> ranked += RankedCandidate(t.jukeboxCode, CandidateTier.MAIN_ORDER, weight = 1)
+                        }
+                    }
+                    ranked.sortedBy { it.tier.ordinal }
+                }
+                EffectiveRuleMode.VS_NIGHT -> {
+                    tracks
+                        .filter { it.anyOriginNight }
+                        .map { RankedCandidate(it.jukeboxCode, CandidateTier.NIGHT_ORDER, weight = 1) }
+                }
+            }
+        }
+
+        companion object {
+            fun parse(text: String): RouteMusicCatalog? = runCatching {
+                val root = JSONObject(text)
+                val schemaVersion = root.getInt("schemaVersion")
+                require(schemaVersion == 1)
+                val themesByStage = linkedMapOf<String, String>()
+                val themesObj = root.optJSONObject("themes")
+                if (themesObj != null) {
+                    val keys = themesObj.keys()
+                    while (keys.hasNext()) {
+                        val themeName = keys.next()
+                        val arr = themesObj.getJSONArray(themeName)
+                        for (i in 0 until arr.length()) {
+                            themesByStage[arr.getString(i).trim().removeSuffix("_00")] = themeName
+                        }
+                    }
+                }
+                val exclArr = root.optJSONArray("exclusiveOriginCourses") ?: JSONArray()
+                val exclusiveCourses = (0 until exclArr.length())
+                    .map { exclArr.getString(it).trim().removeSuffix("_00") }
+                    .toSet()
+
+                val specialMap = linkedMapOf<EdgeKey, SpecialEdgeRule>()
+                val specialArr = root.optJSONArray("specialEdges") ?: JSONArray()
+                for (i in 0 until specialArr.length()) {
+                    val o = specialArr.getJSONObject(i)
+                    val from = o.getString("from").trim().removeSuffix("_00")
+                    val to = o.getString("to").trim().removeSuffix("_00")
+                    specialMap[EdgeKey(from, to)] = SpecialEdgeRule(
+                        from = from,
+                        to = to,
+                        stem = o.getString("stem"),
+                        title = o.getString("title"),
+                    )
+                }
+
+                val gpMap = linkedMapOf<EdgeKey, List<String>>()
+                val gpArr = root.optJSONArray("gpEdges") ?: JSONArray()
+                for (i in 0 until gpArr.length()) {
+                    val o = gpArr.getJSONObject(i)
+                    val from = o.getString("from").trim().removeSuffix("_00")
+                    val to = o.getString("to").trim().removeSuffix("_00")
+                    val cArr = o.getJSONArray("candidates")
+                    val cands = (0 until cArr.length()).map { cArr.getString(it).trim() }.filter { it.isNotEmpty() }.distinct()
+                    gpMap[EdgeKey(from, to)] = cands
+                }
+
+                val tracksArr = root.optJSONArray("tracks") ?: JSONArray()
+                val trackRules = (0 until tracksArr.length()).map { i ->
+                    val o = tracksArr.getJSONObject(i)
+                    fun strSet(key: String): Set<String> {
+                        val a = o.optJSONArray(key) ?: return emptySet()
+                        return (0 until a.length()).map { a.getString(it).trim() }.filter { it.isNotEmpty() }.toSet()
+                    }
+                    TrackRule(
+                        jukeboxCode = o.getString("jukeboxCode").trim(),
+                        anyOriginDay = o.optBoolean("anyOriginDay", false),
+                        anyOriginNight = o.optBoolean("anyOriginNight", false),
+                        dayThemes = strSet("dayThemes"),
+                        dayCourses = strSet("dayCourses"),
+                        likelyDayThemes = strSet("likelyDayThemes"),
+                        likelyDayCourses = strSet("likelyDayCourses"),
+                    )
+                }
+
+                RouteMusicCatalog(
+                    schemaVersion = schemaVersion,
+                    themesByStage = themesByStage,
+                    exclusiveOriginCourses = exclusiveCourses,
+                    specialEdges = specialMap,
+                    gpEdges = gpMap,
+                    tracks = trackRules,
+                )
+            }.getOrNull()
+        }
+    }
+
     sealed interface EdgeMusicResolution {
         val edge: StageConnections.Edge?
 
@@ -116,11 +300,24 @@ internal object RoadJukeboxCatalog {
             override val edge: StageConnections.Edge?,
             val candidates: List<JukeboxCatalog.TrackItem>,
             val selectedOverride: JukeboxCatalog.TrackItem?,
+            val candidateTiers: Map<String, CandidateTier> = emptyMap(),
+            val candidateWeights: List<Int> = List(candidates.size) { 1 },
+            val ruleModeUsed: EffectiveRuleMode? = null,
         ) : EdgeMusicResolution
 
         data class KnownPoolIncomplete(
             override val edge: StageConnections.Edge?,
             val missingCandidateRefs: List<String>,
+        ) : EdgeMusicResolution
+
+        data class SpecialRoadApproach(
+            override val edge: StageConnections.Edge?,
+            val stem: String,
+            val title: String,
+        ) : EdgeMusicResolution
+
+        data class KnockoutTourDirect(
+            override val edge: StageConnections.Edge?,
         ) : EdgeMusicResolution
 
         data class CustomSubstitute(
@@ -162,6 +359,25 @@ internal object RoadJukeboxCatalog {
         val blockingReason: String? = null,
     )
 
+    fun effectiveModeForOfficial(routeKind: OfficialRouteKind, mode: RoadMusicRuleMode): EffectiveRuleMode =
+        when (mode) {
+            RoadMusicRuleMode.AUTO -> when (routeKind) {
+                OfficialRouteKind.GRAND_PRIX -> EffectiveRuleMode.GRAND_PRIX
+                OfficialRouteKind.RALLY -> EffectiveRuleMode.KNOCKOUT_DIRECT
+            }
+            RoadMusicRuleMode.GRAND_PRIX -> EffectiveRuleMode.GRAND_PRIX
+            RoadMusicRuleMode.VS_DAY -> EffectiveRuleMode.VS_DAY
+            RoadMusicRuleMode.VS_NIGHT -> EffectiveRuleMode.VS_NIGHT
+        }
+
+    fun effectiveModeForCustom(mode: RoadMusicRuleMode): EffectiveRuleMode =
+        when (mode) {
+            RoadMusicRuleMode.AUTO,
+            RoadMusicRuleMode.VS_DAY -> EffectiveRuleMode.VS_DAY
+            RoadMusicRuleMode.VS_NIGHT -> EffectiveRuleMode.VS_NIGHT
+            RoadMusicRuleMode.GRAND_PRIX -> EffectiveRuleMode.GRAND_PRIX
+        }
+
     /** Auto-identifies installed Jukebox track strictly by verified metadata (#83). */
     fun matchJukeboxItem(
         ref: String,
@@ -189,6 +405,8 @@ internal object RoadJukeboxCatalog {
         isStagePlayable: (String) -> Boolean,
         isStageHidden: (String) -> Boolean,
         isJukeboxReadable: (JukeboxCatalog.TrackItem) -> Boolean = { true },
+        wikiCatalog: RouteMusicCatalog? = null,
+        ruleModeOverride: RoadMusicRuleMode? = null,
     ): RouteValidationReport {
         val stopCodes = route.stops.map { it.stageCode.removeSuffix("_00") }
         val unplayable = stopCodes.filter { isStageHidden(it) || !isStagePlayable(it) }.distinct()
@@ -196,6 +414,7 @@ internal object RoadJukeboxCatalog {
         val incompletePools = mutableListOf<EdgeKey>()
         val missingSubstitutes = mutableListOf<EdgeKey>()
         val legs = mutableListOf<RouteLegInspection>()
+        val effectiveMode = effectiveModeForCustom(ruleModeOverride ?: route.roadRuleMode)
 
         if (stopCodes.size >= 2) {
             for (i in 0 until stopCodes.lastIndex) {
@@ -218,6 +437,8 @@ internal object RoadJukeboxCatalog {
                     pool = pool,
                     installedJukebox = installedJukebox,
                     isJukeboxReadable = isJukeboxReadable,
+                    wikiCatalog = wikiCatalog,
+                    effectiveRuleMode = effectiveMode,
                 )
                 if (resolution is EdgeMusicResolution.KnownPoolIncomplete) {
                     incompletePools += EdgeKey(from, to)
@@ -257,11 +478,14 @@ internal object RoadJukeboxCatalog {
         isStagePlayable: (String) -> Boolean,
         isStageHidden: (String) -> Boolean,
         isJukeboxReadable: (JukeboxCatalog.TrackItem) -> Boolean = { true },
+        wikiCatalog: RouteMusicCatalog? = null,
+        ruleMode: RoadMusicRuleMode = RoadMusicRuleMode.AUTO,
     ): RouteValidationReport {
         val stopCodes = route.stops.map { it.stageCode.removeSuffix("_00") }
         val unplayable = stopCodes.filter { isStageHidden(it) || !isStagePlayable(it) }.distinct()
         val incompletePools = mutableListOf<EdgeKey>()
         val legs = mutableListOf<RouteLegInspection>()
+        val effectiveMode = effectiveModeForOfficial(route.kind, ruleMode)
 
         for (i in 0 until stopCodes.lastIndex) {
             val from = stopCodes[i]
@@ -277,6 +501,8 @@ internal object RoadJukeboxCatalog {
                 pool = pool,
                 installedJukebox = installedJukebox,
                 isJukeboxReadable = isJukeboxReadable,
+                wikiCatalog = wikiCatalog,
+                effectiveRuleMode = effectiveMode,
             )
             if (resolution is EdgeMusicResolution.KnownPoolIncomplete) {
                 incompletePools += EdgeKey(from, to)
@@ -312,10 +538,12 @@ internal object RoadJukeboxCatalog {
         pool: CandidatePool,
         installedJukebox: List<JukeboxCatalog.TrackItem>,
         isJukeboxReadable: (JukeboxCatalog.TrackItem) -> Boolean,
+        wikiCatalog: RouteMusicCatalog?,
+        effectiveRuleMode: EffectiveRuleMode,
     ): EdgeMusicResolution {
         val poolRefs = pool.candidatesFor(from, to)
         if (!poolRefs.isNullOrEmpty()) {
-            // Known candidate pool: #82 requires ALL candidates to exist & be readable, even if toggled off.
+            // Known candidate pool from pack: #82 requires ALL candidates to exist & be readable, even if toggled off.
             val matched = mutableListOf<JukeboxCatalog.TrackItem>()
             val missing = mutableListOf<String>()
             for (ref in poolRefs) {
@@ -336,6 +564,62 @@ internal object RoadJukeboxCatalog {
                 }
             }
             return EdgeMusicResolution.KnownPoolComplete(edge, matched, selected)
+        }
+
+        if (wikiCatalog != null) {
+            if (effectiveRuleMode == EffectiveRuleMode.KNOCKOUT_DIRECT) {
+                return EdgeMusicResolution.KnockoutTourDirect(edge)
+            }
+            val special = wikiCatalog.specialFor(from, to)
+            if (special != null) {
+                if (!musicEnabled) return EdgeMusicResolution.DisabledByUser(edge)
+                if (allowCustomSubstitute && !selectedRef.isNullOrBlank()) {
+                    val found = matchJukeboxItem(selectedRef, installedJukebox, isJukeboxReadable)
+                        ?: return EdgeMusicResolution.SubstituteMissing(edge, selectedRef)
+                    return EdgeMusicResolution.CustomSubstitute(edge, found)
+                }
+                return EdgeMusicResolution.SpecialRoadApproach(edge, special.stem, special.title)
+            }
+
+            val ranked = wikiCatalog.resolveRuleCandidates(from, to, effectiveRuleMode)
+            if (ranked.isNotEmpty()) {
+                val matchedItems = mutableListOf<JukeboxCatalog.TrackItem>()
+                val matchedTiers = linkedMapOf<String, CandidateTier>()
+                val matchedWeights = mutableListOf<Int>()
+                for (cand in ranked) {
+                    val item = matchJukeboxItem(cand.jukeboxCode, installedJukebox, isJukeboxReadable)
+                    if (item != null && !matchedTiers.containsKey(item.key)) {
+                        matchedItems += item
+                        matchedTiers[item.key] = cand.tier
+                        matchedWeights += cand.weight
+                    }
+                }
+                if (matchedItems.isNotEmpty()) {
+                    if (!musicEnabled) {
+                        return EdgeMusicResolution.DisabledByUser(edge)
+                    }
+                    val selectedInPool = selectedRef?.let { ref ->
+                        matchedItems.firstOrNull {
+                            it.track.key == ref ||
+                                it.track.primary.sha256.equals(ref, ignoreCase = true) ||
+                                it.jukeboxCode?.equals(ref, ignoreCase = true) == true
+                        }
+                    }
+                    if (selectedInPool == null && allowCustomSubstitute && !selectedRef.isNullOrBlank()) {
+                        val sub = matchJukeboxItem(selectedRef, installedJukebox, isJukeboxReadable)
+                            ?: return EdgeMusicResolution.SubstituteMissing(edge, selectedRef)
+                        return EdgeMusicResolution.CustomSubstitute(edge, sub)
+                    }
+                    return EdgeMusicResolution.KnownPoolComplete(
+                        edge = edge,
+                        candidates = matchedItems,
+                        selectedOverride = selectedInPool,
+                        candidateTiers = matchedTiers,
+                        candidateWeights = matchedWeights,
+                        ruleModeUsed = effectiveRuleMode,
+                    )
+                }
+            }
         }
 
         if (!musicEnabled) {

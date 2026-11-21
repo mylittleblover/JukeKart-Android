@@ -12,9 +12,9 @@ android {
         applicationId = "com.mylittleblover.mkwplayer"
         minSdk = 26
         targetSdk = 35
-        // MINF sample timelines, actual Native state, and Rainbow's complete regional graph.
-        versionCode = 19
-        versionName = "0.1.0-alpha19"
+        // Alpha 25: Sleep timer, interactive scheduled transition/stop timer, playback speed & pitch control, A-B loop repeat, 5-band parametric EQ + presets + bass boost + loudness gain + limiter, full JSON backup/restore & M3U export, queue/playlist drag-to-reorder & swipe gestures, track sorting, play count badges, Smart Playlists (Most Played & Favorites Mix), home screen widget & QS tile, and optional live FFT visualizer.
+        versionCode = 25
+        versionName = "0.1.0-alpha25"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

@@ -28,6 +28,7 @@ internal data class CustomRoute(
     val loopWholeRoute: Boolean = false,
     val updatedAtEpochMs: Long = 0L,
     val lastUsedEpochMs: Long = 0L,
+    val roadRuleMode: RoadJukeboxCatalog.RoadMusicRuleMode = RoadJukeboxCatalog.RoadMusicRuleMode.AUTO,
 ) {
     fun edgeFor(index: Int): CustomRouteEdgeConfig? = edges.getOrNull(index)
 
@@ -68,6 +69,7 @@ internal class CustomRouteStore(private val file: File) {
         edges: List<CustomRouteEdgeConfig>,
         connections: StageConnections.Catalog,
         loopWholeRoute: Boolean = false,
+        roadRuleMode: RoadJukeboxCatalog.RoadMusicRuleMode = RoadJukeboxCatalog.RoadMusicRuleMode.AUTO,
         nowEpochMs: Long = System.currentTimeMillis(),
     ): Result<CustomRoute> {
         val createdId = UUID.randomUUID().toString()
@@ -85,6 +87,7 @@ internal class CustomRouteStore(private val file: File) {
                 loopWholeRoute = loopWholeRoute,
                 updatedAtEpochMs = nowEpochMs,
                 lastUsedEpochMs = nowEpochMs,
+                roadRuleMode = roadRuleMode,
             )
             listOf(route) + current
         }.map { list -> list.first { it.id == createdId } }
@@ -98,6 +101,7 @@ internal class CustomRouteStore(private val file: File) {
         draftEdges: List<CustomRouteEdgeConfig>,
         connections: StageConnections.Catalog,
         loopWholeRoute: Boolean,
+        roadRuleMode: RoadJukeboxCatalog.RoadMusicRuleMode? = null,
         nowEpochMs: Long = System.currentTimeMillis(),
     ): Result<CustomRoute> = update { current ->
         val existing = current.firstOrNull { it.id == existingId }
@@ -119,6 +123,7 @@ internal class CustomRouteStore(private val file: File) {
             edges = normalizedEdges,
             loopWholeRoute = loopWholeRoute,
             updatedAtEpochMs = nowEpochMs,
+            roadRuleMode = roadRuleMode ?: existing.roadRuleMode,
         )
         current.map { if (it.id == existingId) updated else it }
     }.map { list -> list.first { it.id == existingId } }
@@ -268,6 +273,16 @@ internal class CustomRouteStore(private val file: File) {
         }
     }
 
+    fun setRoadRuleMode(
+        id: String,
+        mode: RoadJukeboxCatalog.RoadMusicRuleMode,
+        nowEpochMs: Long = System.currentTimeMillis(),
+    ): Result<List<CustomRoute>> = update { current ->
+        current.map { route ->
+            if (route.id != id) route else route.copy(roadRuleMode = mode, updatedAtEpochMs = nowEpochMs)
+        }
+    }
+
     fun rename(
         id: String,
         name: String,
@@ -296,6 +311,54 @@ internal class CustomRouteStore(private val file: File) {
                 stops = route.stops.map { s -> if (s.presetId == presetId) s.copy(presetId = null) else s },
             )
         }
+    }
+
+    fun replaceAll(routes: List<CustomRoute>): Result<List<CustomRoute>> = update {
+        normalizeImportedRoutes(routes)
+    }
+
+    fun mergeAll(incoming: List<CustomRoute>): Result<List<CustomRoute>> = update { current ->
+        val byId = LinkedHashMap<String, CustomRoute>()
+        current.forEach { byId[it.id] = it }
+        normalizeImportedRoutes(incoming).forEach { route ->
+            val existing = byId[route.id]
+            if (existing == null || route.updatedAtEpochMs >= existing.updatedAtEpochMs) {
+                byId[route.id] = route
+            }
+        }
+        byId.values.toList()
+    }
+
+    private fun normalizeImportedRoutes(routes: List<CustomRoute>): List<CustomRoute> {
+        val out = LinkedHashMap<String, CustomRoute>()
+        routes.forEach { raw ->
+            val cleanName = raw.name.trim().take(120)
+            if (cleanName.isEmpty() || raw.stops.size < 2) return@forEach
+            val stops = raw.stops.mapNotNull { stop ->
+                val code = stop.stageCode.trim().removeSuffix("_00")
+                if (code.isEmpty()) null else CustomRouteStop(code, stop.presetId?.takeIf { it.isNotBlank() })
+            }
+            if (stops.size < 2) return@forEach
+            val edges = (0 until stops.lastIndex).map { idx ->
+                val from = stops[idx].stageCode
+                val to = stops[idx + 1].stageCode
+                val cfg = raw.edges.getOrNull(idx)
+                CustomRouteEdgeConfig(
+                    from = from,
+                    to = to,
+                    musicEnabled = cfg?.musicEnabled ?: true,
+                    selectedJukeboxKey = cfg?.selectedJukeboxKey?.takeIf { it.isNotBlank() },
+                )
+            }
+            val cleanId = raw.id.trim().ifEmpty { UUID.randomUUID().toString() }
+            out[cleanId] = raw.copy(
+                id = cleanId,
+                name = cleanName,
+                stops = stops,
+                edges = edges,
+            )
+        }
+        return out.values.toList()
     }
 
     private fun validateTopologyAndEdges(
@@ -373,6 +436,7 @@ internal class CustomRouteStore(private val file: File) {
             .put("loopWholeRoute", route.loopWholeRoute)
             .put("updatedAtEpochMs", route.updatedAtEpochMs)
             .put("lastUsedEpochMs", route.lastUsedEpochMs)
+            .put("roadRuleMode", route.roadRuleMode.name)
     }
 
     private fun decodeRoute(obj: JSONObject): CustomRoute {
@@ -404,6 +468,7 @@ internal class CustomRouteStore(private val file: File) {
             loopWholeRoute = obj.optBoolean("loopWholeRoute", false),
             updatedAtEpochMs = obj.optLong("updatedAtEpochMs", 0L),
             lastUsedEpochMs = obj.optLong("lastUsedEpochMs", 0L),
+            roadRuleMode = RoadJukeboxCatalog.RoadMusicRuleMode.fromStored(obj.optString("roadRuleMode", "")),
         )
     }
 

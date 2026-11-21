@@ -23,6 +23,7 @@ internal data class InteractivePlaybackPlan(
     val advanceViaOutro: Set<Int> = emptySet(),
     val customInitialSegments: List<Int> = emptyList(),
     val overlayTrackIndices: List<Int> = emptyList(),
+    val overlayDefaultEnabled: Boolean = false,
 ) {
     data class Version(val number: Int,val main: Int,val fast: Int?)
 
@@ -46,13 +47,60 @@ internal data class InteractivePlaybackPlan(
         return copy(entry = match)
     }
 
+    data class Options(
+        val segmentSwitchFadeOutMs: Int = 0,
+        val perfectBeatEnabled: Boolean = false,
+        val allowPreludeToFast: Boolean = false,
+    )
+
     /** Authored Outro markers lead into the next looping prelude without another user event. */
     val automaticNext: Map<Int,Int> get()=outros.values.mapNotNull { from -> next[from]?.let { from to it } }.toMap()+entryAutomaticNext
     companion object {
-        fun normal(flow: StageFlow,bytes: Map<String,ByteArray>,catalog: MinfCatalog): InteractivePlaybackPlan {
-            val prepared=MinfInteractiveCompiler.prepare(flow,flow.parts.associate { part ->
+        internal fun applySegmentSwitchFadeOut(spec: G.Spec, fadeOutMs: Int): G.Spec {
+            if (fadeOutMs <= 0) return spec
+            val fadeBeats = (fadeOutMs.coerceAtMost(30_000) / 1000.0) * spec.bpm / 60.0
+            if (fadeBeats <= 0.0) return spec
+            return spec.copy(
+                transitions = spec.transitions.map { rule ->
+                    if (rule.fadeOut.beats > 0.0 || rule.fadeOut.offset != 0.0) {
+                        rule
+                    } else {
+                        rule.copy(
+                            postExit = true,
+                            fadeOut = G.Fade(beats = fadeBeats, offset = 0.0, shape = G.Shape.Linear),
+                        )
+                    }
+                },
+            )
+        }
+
+        internal fun applySwitchFadeToPlan(plan: InteractivePlaybackPlan, fadeOutMs: Int): InteractivePlaybackPlan {
+            if (fadeOutMs <= 0) return plan
+            val updatedSpec = applySegmentSwitchFadeOut(plan.spec, fadeOutMs)
+            val updatedPacket = G.build(updatedSpec)
+            return plan.copy(
+                spec = updatedSpec,
+                packet = updatedPacket,
+                standard = plan.standard?.copy(packet = updatedPacket),
+            )
+        }
+
+        fun normal(
+            flow: StageFlow,
+            bytes: Map<String,ByteArray>,
+            catalog: MinfCatalog,
+            options: Options = Options(),
+        ): InteractivePlaybackPlan {
+            val digests = flow.parts.associate { part ->
                 part.fileName to MessageDigest.getInstance("SHA-256").digest(bytes.getValue(part.fileName))
-            },catalog)
+            }
+            val prepared=MinfInteractiveCompiler.prepare(
+                flow = flow,
+                digests = digests,
+                catalog = catalog,
+                allowPreludeToFast = options.allowPreludeToFast,
+                includeBeat1Cues = options.perfectBeatEnabled,
+            )
             val compiled=prepared.compiled
             val roles=compiled.segmentByRole
             val main=roles.getValue(StageFlow.Role.Main)
@@ -78,30 +126,52 @@ internal data class InteractivePlaybackPlan(
             val base=InteractivePlaybackPlan(flow.name,prepared.spec,compiled.packet,compiled.assetPaths,entry,next,
                 compiled.segmentByOutro,roles[StageFlow.Role.Fast],labels,compiled,
                 streamed=true,preparedAssets=preparedAssets,entryPreparedAssets=entryPreparedAssets)
-            val enriched = FinalLapFanfareCompiler.extend(
-                DonkeyRegionCompiler.extend(FullVersionCompiler.extend(base,flow,bytes,catalog),flow,bytes,catalog),bytes)
-            return DirectBridgeCompiler.normal(enriched, flow, catalog)
+            val regionExtended = DonkeyRegionCompiler.extend(FullVersionCompiler.extend(base,flow,bytes,catalog),flow,bytes,catalog)
+            val fanfared = FinalLapFanfareCompiler.extend(regionExtended, bytes, perfectBeatEnabled = options.perfectBeatEnabled)
+            val bridged = DirectBridgeCompiler.normal(fanfared, flow, catalog)
+            return applySwitchFadeToPlan(bridged, options.segmentSwitchFadeOutMs)
         }
-        fun rainbow(bytes: Map<String,ByteArray>,catalog: MinfCatalog): InteractivePlaybackPlan {
+        fun rainbow(
+            bytes: Map<String,ByteArray>,
+            catalog: MinfCatalog,
+            options: Options = Options(),
+        ): InteractivePlaybackPlan {
             val sources=RainbowInteractiveCompiler.roles.map { role ->
                 val name="BGM_Rainbow_$role.bwav";val data=bytes[name] ?: error("Missing $name")
                 val info=(BwavHeader.read(data) as? BwavHeader.Result.Ok)?.info ?: error("Unreadable $name")
                 RainbowInteractiveCompiler.Source(name,info.sampleRate,info.channels,info.frames.toLong(),
                     info.loopStart?.toLong(),info.loopEnd?.toLong(),MessageDigest.getInstance("SHA-256").digest(data))
             }
-            val p=RainbowInteractiveCompiler.prepare(sources,catalog)
+            val p=RainbowInteractiveCompiler.prepare(
+                sources = sources,
+                catalog = catalog,
+                allowPreludeToFast = options.allowPreludeToFast,
+                perfectBeatEnabled = options.perfectBeatEnabled,
+            )
             val pairs=listOf("Area1_Pre" to "Area1","Area1" to "Area2","Area3_Pre" to "Area3",
                 "Area3" to "Final_Pre","Final_Pre" to "Final","FinalLapFanfare" to "Final")+
                 (0..4).map { "Area2_Outro%02d".format(it) to "Area3_Pre" }
+            val area1SegId = p.segments.getValue("Area1")
+            val melodyAssetIdx = RainbowInteractiveCompiler.roles.indexOf("Area1_Melody")
+            val melodyTrackIds = p.spec.tracks
+                .filter { it.segment == area1SegId && it.clips.any { clip -> clip.asset == melodyAssetIdx } }
+                .map { it.index }
+            val fastId = if (options.allowPreludeToFast) p.segments.getValue("Final") else null
             val base = InteractivePlaybackPlan("Rainbow",p.spec,p.packet,p.assets.map { it.fileName },p.segments.getValue("Area1_Pre"),
                 pairs.associate { p.segments.getValue(it.first) to p.segments.getValue(it.second) },
-                (0..4).associateWith { p.segments.getValue("Area2_Outro%02d".format(it)) },null,
+                (0..4).associateWith { p.segments.getValue("Area2_Outro%02d".format(it)) },fastId,
                 p.segments.entries.associate { it.value to it.key },streamed=true,
                 // The waiting prelude repeats while the bridge and layered main arrange their next entry.
                 // Keep this loop resident so the decode worker cannot interrupt it at a page or loop boundary.
-                entryPreparedAssets=mapOf(p.segments.getValue("Area1_Pre") to setOf("BGM_Rainbow_Area1_Pre.bwav")),
-                advanceViaOutro=setOf(p.segments.getValue("Area2")))
-            return DirectBridgeCompiler.rainbow(base, catalog)
+                preparedAssets=setOf("BGM_Rainbow_FinalLapFanfare.bwav"),
+                entryPreparedAssets=mapOf(
+                    p.segments.getValue("Area1_Pre") to setOf("BGM_Rainbow_Area1_Pre.bwav","BGM_Rainbow_FinalLapFanfare.bwav"),
+                    p.segments.getValue("Area3_Pre") to setOf("BGM_Rainbow_Area3_Pre.bwav","BGM_Rainbow_FinalLapFanfare.bwav"),
+                ),
+                advanceViaOutro=setOf(p.segments.getValue("Area2")),
+                overlayTrackIndices=melodyTrackIds,
+                overlayDefaultEnabled=true)
+            return applySwitchFadeToPlan(DirectBridgeCompiler.rainbow(base, catalog), options.segmentSwitchFadeOutMs)
         }
     }
 }

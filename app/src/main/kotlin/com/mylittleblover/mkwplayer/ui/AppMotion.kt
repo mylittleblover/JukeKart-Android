@@ -5,6 +5,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.interaction.InteractionSource
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
@@ -17,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -91,13 +93,23 @@ internal fun rememberPressScale(
     interactionSource: InteractionSource,
     pressedScale: Float = 0.97f,
 ): Float {
+    val reduceMotion = rememberReducedMotion()
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (pressed) pressedScale else 1f,
+        targetValue = if (pressed && !reduceMotion) pressedScale else 1f,
         animationSpec = AppMotion.pressSpring,
         label = "press-scale",
     )
     return scale
+}
+
+@Composable
+internal fun rememberPressScale(
+    pressedScale: Float = 0.97f,
+): Pair<Modifier, MutableInteractionSource> {
+    val interactionSource = remember { MutableInteractionSource() }
+    val scale = rememberPressScale(interactionSource = interactionSource, pressedScale = pressedScale)
+    return Modifier.graphicsLayer { scaleX = scale; scaleY = scale } to interactionSource
 }
 
 @Composable

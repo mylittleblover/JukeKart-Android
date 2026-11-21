@@ -6,31 +6,23 @@
       "index": 1,
       "courseCode": "FirstCircuit",
       "variant": "medley",
-      "totalFrames": 8378175,
-      "durationMs": 174545,
+      "totalFrames": 7779733,
+      "durationMs": 162078,
       "measuredResidualRms": 0.00011,
       "gFullOffline": 5.641574,
       "gPreShortOffline": 5.046699,
       "clips": [
         {
-          "stem": "BGM_Stage_FirstCircuit_Pre_Short",
+          "stem": "BGM_Stage_FirstCircuit_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 672468,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_FirstCircuit_Pre",
-          "start": 672468,
-          "sourceOffset": 74026,
-          "sourceLength": 2544153,
+          "sourceLength": 2618179,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_FirstCircuit_Bridge",
-          "start": 3216621,
+          "start": 2618179,
           "sourceOffset": 0,
           "sourceLength": 40219,
           "fadeIn": 0,
@@ -38,7 +30,7 @@
         },
         {
           "stem": "BGM_Stage_FirstCircuit",
-          "start": 3207232,
+          "start": 2608790,
           "sourceOffset": 0,
           "sourceLength": 2851984,
           "fadeIn": 0,
@@ -46,7 +38,7 @@
         },
         {
           "stem": "BGM_Stage_FirstCircuit",
-          "start": 6059216,
+          "start": 5460774,
           "sourceOffset": 233805,
           "sourceLength": 2150647,
           "fadeIn": 0,
@@ -54,7 +46,7 @@
         },
         {
           "stem": "BGM_Stage_FirstCircuit_Outro04",
-          "start": 8209863,
+          "start": 7611421,
           "sourceOffset": 0,
           "sourceLength": 168312,
           "fadeIn": 0,
@@ -66,31 +58,23 @@
       "index": 2,
       "courseCode": "WestCity",
       "variant": "medley",
-      "totalFrames": 9280434,
-      "durationMs": 193342,
+      "totalFrames": 8560434,
+      "durationMs": 178342,
       "measuredResidualRms": 0.203843,
       "gFullOffline": 5.760392,
       "gPreShortOffline": 5.121684,
       "clips": [
         {
-          "stem": "BGM_Stage_WestCity_Pre_Short",
+          "stem": "BGM_Stage_WestCity_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 777198,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_WestCity_Pre",
-          "start": 777198,
-          "sourceOffset": 57198,
-          "sourceLength": 2879755,
+          "sourceLength": 2936953,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_WestCity_Bridge",
-          "start": 3607032,
+          "start": 2887032,
           "sourceOffset": 0,
           "sourceLength": 79266,
           "fadeIn": 0,
@@ -98,7 +82,7 @@
         },
         {
           "stem": "BGM_Stage_WestCity",
-          "start": 3651329,
+          "start": 2931329,
           "sourceOffset": 0,
           "sourceLength": 3245625,
           "fadeIn": 0,
@@ -106,7 +90,7 @@
         },
         {
           "stem": "BGM_Stage_WestCity",
-          "start": 6896954,
+          "start": 6176954,
           "sourceOffset": 725625,
           "sourceLength": 2160000,
           "fadeIn": 0,
@@ -114,7 +98,7 @@
         },
         {
           "stem": "BGM_Stage_WestCity_Outro00",
-          "start": 9056954,
+          "start": 8336954,
           "sourceOffset": 0,
           "sourceLength": 223480,
           "fadeIn": 0,
@@ -126,31 +110,23 @@
       "index": 3,
       "courseCode": "Coaster",
       "variant": "medley",
-      "totalFrames": 8948563,
-      "durationMs": 186428,
+      "totalFrames": 8619420,
+      "durationMs": 179571,
       "measuredResidualRms": 0.00039,
       "gFullOffline": 5.095866,
       "gPreShortOffline": 4.558652,
       "clips": [
         {
-          "stem": "BGM_Stage_Coaster_Pre_Short",
+          "stem": "BGM_Stage_Coaster_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 369085,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_Coaster_Pre",
-          "start": 369085,
-          "sourceOffset": 39942,
-          "sourceLength": 2305198,
+          "sourceLength": 2345140,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_Coaster_Bridge",
-          "start": 2653712,
+          "start": 2324569,
           "sourceOffset": 0,
           "sourceLength": 88320,
           "fadeIn": 0,
@@ -158,7 +134,7 @@
         },
         {
           "stem": "BGM_Stage_Coaster",
-          "start": 2674283,
+          "start": 2345140,
           "sourceOffset": 0,
           "sourceLength": 3373711,
           "fadeIn": 0,
@@ -166,7 +142,7 @@
         },
         {
           "stem": "BGM_Stage_Coaster",
-          "start": 6047994,
+          "start": 5718851,
           "sourceOffset": 493714,
           "sourceLength": 2612569,
           "fadeIn": 0,
@@ -174,7 +150,7 @@
         },
         {
           "stem": "BGM_Stage_Coaster_Outro05",
-          "start": 8660563,
+          "start": 8331420,
           "sourceOffset": 0,
           "sourceLength": 288000,
           "fadeIn": 0,
@@ -186,31 +162,23 @@
       "index": 4,
       "courseCode": "DonkeyKong",
       "variant": "medley",
-      "totalFrames": 10855789,
-      "durationMs": 226162,
+      "totalFrames": 10326134,
+      "durationMs": 215128,
       "measuredResidualRms": 0.075394,
       "gFullOffline": 5.512808,
       "gPreShortOffline": 4.9342,
       "clips": [
         {
-          "stem": "BGM_Stage_DonkeyKong_Pre_Short",
+          "stem": "BGM_Stage_DonkeyKong_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 604171,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_DonkeyKong_Pre",
-          "start": 604171,
-          "sourceOffset": 74516,
-          "sourceLength": 2118583,
+          "sourceLength": 2193099,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_DonkeyKong",
-          "start": 2722754,
+          "start": 2193099,
           "sourceOffset": 0,
           "sourceLength": 2780684,
           "fadeIn": 0,
@@ -218,7 +186,7 @@
         },
         {
           "stem": "BGM_Stage_DonkeyKong_Pattern2",
-          "start": 5503438,
+          "start": 4973783,
           "sourceOffset": 0,
           "sourceLength": 993102,
           "fadeIn": 0,
@@ -226,7 +194,7 @@
         },
         {
           "stem": "BGM_Stage_DonkeyKong_Pattern2",
-          "start": 6496540,
+          "start": 5966885,
           "sourceOffset": 463447,
           "sourceLength": 132414,
           "fadeIn": 0,
@@ -234,7 +202,7 @@
         },
         {
           "stem": "BGM_Stage_DonkeyKong_Pattern3",
-          "start": 6628954,
+          "start": 6099299,
           "sourceOffset": 0,
           "sourceLength": 1059308,
           "fadeIn": 0,
@@ -242,7 +210,7 @@
         },
         {
           "stem": "BGM_Stage_DonkeyKong_Pattern4",
-          "start": 7688262,
+          "start": 7158607,
           "sourceOffset": 0,
           "sourceLength": 1059308,
           "fadeIn": 0,
@@ -250,7 +218,7 @@
         },
         {
           "stem": "BGM_Stage_DonkeyKong_Pattern5",
-          "start": 8747570,
+          "start": 8217915,
           "sourceOffset": 0,
           "sourceLength": 1059308,
           "fadeIn": 0,
@@ -258,7 +226,7 @@
         },
         {
           "stem": "BGM_Stage_DonkeyKong_Fast",
-          "start": 9806878,
+          "start": 9277223,
           "sourceOffset": 0,
           "sourceLength": 482513,
           "fadeIn": 0,
@@ -266,7 +234,7 @@
         },
         {
           "stem": "BGM_Stage_DonkeyKong_Fast",
-          "start": 10289391,
+          "start": 9759736,
           "sourceOffset": 120628,
           "sourceLength": 301570,
           "fadeIn": 0,
@@ -274,7 +242,7 @@
         },
         {
           "stem": "BGM_Stage_DonkeyKong_Outro01",
-          "start": 10590961,
+          "start": 10061306,
           "sourceOffset": 0,
           "sourceLength": 264828,
           "fadeIn": 0,
@@ -286,31 +254,23 @@
       "index": 5,
       "courseCode": "DonkeyKong",
       "variant": "knockout",
-      "totalFrames": 8681365,
-      "durationMs": 180862,
+      "totalFrames": 8151710,
+      "durationMs": 169827,
       "measuredResidualRms": 0.000714,
       "gFullOffline": 6.565231,
       "gPreShortOffline": 5.871911,
       "clips": [
         {
-          "stem": "BGM_Stage_DonkeyKong_Pre_Short",
+          "stem": "BGM_Stage_DonkeyKong_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 604171,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_DonkeyKong_Pre",
-          "start": 604171,
-          "sourceOffset": 74516,
-          "sourceLength": 2118583,
+          "sourceLength": 2193099,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_DonkeyKong",
-          "start": 2722754,
+          "start": 2193099,
           "sourceOffset": 0,
           "sourceLength": 2979305,
           "fadeIn": 0,
@@ -318,7 +278,7 @@
         },
         {
           "stem": "BGM_Stage_DonkeyKong",
-          "start": 5702059,
+          "start": 5172404,
           "sourceOffset": 331034,
           "sourceLength": 2366892,
           "fadeIn": 0,
@@ -326,7 +286,7 @@
         },
         {
           "stem": "BGM_Stage_DonkeyKong_Outro00",
-          "start": 8068951,
+          "start": 7539296,
           "sourceOffset": 0,
           "sourceLength": 612414,
           "fadeIn": 0,
@@ -338,31 +298,23 @@
       "index": 6,
       "courseCode": "DesertHills",
       "variant": "medley",
-      "totalFrames": 8241224,
-      "durationMs": 171692,
+      "totalFrames": 7532301,
+      "durationMs": 156923,
       "measuredResidualRms": 0.000698,
       "gFullOffline": 5.72137,
       "gPreShortOffline": 5.117562,
       "clips": [
         {
-          "stem": "BGM_Stage_DesertHills_Pre_Short",
+          "stem": "BGM_Stage_DesertHills_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 795955,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_DesertHills_Pre",
-          "start": 795955,
-          "sourceOffset": 87032,
-          "sourceLength": 1419428,
+          "sourceLength": 1506460,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_DesertHills_Bridge",
-          "start": 2215383,
+          "start": 1506460,
           "sourceOffset": 0,
           "sourceLength": 44308,
           "fadeIn": 0,
@@ -370,7 +322,7 @@
         },
         {
           "stem": "BGM_Stage_DesertHills",
-          "start": 2215383,
+          "start": 1506460,
           "sourceOffset": 0,
           "sourceLength": 3190151,
           "fadeIn": 0,
@@ -378,7 +330,7 @@
         },
         {
           "stem": "BGM_Stage_DesertHills",
-          "start": 5405534,
+          "start": 4696611,
           "sourceOffset": 265846,
           "sourceLength": 2547690,
           "fadeIn": 0,
@@ -386,7 +338,7 @@
         },
         {
           "stem": "BGM_Stage_DesertHills_Outro00",
-          "start": 7953224,
+          "start": 7244301,
           "sourceOffset": 0,
           "sourceLength": 288000,
           "fadeIn": 0,
@@ -398,31 +350,23 @@
       "index": 7,
       "courseCode": "ShyGuyBazaar",
       "variant": "medley",
-      "totalFrames": 8537139,
-      "durationMs": 177857,
+      "totalFrames": 8125711,
+      "durationMs": 169286,
       "measuredResidualRms": 9.4e-05,
       "gFullOffline": 5.620479,
       "gPreShortOffline": 5.027179,
       "clips": [
         {
-          "stem": "BGM_Stage_ShyGuyBazaar_Pre_Short",
+          "stem": "BGM_Stage_ShyGuyBazaar_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 513482,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_ShyGuyBazaar_Pre",
-          "start": 513482,
-          "sourceOffset": 102054,
-          "sourceLength": 1646516,
+          "sourceLength": 1748570,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_ShyGuyBazaar",
-          "start": 2159998,
+          "start": 1748570,
           "sourceOffset": 0,
           "sourceLength": 3272338,
           "fadeIn": 0,
@@ -430,7 +374,7 @@
         },
         {
           "stem": "BGM_Stage_ShyGuyBazaar",
-          "start": 5432336,
+          "start": 5020908,
           "sourceOffset": 289481,
           "sourceLength": 2770517,
           "fadeIn": 0,
@@ -438,7 +382,7 @@
         },
         {
           "stem": "BGM_Stage_ShyGuyBazaar_Outro00",
-          "start": 8202853,
+          "start": 7791425,
           "sourceOffset": 0,
           "sourceLength": 334286,
           "fadeIn": 0,
@@ -450,31 +394,23 @@
       "index": 8,
       "courseCode": "WarioStadium",
       "variant": "medley",
-      "totalFrames": 10600705,
-      "durationMs": 220848,
+      "totalFrames": 9942419,
+      "durationMs": 207134,
       "measuredResidualRms": 0.000791,
       "gFullOffline": 6.286778,
       "gPreShortOffline": 5.623464,
       "clips": [
         {
-          "stem": "BGM_Stage_WarioStadium_Pre_Short",
+          "stem": "BGM_Stage_WarioStadium_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 746712,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_WarioStadium_Pre",
-          "start": 746712,
-          "sourceOffset": 88426,
-          "sourceLength": 2633428,
+          "sourceLength": 2721854,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_WarioStadium",
-          "start": 3359569,
+          "start": 2701283,
           "sourceOffset": 0,
           "sourceLength": 3887996,
           "fadeIn": 0,
@@ -482,7 +418,7 @@
         },
         {
           "stem": "BGM_Stage_WarioStadium",
-          "start": 7247565,
+          "start": 6589279,
           "sourceOffset": 432000,
           "sourceLength": 3167996,
           "fadeIn": 0,
@@ -490,7 +426,7 @@
         },
         {
           "stem": "BGM_Stage_WarioStadium_Outro00",
-          "start": 10415561,
+          "start": 9757275,
           "sourceOffset": 0,
           "sourceLength": 185144,
           "fadeIn": 0,
@@ -502,31 +438,23 @@
       "index": 9,
       "courseCode": "AirshipFortress",
       "variant": "medley",
-      "totalFrames": 10012801,
-      "durationMs": 208600,
+      "totalFrames": 9398401,
+      "durationMs": 195800,
       "measuredResidualRms": 0.005841,
       "gFullOffline": 7.19522,
       "gPreShortOffline": 6.395275,
       "clips": [
         {
-          "stem": "BGM_Stage_AirshipFortress_Pre_Short",
+          "stem": "BGM_Stage_AirshipFortress_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 624144,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_AirshipFortress_Pre",
-          "start": 624144,
-          "sourceOffset": 9744,
-          "sourceLength": 2457456,
+          "sourceLength": 2467200,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_AirshipFortress_Bridge",
-          "start": 3081600,
+          "start": 2467200,
           "sourceOffset": 0,
           "sourceLength": 102700,
           "fadeIn": 0,
@@ -534,7 +462,7 @@
         },
         {
           "stem": "BGM_Stage_AirshipFortress",
-          "start": 3081600,
+          "start": 2467200,
           "sourceOffset": 0,
           "sourceLength": 3916800,
           "fadeIn": 0,
@@ -542,7 +470,7 @@
         },
         {
           "stem": "BGM_Stage_AirshipFortress",
-          "start": 6998400,
+          "start": 6384000,
           "sourceOffset": 307200,
           "sourceLength": 2683200,
           "fadeIn": 0,
@@ -550,7 +478,7 @@
         },
         {
           "stem": "BGM_Stage_AirshipFortress_Outro05",
-          "start": 9681600,
+          "start": 9067200,
           "sourceOffset": 0,
           "sourceLength": 331201,
           "fadeIn": 0,
@@ -562,31 +490,23 @@
       "index": 10,
       "courseCode": "DKPass",
       "variant": "medley",
-      "totalFrames": 8148296,
-      "durationMs": 169756,
+      "totalFrames": 7399027,
+      "durationMs": 154146,
       "measuredResidualRms": 0.038174,
       "gFullOffline": 6.059206,
       "gPreShortOffline": 5.387092,
       "clips": [
         {
-          "stem": "BGM_Stage_DKPass_Pre_Short",
+          "stem": "BGM_Stage_DKPass_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 796098,
+          "sourceLength": 1639025,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_DKPass_Pre",
-          "start": 796098,
-          "sourceOffset": 46829,
-          "sourceLength": 1592196,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_DKPass_Pre",
-          "start": 2388294,
+          "start": 1639025,
           "sourceOffset": 140488,
           "sourceLength": 93658,
           "fadeIn": 0,
@@ -594,7 +514,7 @@
         },
         {
           "stem": "BGM_Stage_DKPass_Bridge",
-          "start": 2481952,
+          "start": 1732683,
           "sourceOffset": 0,
           "sourceLength": 146850,
           "fadeIn": 0,
@@ -602,7 +522,7 @@
         },
         {
           "stem": "BGM_Stage_DKPass",
-          "start": 2522928,
+          "start": 1773659,
           "sourceOffset": 0,
           "sourceLength": 3002928,
           "fadeIn": 0,
@@ -610,7 +530,7 @@
         },
         {
           "stem": "BGM_Stage_DKPass",
-          "start": 5525856,
+          "start": 4776587,
           "sourceOffset": 380488,
           "sourceLength": 2154147,
           "fadeIn": 0,
@@ -618,7 +538,7 @@
         },
         {
           "stem": "BGM_Stage_DKPass_Outro06",
-          "start": 7680003,
+          "start": 6930734,
           "sourceOffset": 0,
           "sourceLength": 468293,
           "fadeIn": 0,
@@ -630,31 +550,23 @@
       "index": 11,
       "courseCode": "SnowMountain",
       "variant": "medley",
-      "totalFrames": 8267290,
-      "durationMs": 172235,
+      "totalFrames": 7725173,
+      "durationMs": 160941,
       "measuredResidualRms": 0.00016,
       "gFullOffline": 8.380115,
       "gPreShortOffline": 7.446405,
       "clips": [
         {
-          "stem": "BGM_Stage_SnowMountain_Pre_Short",
+          "stem": "BGM_Stage_SnowMountain_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 609882,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_SnowMountain_Pre",
-          "start": 609882,
-          "sourceOffset": 67765,
-          "sourceLength": 2168469,
+          "sourceLength": 2236234,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_SnowMountain",
-          "start": 2778351,
+          "start": 2236234,
           "sourceOffset": 0,
           "sourceLength": 2575057,
           "fadeIn": 0,
@@ -662,7 +574,7 @@
         },
         {
           "stem": "BGM_Stage_SnowMountain_Pattern2",
-          "start": 5353408,
+          "start": 4811291,
           "sourceOffset": 2575057,
           "sourceLength": 271059,
           "fadeIn": 0,
@@ -670,7 +582,7 @@
         },
         {
           "stem": "BGM_Stage_SnowMountain_Pattern2",
-          "start": 5624467,
+          "start": 5082350,
           "sourceOffset": 406588,
           "sourceLength": 2168470,
           "fadeIn": 0,
@@ -678,7 +590,7 @@
         },
         {
           "stem": "BGM_Stage_SnowMountain_Outro01",
-          "start": 7792937,
+          "start": 7250820,
           "sourceOffset": 0,
           "sourceLength": 474353,
           "fadeIn": 0,
@@ -690,39 +602,23 @@
       "index": 12,
       "courseCode": "IceBuildings",
       "variant": "medley",
-      "totalFrames": 9017119,
-      "durationMs": 187857,
+      "totalFrames": 8468552,
+      "durationMs": 176428,
       "measuredResidualRms": 0.000358,
       "gFullOffline": 4.24764,
       "gPreShortOffline": 3.776864,
       "clips": [
         {
-          "stem": "BGM_Stage_IceBuildings_Pre_Short",
+          "stem": "BGM_Stage_IceBuildings_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 582879,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_IceBuildings_Pre",
-          "start": 582879,
-          "sourceOffset": 2228593,
-          "sourceLength": 205687,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_IceBuildings_Pre",
-          "start": 788566,
-          "sourceOffset": 239999,
-          "sourceLength": 1988567,
+          "sourceLength": 2228566,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_IceBuildings_Bridge",
-          "start": 2777133,
+          "start": 2228566,
           "sourceOffset": 0,
           "sourceLength": 230880,
           "fadeIn": 0,
@@ -730,7 +626,7 @@
         },
         {
           "stem": "BGM_Stage_IceBuildings",
-          "start": 2845704,
+          "start": 2297137,
           "sourceOffset": 34286,
           "sourceLength": 3222849,
           "fadeIn": 0,
@@ -738,7 +634,7 @@
         },
         {
           "stem": "BGM_Stage_IceBuildings",
-          "start": 6068553,
+          "start": 5519986,
           "sourceOffset": 582856,
           "sourceLength": 2665708,
           "fadeIn": 0,
@@ -746,7 +642,7 @@
         },
         {
           "stem": "BGM_Stage_IceBuildings_Outro00",
-          "start": 8734261,
+          "start": 8185694,
           "sourceOffset": 0,
           "sourceLength": 282858,
           "fadeIn": 0,
@@ -758,31 +654,23 @@
       "index": 13,
       "courseCode": "WarioShipyard",
       "variant": "medley",
-      "totalFrames": 9322086,
-      "durationMs": 194210,
+      "totalFrames": 8715770,
+      "durationMs": 181579,
       "measuredResidualRms": 0.000708,
       "gFullOffline": 6.511719,
       "gPreShortOffline": 5.789202,
       "clips": [
         {
-          "stem": "BGM_Stage_WarioShipyard_Pre_Short",
+          "stem": "BGM_Stage_WarioShipyard_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 680998,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_WarioShipyard_Pre",
-          "start": 680998,
-          "sourceOffset": 74682,
-          "sourceLength": 2426365,
+          "sourceLength": 2501047,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_WarioShipyard_Bridge",
-          "start": 3107363,
+          "start": 2501047,
           "sourceOffset": 0,
           "sourceLength": 209132,
           "fadeIn": 0,
@@ -790,7 +678,7 @@
         },
         {
           "stem": "BGM_Stage_WarioShipyard",
-          "start": 3183152,
+          "start": 2576836,
           "sourceOffset": 0,
           "sourceLength": 3258940,
           "fadeIn": 0,
@@ -798,7 +686,7 @@
         },
         {
           "stem": "BGM_Stage_WarioShipyard",
-          "start": 6442092,
+          "start": 5835776,
           "sourceOffset": 530525,
           "sourceLength": 2652626,
           "fadeIn": 0,
@@ -806,7 +694,7 @@
         },
         {
           "stem": "BGM_Stage_WarioShipyard_Outro00",
-          "start": 9094718,
+          "start": 8488402,
           "sourceOffset": 0,
           "sourceLength": 227368,
           "fadeIn": 0,
@@ -818,39 +706,23 @@
       "index": 14,
       "courseCode": "KoopaTroopaBeach",
       "variant": "medley",
-      "totalFrames": 6179818,
-      "durationMs": 128746,
+      "totalFrames": 5436595,
+      "durationMs": 113262,
       "measuredResidualRms": 0.113219,
       "gFullOffline": 6.961392,
       "gPreShortOffline": 6.258932,
       "clips": [
         {
-          "stem": "BGM_Stage_KoopaTroopaBeach_Pre_Short",
+          "stem": "BGM_Stage_KoopaTroopaBeach_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 804788,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_KoopaTroopaBeach_Pre",
-          "start": 804788,
-          "sourceOffset": 1548014,
-          "sourceLength": 310047,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_KoopaTroopaBeach_Pre",
-          "start": 1114835,
-          "sourceOffset": 371612,
-          "sourceLength": 1161288,
+          "sourceLength": 1532900,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_KoopaTroopaBeach_Bridge",
-          "start": 2276123,
+          "start": 1532900,
           "sourceOffset": 0,
           "sourceLength": 196600,
           "fadeIn": 0,
@@ -858,7 +730,7 @@
         },
         {
           "stem": "BGM_Stage_KoopaTroopaBeach",
-          "start": 2299349,
+          "start": 1556126,
           "sourceOffset": 0,
           "sourceLength": 2206447,
           "fadeIn": 0,
@@ -866,7 +738,7 @@
         },
         {
           "stem": "BGM_Stage_KoopaTroopaBeach",
-          "start": 4505796,
+          "start": 3762573,
           "sourceOffset": 348386,
           "sourceLength": 1486449,
           "fadeIn": 0,
@@ -874,7 +746,7 @@
         },
         {
           "stem": "BGM_Stage_KoopaTroopaBeach_Outro00",
-          "start": 5992245,
+          "start": 5249022,
           "sourceOffset": 0,
           "sourceLength": 187573,
           "fadeIn": 0,
@@ -886,31 +758,23 @@
       "index": 15,
       "courseCode": "DKJungleParkway",
       "variant": "medley",
-      "totalFrames": 7975377,
-      "durationMs": 166154,
+      "totalFrames": 7384608,
+      "durationMs": 153846,
       "measuredResidualRms": 0.00215,
       "gFullOffline": 5.750874,
       "gPreShortOffline": 5.162742,
       "clips": [
         {
-          "stem": "BGM_Stage_DKJungleParkway_Pre_Short",
+          "stem": "BGM_Stage_DKJungleParkway_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 664425,
+          "sourceLength": 1329229,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_DKJungleParkway_Pre",
-          "start": 664425,
-          "sourceOffset": 73656,
-          "sourceLength": 1255573,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_DKJungleParkway_Pre",
-          "start": 1919998,
+          "start": 1329229,
           "sourceOffset": 147692,
           "sourceLength": 147692,
           "fadeIn": 0,
@@ -918,7 +782,7 @@
         },
         {
           "stem": "BGM_Stage_DKJungleParkway_Bridge",
-          "start": 2060767,
+          "start": 1469998,
           "sourceOffset": 0,
           "sourceLength": 192357,
           "fadeIn": 0,
@@ -926,7 +790,7 @@
         },
         {
           "stem": "BGM_Stage_DKJungleParkway",
-          "start": 2136267,
+          "start": 1545498,
           "sourceOffset": 0,
           "sourceLength": 3328343,
           "fadeIn": 0,
@@ -934,7 +798,7 @@
         },
         {
           "stem": "BGM_Stage_DKJungleParkway",
-          "start": 5464610,
+          "start": 4873841,
           "sourceOffset": 596038,
           "sourceLength": 2252305,
           "fadeIn": 0,
@@ -942,7 +806,7 @@
         },
         {
           "stem": "BGM_Stage_DKJungleParkway_Outro00",
-          "start": 7716915,
+          "start": 7126146,
           "sourceOffset": 0,
           "sourceLength": 258462,
           "fadeIn": 0,
@@ -954,39 +818,23 @@
       "index": 16,
       "courseCode": "Central",
       "variant": "medley",
-      "totalFrames": 8352000,
-      "durationMs": 174000,
+      "totalFrames": 7776000,
+      "durationMs": 162000,
       "measuredResidualRms": 6.8e-05,
       "gFullOffline": 7.299475,
       "gPreShortOffline": 6.526845,
       "clips": [
         {
-          "stem": "BGM_Stage_Central_Pre_Short",
+          "stem": "BGM_Stage_Central_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 432000,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_Central_Pre_Short",
-          "start": 432000,
-          "sourceOffset": 144000,
-          "sourceLength": 216000,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_Central_Pre",
-          "start": 648000,
-          "sourceOffset": 72000,
-          "sourceLength": 2016000,
+          "sourceLength": 2088000,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_Central_Bridge",
-          "start": 2646000,
+          "start": 2070000,
           "sourceOffset": 0,
           "sourceLength": 306000,
           "fadeIn": 0,
@@ -994,7 +842,7 @@
         },
         {
           "stem": "BGM_Stage_Central",
-          "start": 2734875,
+          "start": 2158875,
           "sourceOffset": 0,
           "sourceLength": 3097125,
           "fadeIn": 0,
@@ -1002,7 +850,7 @@
         },
         {
           "stem": "BGM_Stage_Central",
-          "start": 5832000,
+          "start": 5256000,
           "sourceOffset": 361125,
           "sourceLength": 2295000,
           "fadeIn": 0,
@@ -1010,7 +858,7 @@
         },
         {
           "stem": "BGM_Stage_Central_Outro03",
-          "start": 8127000,
+          "start": 7551000,
           "sourceOffset": 0,
           "sourceLength": 225000,
           "fadeIn": 0,
@@ -1022,31 +870,23 @@
       "index": 17,
       "courseCode": "PeachBeach",
       "variant": "medley",
-      "totalFrames": 10272635,
-      "durationMs": 214013,
+      "totalFrames": 9535355,
+      "durationMs": 198653,
       "measuredResidualRms": 0.0004,
       "gFullOffline": 6.715648,
       "gPreShortOffline": 6.005552,
       "clips": [
         {
-          "stem": "BGM_Stage_PeachBeach_Pre_Short",
+          "stem": "BGM_Stage_PeachBeach_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 872966,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_PeachBeach_Pre",
-          "start": 872966,
-          "sourceOffset": 135686,
-          "sourceLength": 2951673,
+          "sourceLength": 3087359,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_PeachBeach",
-          "start": 3801599,
+          "start": 3064319,
           "sourceOffset": 0,
           "sourceLength": 3571200,
           "fadeIn": 0,
@@ -1054,7 +894,7 @@
         },
         {
           "stem": "BGM_Stage_PeachBeach",
-          "start": 7372799,
+          "start": 6635519,
           "sourceOffset": 622080,
           "sourceLength": 2666880,
           "fadeIn": 0,
@@ -1062,7 +902,7 @@
         },
         {
           "stem": "BGM_Stage_PeachBeach_Outro02",
-          "start": 10039679,
+          "start": 9302399,
           "sourceOffset": 0,
           "sourceLength": 232956,
           "fadeIn": 0,
@@ -1074,31 +914,23 @@
       "index": 18,
       "courseCode": "LagoonCity",
       "variant": "medley",
-      "totalFrames": 8718887,
-      "durationMs": 181643,
+      "totalFrames": 8087654,
+      "durationMs": 168493,
       "measuredResidualRms": 0.000453,
       "gFullOffline": 4.498546,
       "gPreShortOffline": 4.025005,
       "clips": [
         {
-          "stem": "BGM_Stage_LagoonCity_Pre_Short",
-          "start": 0,
-          "sourceOffset": 9,
-          "sourceLength": 709941,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
           "stem": "BGM_Stage_LagoonCity_Pre",
-          "start": 709941,
-          "sourceOffset": 78708,
-          "sourceLength": 2525121,
+          "start": 0,
+          "sourceOffset": 0,
+          "sourceLength": 2603829,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_LagoonCity",
-          "start": 3225200,
+          "start": 2593967,
           "sourceOffset": 0,
           "sourceLength": 3166020,
           "fadeIn": 0,
@@ -1106,7 +938,7 @@
         },
         {
           "stem": "BGM_Stage_LagoonCity",
-          "start": 6391220,
+          "start": 5759987,
           "sourceOffset": 483287,
           "sourceLength": 2110680,
           "fadeIn": 0,
@@ -1114,7 +946,7 @@
         },
         {
           "stem": "BGM_Stage_LagoonCity_Outro07",
-          "start": 8501900,
+          "start": 7870667,
           "sourceOffset": 0,
           "sourceLength": 216987,
           "fadeIn": 0,
@@ -1126,31 +958,23 @@
       "index": 19,
       "courseCode": "DinoDinoJungle",
       "variant": "medley",
-      "totalFrames": 9010033,
-      "durationMs": 187709,
+      "totalFrames": 8673683,
+      "durationMs": 180702,
       "measuredResidualRms": 0.058878,
       "gFullOffline": 5.549196,
       "gPreShortOffline": 4.960424,
       "clips": [
         {
-          "stem": "BGM_Stage_DinoDinoJungle_Pre_Short",
+          "stem": "BGM_Stage_DinoDinoJungle_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 346863,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_DinoDinoJungle_Pre",
-          "start": 346863,
-          "sourceOffset": 10513,
-          "sourceLength": 2680288,
+          "sourceLength": 2690801,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_DinoDinoJungle_Bridge",
-          "start": 3027151,
+          "start": 2690801,
           "sourceOffset": 0,
           "sourceLength": 168175,
           "fadeIn": 0,
@@ -1158,7 +982,7 @@
         },
         {
           "stem": "BGM_Stage_DinoDinoJungle",
-          "start": 3195326,
+          "start": 2858976,
           "sourceOffset": 420438,
           "sourceLength": 3111239,
           "fadeIn": 0,
@@ -1166,7 +990,7 @@
         },
         {
           "stem": "BGM_Stage_DinoDinoJungle",
-          "start": 6306565,
+          "start": 5970215,
           "sourceOffset": 840876,
           "sourceLength": 2501604,
           "fadeIn": 0,
@@ -1174,7 +998,7 @@
         },
         {
           "stem": "BGM_Stage_DinoDinoJungle_Outro00",
-          "start": 8808169,
+          "start": 8471819,
           "sourceOffset": 0,
           "sourceLength": 201864,
           "fadeIn": 0,
@@ -1186,31 +1010,23 @@
       "index": 20,
       "courseCode": "StormClouds",
       "variant": "medley",
-      "totalFrames": 8575226,
-      "durationMs": 178651,
+      "totalFrames": 7943993,
+      "durationMs": 165500,
       "measuredResidualRms": 0.000305,
       "gFullOffline": 5.80965,
       "gPreShortOffline": 5.195373,
       "clips": [
         {
-          "stem": "BGM_Stage_StormClouds_Pre_Short",
+          "stem": "BGM_Stage_StormClouds_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 670736,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_StormClouds_Pre",
-          "start": 670736,
-          "sourceOffset": 39503,
-          "sourceLength": 2524874,
+          "sourceLength": 2564377,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_StormClouds",
-          "start": 3195610,
+          "start": 2564377,
           "sourceOffset": 0,
           "sourceLength": 2682734,
           "fadeIn": 0,
@@ -1218,7 +1034,7 @@
         },
         {
           "stem": "BGM_Stage_StormClouds",
-          "start": 5878344,
+          "start": 5247111,
           "sourceOffset": 157808,
           "sourceLength": 2446022,
           "fadeIn": 0,
@@ -1226,7 +1042,7 @@
         },
         {
           "stem": "BGM_Stage_StormClouds_Outro00",
-          "start": 8324366,
+          "start": 7693133,
           "sourceOffset": 0,
           "sourceLength": 250860,
           "fadeIn": 0,
@@ -1238,31 +1054,23 @@
       "index": 21,
       "courseCode": "RaftingRiver",
       "variant": "medley",
-      "totalFrames": 8639984,
-      "durationMs": 180000,
+      "totalFrames": 8033668,
+      "durationMs": 167368,
       "measuredResidualRms": 0.00817,
       "gFullOffline": 6.201227,
       "gPreShortOffline": 5.546586,
       "clips": [
         {
-          "stem": "BGM_Stage_RaftingRiver_Pre_Short",
+          "stem": "BGM_Stage_RaftingRiver_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 681183,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_RaftingRiver_Pre",
-          "start": 681183,
-          "sourceOffset": 74867,
-          "sourceLength": 2426180,
+          "sourceLength": 2501047,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_RaftingRiver_Bridge",
-          "start": 3069469,
+          "start": 2463153,
           "sourceOffset": 0,
           "sourceLength": 189475,
           "fadeIn": 0,
@@ -1270,7 +1078,7 @@
         },
         {
           "stem": "BGM_Stage_RaftingRiver",
-          "start": 3107364,
+          "start": 2501048,
           "sourceOffset": 0,
           "sourceLength": 3031572,
           "fadeIn": 0,
@@ -1278,7 +1086,7 @@
         },
         {
           "stem": "BGM_Stage_RaftingRiver",
-          "start": 6138936,
+          "start": 5532620,
           "sourceOffset": 454736,
           "sourceLength": 2273679,
           "fadeIn": 0,
@@ -1286,7 +1094,7 @@
         },
         {
           "stem": "BGM_Stage_RaftingRiver_Outro06",
-          "start": 8412615,
+          "start": 7806299,
           "sourceOffset": 0,
           "sourceLength": 227369,
           "fadeIn": 0,
@@ -1298,31 +1106,23 @@
       "index": 22,
       "courseCode": "Cave",
       "variant": "medley",
-      "totalFrames": 8963756,
-      "durationMs": 186745,
+      "totalFrames": 8323756,
+      "durationMs": 173412,
       "measuredResidualRms": 0.000324,
       "gFullOffline": 6.004918,
       "gPreShortOffline": 5.370289,
       "clips": [
         {
-          "stem": "BGM_Stage_Cave_Pre_Short",
+          "stem": "BGM_Stage_Cave_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 681047,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_Cave_Pre",
-          "start": 681047,
-          "sourceOffset": 41047,
-          "sourceLength": 2560205,
+          "sourceLength": 2601252,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_Cave_Bridge",
-          "start": 3201252,
+          "start": 2561252,
           "sourceOffset": 0,
           "sourceLength": 153243,
           "fadeIn": 0,
@@ -1330,7 +1130,7 @@
         },
         {
           "stem": "BGM_Stage_Cave",
-          "start": 3241252,
+          "start": 2601252,
           "sourceOffset": 0,
           "sourceLength": 2922502,
           "fadeIn": 0,
@@ -1338,7 +1138,7 @@
         },
         {
           "stem": "BGM_Stage_Cave",
-          "start": 6163754,
+          "start": 5523754,
           "sourceOffset": 222500,
           "sourceLength": 2480002,
           "fadeIn": 0,
@@ -1346,7 +1146,7 @@
         },
         {
           "stem": "BGM_Stage_Cave_Outro00",
-          "start": 8643756,
+          "start": 8003756,
           "sourceOffset": 0,
           "sourceLength": 320000,
           "fadeIn": 0,
@@ -1358,31 +1158,23 @@
       "index": 23,
       "courseCode": "Cinema",
       "variant": "medley",
-      "totalFrames": 7685139,
-      "durationMs": 160107,
+      "totalFrames": 7246282,
+      "durationMs": 150964,
       "measuredResidualRms": 0.009875,
       "gFullOffline": 3.769644,
       "gPreShortOffline": 3.353307,
       "clips": [
         {
-          "stem": "BGM_Stage_Cinema_Pre_Short",
+          "stem": "BGM_Stage_Cinema_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 498574,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_Cinema_Pre",
-          "start": 498574,
-          "sourceOffset": 59717,
-          "sourceLength": 1755709,
+          "sourceLength": 1815426,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_Cinema",
-          "start": 2226855,
+          "start": 1787998,
           "sourceOffset": 0,
           "sourceLength": 2880000,
           "fadeIn": 0,
@@ -1390,7 +1182,7 @@
         },
         {
           "stem": "BGM_Stage_Cinema",
-          "start": 5106855,
+          "start": 4667998,
           "sourceOffset": 466285,
           "sourceLength": 267429,
           "fadeIn": 0,
@@ -1398,7 +1190,7 @@
         },
         {
           "stem": "BGM_Stage_Cinema_Pattern2",
-          "start": 5326284,
+          "start": 4887427,
           "sourceOffset": 685714,
           "sourceLength": 1974855,
           "fadeIn": 48000,
@@ -1406,7 +1198,7 @@
         },
         {
           "stem": "BGM_Stage_Cinema_Outro04",
-          "start": 7301139,
+          "start": 6862282,
           "sourceOffset": 0,
           "sourceLength": 384000,
           "fadeIn": 0,
@@ -1418,31 +1210,23 @@
       "index": 24,
       "courseCode": "DinoBones",
       "variant": "medley",
-      "totalFrames": 7919994,
-      "durationMs": 165000,
+      "totalFrames": 7388301,
+      "durationMs": 153923,
       "measuredResidualRms": 0.001075,
       "gFullOffline": 5.597721,
       "gPreShortOffline": 4.619238,
       "clips": [
         {
-          "stem": "BGM_Stage_DinoBones_Pre_Short",
+          "stem": "BGM_Stage_DinoBones_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 597281,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_DinoBones_Pre",
-          "start": 597281,
-          "sourceOffset": 65588,
-          "sourceLength": 2127640,
+          "sourceLength": 2193228,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_DinoBones_Bridge",
-          "start": 2724921,
+          "start": 2193228,
           "sourceOffset": 0,
           "sourceLength": 70224,
           "fadeIn": 0,
@@ -1450,7 +1234,7 @@
         },
         {
           "stem": "BGM_Stage_DinoBones",
-          "start": 2719383,
+          "start": 2187690,
           "sourceOffset": 0,
           "sourceLength": 2730459,
           "fadeIn": 0,
@@ -1458,7 +1242,7 @@
         },
         {
           "stem": "BGM_Stage_DinoBones",
-          "start": 5449842,
+          "start": 4918149,
           "sourceOffset": 337846,
           "sourceLength": 2259690,
           "fadeIn": 0,
@@ -1466,7 +1250,7 @@
         },
         {
           "stem": "BGM_Stage_DinoBones_Outro00",
-          "start": 7709532,
+          "start": 7177839,
           "sourceOffset": 0,
           "sourceLength": 210462,
           "fadeIn": 0,
@@ -1478,39 +1262,23 @@
       "index": 25,
       "courseCode": "MooMooFarm",
       "variant": "medley",
-      "totalFrames": 9377280,
-      "durationMs": 195360,
+      "totalFrames": 8657280,
+      "durationMs": 180360,
       "measuredResidualRms": 0.000301,
       "gFullOffline": 4.958839,
       "gPreShortOffline": 4.435467,
       "clips": [
         {
-          "stem": "BGM_Stage_MooMooFarm_Pre_Short",
+          "stem": "BGM_Stage_MooMooFarm_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 585000,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_MooMooFarm_Pre_Short",
-          "start": 585000,
-          "sourceOffset": 225000,
-          "sourceLength": 180026,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_MooMooFarm_Pre",
-          "start": 765026,
-          "sourceOffset": 45026,
-          "sourceLength": 2879974,
+          "sourceLength": 2925000,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_MooMooFarm_Bridge",
-          "start": 3645000,
+          "start": 2925000,
           "sourceOffset": 0,
           "sourceLength": 43659,
           "fadeIn": 0,
@@ -1518,7 +1286,7 @@
         },
         {
           "stem": "BGM_Stage_MooMooFarm",
-          "start": 3645000,
+          "start": 2925000,
           "sourceOffset": 0,
           "sourceLength": 3240000,
           "fadeIn": 0,
@@ -1526,7 +1294,7 @@
         },
         {
           "stem": "BGM_Stage_MooMooFarm",
-          "start": 6885000,
+          "start": 6165000,
           "sourceOffset": 450000,
           "sourceLength": 2244375,
           "fadeIn": 0,
@@ -1534,7 +1302,7 @@
         },
         {
           "stem": "BGM_Stage_MooMooFarm_Outro00",
-          "start": 9129375,
+          "start": 8409375,
           "sourceOffset": 0,
           "sourceLength": 247905,
           "fadeIn": 0,
@@ -1546,31 +1314,23 @@
       "index": 26,
       "courseCode": "ChocoMountain",
       "variant": "medley",
-      "totalFrames": 12025960,
-      "durationMs": 250541,
+      "totalFrames": 11563560,
+      "durationMs": 240908,
       "measuredResidualRms": 0.00058,
       "gFullOffline": 7.458381,
       "gPreShortOffline": 6.672069,
       "clips": [
         {
-          "stem": "BGM_Stage_ChocoMountain_Pre_Short",
+          "stem": "BGM_Stage_ChocoMountain_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 652816,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_ChocoMountain_Pre",
-          "start": 652816,
-          "sourceOffset": 190416,
-          "sourceLength": 2458584,
+          "sourceLength": 2649000,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_ChocoMountain_Bridge",
-          "start": 3111400,
+          "start": 2649000,
           "sourceOffset": 0,
           "sourceLength": 76800,
           "fadeIn": 0,
@@ -1578,7 +1338,7 @@
         },
         {
           "stem": "BGM_Stage_ChocoMountain",
-          "start": 3188200,
+          "start": 2725800,
           "sourceOffset": 38400,
           "sourceLength": 4454400,
           "fadeIn": 0,
@@ -1586,7 +1346,7 @@
         },
         {
           "stem": "BGM_Stage_ChocoMountain",
-          "start": 7642600,
+          "start": 7180200,
           "sourceOffset": 192000,
           "sourceLength": 4108800,
           "fadeIn": 0,
@@ -1594,7 +1354,7 @@
         },
         {
           "stem": "BGM_Stage_ChocoMountain_Outro00",
-          "start": 11751400,
+          "start": 11289000,
           "sourceOffset": 0,
           "sourceLength": 274560,
           "fadeIn": 0,
@@ -1606,31 +1366,23 @@
       "index": 27,
       "courseCode": "ToadFactory",
       "variant": "medley",
-      "totalFrames": 9429289,
-      "durationMs": 196444,
+      "totalFrames": 9010380,
+      "durationMs": 187716,
       "measuredResidualRms": 0.000173,
       "gFullOffline": 7.391796,
       "gPreShortOffline": 6.572696,
       "clips": [
         {
-          "stem": "BGM_Stage_ToadFactory_Pre_Short",
+          "stem": "BGM_Stage_ToadFactory_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 470591,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_ToadFactory_Pre",
-          "start": 470591,
-          "sourceOffset": 51682,
-          "sourceLength": 1676316,
+          "sourceLength": 1727998,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_ToadFactory_Bridge",
-          "start": 2146907,
+          "start": 1727998,
           "sourceOffset": 0,
           "sourceLength": 471272,
           "fadeIn": 0,
@@ -1638,7 +1390,7 @@
         },
         {
           "stem": "BGM_Stage_ToadFactory",
-          "start": 2618179,
+          "start": 2199270,
           "sourceOffset": 110454,
           "sourceLength": 3717815,
           "fadeIn": 0,
@@ -1646,7 +1398,7 @@
         },
         {
           "stem": "BGM_Stage_ToadFactory",
-          "start": 6335994,
+          "start": 5917085,
           "sourceOffset": 738817,
           "sourceLength": 2984725,
           "fadeIn": 0,
@@ -1654,7 +1406,7 @@
         },
         {
           "stem": "BGM_Stage_ToadFactory_Outro00",
-          "start": 9320719,
+          "start": 8901810,
           "sourceOffset": 0,
           "sourceLength": 108570,
           "fadeIn": 0,
@@ -1666,31 +1418,23 @@
       "index": 28,
       "courseCode": "Lava",
       "variant": "medley",
-      "totalFrames": 8871993,
-      "durationMs": 184833,
+      "totalFrames": 8359993,
+      "durationMs": 174167,
       "measuredResidualRms": 0.000265,
       "gFullOffline": 7.843169,
       "gPreShortOffline": 7.015405,
       "clips": [
         {
-          "stem": "BGM_Stage_Lava_Pre_Short",
+          "stem": "BGM_Stage_Lava_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 619168,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_Lava_Pre",
-          "start": 619168,
-          "sourceOffset": 107168,
-          "sourceLength": 1212830,
+          "sourceLength": 1319998,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_Lava_Bridge",
-          "start": 1799999,
+          "start": 1287999,
           "sourceOffset": 0,
           "sourceLength": 237565,
           "fadeIn": 0,
@@ -1698,7 +1442,7 @@
         },
         {
           "stem": "BGM_Stage_Lava",
-          "start": 1894000,
+          "start": 1382000,
           "sourceOffset": 0,
           "sourceLength": 3521996,
           "fadeIn": 0,
@@ -1706,7 +1450,7 @@
         },
         {
           "stem": "BGM_Stage_Lava",
-          "start": 5415996,
+          "start": 4903996,
           "sourceOffset": 386000,
           "sourceLength": 2943997,
           "fadeIn": 0,
@@ -1714,7 +1458,7 @@
         },
         {
           "stem": "BGM_Stage_Lava_Outro01",
-          "start": 8359993,
+          "start": 7847993,
           "sourceOffset": 0,
           "sourceLength": 512000,
           "fadeIn": 0,
@@ -1726,39 +1470,23 @@
       "index": 29,
       "courseCode": "BigTree",
       "variant": "medley",
-      "totalFrames": 7412131,
-      "durationMs": 154419,
+      "totalFrames": 6794988,
+      "durationMs": 141562,
       "measuredResidualRms": 0.064049,
       "gFullOffline": 8.286653,
       "gPreShortOffline": 7.366718,
       "clips": [
         {
-          "stem": "BGM_Stage_BigTree_Pre_Short",
+          "stem": "BGM_Stage_BigTree_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 662152,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_BigTree_Pre",
-          "start": 662152,
-          "sourceOffset": 1279294,
-          "sourceLength": 154277,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_BigTree_Pre",
-          "start": 816429,
-          "sourceOffset": 199286,
-          "sourceLength": 1079999,
+          "sourceLength": 1279285,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_BigTree",
-          "start": 1896428,
+          "start": 1279285,
           "sourceOffset": 0,
           "sourceLength": 3201427,
           "fadeIn": 0,
@@ -1766,7 +1494,7 @@
         },
         {
           "stem": "BGM_Stage_BigTree",
-          "start": 5097855,
+          "start": 4480712,
           "sourceOffset": 578571,
           "sourceLength": 2005713,
           "fadeIn": 0,
@@ -1774,7 +1502,7 @@
         },
         {
           "stem": "BGM_Stage_BigTree_Outro00",
-          "start": 7103568,
+          "start": 6486425,
           "sourceOffset": 0,
           "sourceLength": 308563,
           "fadeIn": 0,
@@ -1786,31 +1514,23 @@
       "index": 30,
       "courseCode": "SFCMarioCircuit",
       "variant": "medley",
-      "totalFrames": 7094762,
-      "durationMs": 147808,
+      "totalFrames": 6385839,
+      "durationMs": 133038,
       "measuredResidualRms": 0.000123,
       "gFullOffline": 4.967068,
       "gPreShortOffline": 4.416158,
       "clips": [
         {
-          "stem": "BGM_Stage_SFCMarioCircuit_Pre_Short",
+          "stem": "BGM_Stage_SFCMarioCircuit_Pre",
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 758771,
-          "fadeIn": 0,
-          "fadeOut": 0
-        },
-        {
-          "stem": "BGM_Stage_SFCMarioCircuit_Pre",
-          "start": 758771,
-          "sourceOffset": 49848,
-          "sourceLength": 2835687,
+          "sourceLength": 2885535,
           "fadeIn": 0,
           "fadeOut": 0
         },
         {
           "stem": "BGM_Stage_SFCMarioCircuit_Bridge",
-          "start": 3594458,
+          "start": 2885535,
           "sourceOffset": 0,
           "sourceLength": 40219,
           "fadeIn": 0,
@@ -1818,7 +1538,7 @@
         },
         {
           "stem": "BGM_Stage_SFCMarioCircuit",
-          "start": 3594458,
+          "start": 2885535,
           "sourceOffset": 0,
           "sourceLength": 1860921,
           "fadeIn": 0,
@@ -1826,7 +1546,7 @@
         },
         {
           "stem": "BGM_Stage_SFCMarioCircuit",
-          "start": 5455379,
+          "start": 4746456,
           "sourceOffset": 265846,
           "sourceLength": 1484306,
           "fadeIn": 0,
@@ -1834,7 +1554,7 @@
         },
         {
           "stem": "BGM_Stage_SFCMarioCircuit_Outro00",
-          "start": 6939685,
+          "start": 6230762,
           "sourceOffset": 0,
           "sourceLength": 155077,
           "fadeIn": 0,

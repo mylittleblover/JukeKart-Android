@@ -48,4 +48,22 @@ class DailyRecommendationsTest {
         assertEquals(10, repaired.size)
         assertFalse(missing in repaired)
     }
+
+    @Test fun mixesCourseSfcBattleExtraAndFreeRoamCandidates() {
+        val candidates = listOf(
+            RecommendationCandidate("FirstCircuit", RecommendationKind.COURSE, true),
+            RecommendationCandidate("sfc:mc1", RecommendationKind.COURSE, true),
+            RecommendationCandidate("battle:big_donut", RecommendationKind.COURSE, true),
+            RecommendationCandidate("extra:Title_00", RecommendationKind.COURSE, true),
+            RecommendationCandidate("MarioCircuit", RecommendationKind.COURSE, true),
+        ) + (0 until 5).map { idx ->
+            RecommendationCandidate("jb:free_$idx", RecommendationKind.FREE_DRIVING, true)
+        }
+        val result = DailyRecommendations.select(day, candidates, emptyList())
+        assertEquals(10, result.size)
+        assertTrue("sfc:mc1" in result)
+        assertTrue("battle:big_donut" in result)
+        assertTrue("extra:Title_00" in result)
+        assertEquals(5, result.count { it.startsWith("jb:") })
+    }
 }

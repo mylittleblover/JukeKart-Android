@@ -8,7 +8,13 @@ import com.mylittleblover.mkwplayer.library.StageFlow
 internal object MinfInteractiveCompiler {
     data class Prepared(val spec: G.Spec, val compiled: StageFlowCompiler.Compiled, val entryBasis: String = "SOURCE_MINF_PHASE_CANDIDATE")
 
-    fun prepare(flow: StageFlow, digests: Map<String, ByteArray>, catalog: MinfCatalog): Prepared {
+    fun prepare(
+        flow: StageFlow,
+        digests: Map<String, ByteArray>,
+        catalog: MinfCatalog,
+        allowPreludeToFast: Boolean = false,
+        includeBeat1Cues: Boolean = false,
+    ): Prepared {
         val stage=flow.name.removePrefix("BGM_Stage_")
         require(stage!="Rainbow") { "Rainbow requires its Area/Final graph" }
         val full=catalog.part(stage,"Full") ?: error("No unambiguous Full MINF for $stage")
@@ -46,16 +52,26 @@ internal object MinfInteractiveCompiler {
                     val r=catalog.part(stage,role) ?: error("No $role MINF for $stage")
                     require(part.loopStart==r.loopStart && part.loopEnd==r.loopEnd) { "$stage $role source loop differs from MINF" }
                     require(r.loopCandidates.isNotEmpty())
+                    val extraBeat1 = if (includeBeat1Cues) {
+                        r.beats.filter { it.label == 1 && it.frame in 0L..part.frames }
+                            .map { G.Cue(cueIndex++, "beat1.exit", it.frame) }
+                    } else emptyList()
                     G.Segment(id,exit=part.frames,loop=G.Loop(r.loopStart,r.loopEnd),
-                        cues=r.loopCandidates.map { G.Cue(cueIndex++,"pre.exit",it) })
+                        cues=(r.loopCandidates.map { G.Cue(cueIndex++,"pre.exit",it) } + extraBeat1).sortedBy { it.frame })
                 }
                 StageFlow.Role.Bridge -> G.Segment(id,exit=part.frames)
-                StageFlow.Role.Main -> G.Segment(id,exit=part.frames,
-                    loop=part.loopStart?.let { G.Loop(it,part.loopEnd!!) },
-                    cues=(confirmed.flatMap { (n,points) -> points.map { point ->
-                        require(point<part.frames) { "$stage Outro$n trigger outside Full source" }
-                        G.Cue(cueIndex++,"outro.$n",point)
-                    } } + if(fast!=null && byRole[StageFlow.Role.Fast]!=null) full.loopCandidates.map { G.Cue(cueIndex++,"fast.exit",it) } else emptyList()).sortedBy { it.frame })
+                StageFlow.Role.Main -> {
+                    val extraBeat1 = if (includeBeat1Cues) {
+                        full.beats.filter { it.label == 1 && it.frame in 0L..part.frames }
+                            .map { G.Cue(cueIndex++, "beat1.exit", it.frame) }
+                    } else emptyList()
+                    G.Segment(id,exit=part.frames,
+                        loop=part.loopStart?.let { G.Loop(it,part.loopEnd!!) },
+                        cues=(confirmed.flatMap { (n,points) -> points.map { point ->
+                            require(point<part.frames) { "$stage Outro$n trigger outside Full source" }
+                            G.Cue(cueIndex++,"outro.$n",point)
+                        } } + (if(fast!=null && byRole[StageFlow.Role.Fast]!=null) full.loopCandidates.map { G.Cue(cueIndex++,"fast.exit",it) } else emptyList()) + extraBeat1).sortedBy { it.frame })
+                }
                 StageFlow.Role.Outro -> G.Segment(id,exit=part.frames)
                 StageFlow.Role.Fast -> G.Segment(id,exit=part.frames,loop=part.loopStart?.let { G.Loop(it,part.loopEnd!!) })
             }
@@ -77,6 +93,15 @@ internal object MinfInteractiveCompiler {
                 // Research phase-alignment preview. No rate change; Fast is its own real asset.
                 add(G.Transition(rule++,listOf(main),listOf(target),sync=G.SyncPoint.NextCustomCue,
                     sourceCue="fast.exit",timeline=G.TransitionTimeline(0,-fast.phase,0,0)))
+                if (allowPreludeToFast) {
+                    for (preRole in listOf(StageFlow.Role.Pre, StageFlow.Role.PreShort)) {
+                        byRole[preRole]?.let { preId ->
+                            add(G.Transition(rule++, listOf(preId), listOf(target), sync = G.SyncPoint.NextCustomCue,
+                                sourceCue = if (includeBeat1Cues) "beat1.exit" else "pre.exit",
+                                timeline = G.TransitionTimeline(0, -fast.phase, 0, 0)))
+                        }
+                    }
+                }
             }
             for((n,to) in byOutro) {
                 require(n in confirmed) { "$stage Outro$n has no confirmed Full exit" }

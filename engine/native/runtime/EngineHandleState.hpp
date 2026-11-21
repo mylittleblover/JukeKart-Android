@@ -6,6 +6,8 @@
 #include "music/GraphReader.hpp"
 #include "runtime/EngineRuntime.hpp"
 #include "runtime/DeviceRateAdapter.hpp"
+#include "dsp/MasterDspChain.hpp"
+#include "dsp/SpectrumAnalyzer.hpp"
 #include "audio/source/SourceHandle.hpp"
 #include "audio/source/PrepareBuffer.hpp"
 #include "audio/source/SourceDigest.hpp"
@@ -23,6 +25,11 @@ public:
     std::unique_ptr<EngineRuntime> runtime;
     std::atomic<bool> cueSearchV9{false};
     DeviceRateAdapter device;
+    std::atomic<int> tempoMilli{1000};
+    std::atomic<int> pitchCentisemi{0};
+    dsp::MasterDspMailbox masterDspMailbox;
+    dsp::MasterDspProcessor masterDspProcessor;
+    dsp::SpectrumAnalyzer spectrumAnalyzer;
     std::atomic<bool> outputActive{false};
     // Atomic payload as well as sequence avoids C++ data races in the monitor reader.
     std::atomic<std::uint32_t> sequence{0};
@@ -108,7 +115,7 @@ public:
     std::array<SourceSlot,128> sources;
     std::array<EffectMonitorSlot,4096> effects;
     AlbumFlowMonitorSlot album;
-    bool graphSchemaDirty{true};
+    bool graphSchemaDirty{true}; std::array<bool,128> publishedSourceActive_{}; std::uint64_t publishedSyncRev_{UINT64_MAX},publishedParamRev_{UINT64_MAX},publishedLayerRev_{UINT64_MAX};
     EngineHandle() noexcept {
         for(auto& value:syncValues)value.store(-1,std::memory_order_relaxed);
         for(const auto index: {0,1,4,7,8,12}) {
@@ -151,11 +158,12 @@ public:
         for(std::size_t i=0;i<s.transition.size();++i) transition[i].store(s.transition[i],std::memory_order_relaxed);
         for(std::size_t i=0;i<s.stinger.size();++i) stinger[i].store(s.stinger[i],std::memory_order_relaxed);
         for(std::size_t i=0;i<s.event.size();++i) event[i].store(s.event[i],std::memory_order_relaxed);
+        const auto* params=runtime ? runtime->parameters() : nullptr; const auto syncRev=params ? params->syncRevision() : 0; const auto paramRev=params ? params->parameterRevision() : 0; const auto layerRev=params ? params->layerRevision() : 0;
         if(graphSchemaDirty) for(auto& parameter:parameters) parameter.valid.store(false,std::memory_order_relaxed);
         if(graphSchemaDirty)for(auto& value:syncValues)value.store(-1,std::memory_order_relaxed);
-        if(runtime && runtime->graph())for(const auto& definition:runtime->graph()->groups)
+        if(runtime && runtime->graph() && (graphSchemaDirty || syncRev!=publishedSyncRev_)) for(const auto& definition:runtime->graph()->groups)
             syncValues[definition.index].store(runtime->syncValue(definition.index),std::memory_order_relaxed);
-        if(runtime && runtime->graph()) for(const auto& definition:runtime->graph()->parameters) {
+        if(runtime && runtime->graph() && (graphSchemaDirty || paramRev!=publishedParamRev_)) for(const auto& definition:runtime->graph()->parameters) {
             const auto value=runtime->parameterSnapshot(definition.index); auto& slot=parameters[definition.index];
             slot.store(0,value.current); slot.store(1,value.target);
             if(graphSchemaDirty) {
@@ -182,7 +190,7 @@ public:
         }
         const auto entry=runtime ? runtime->entryStateSnapshot() : EntryStateSnapshot{};
         if(graphSchemaDirty)for(auto& layer:layers)layer.valid.store(false,std::memory_order_relaxed);
-        if(runtime && runtime->graph())for(const auto& track:runtime->graph()->tracks){const auto s=runtime->layerSnapshot(track.index);auto& layer=layers[track.index];layer.store(0,s.trimDb);layer.store(1,s.baseDb);layer.store(2,s.rtpcDb);layer.store(3,s.finalDb);layer.valid.store(true,std::memory_order_relaxed);}
+        if(runtime && runtime->graph() && (graphSchemaDirty || layerRev!=publishedLayerRev_ || paramRev!=publishedParamRev_))for(const auto& track:runtime->graph()->tracks){const auto s=runtime->layerSnapshot(track.index);auto& layer=layers[track.index];layer.store(0,s.trimDb);layer.store(1,s.baseDb);layer.store(2,s.rtpcDb);layer.store(3,s.finalDb);layer.valid.store(true,std::memory_order_relaxed);}
         const auto perf=runtime ? runtime->performanceSnapshot() : PerformanceSnapshot{};
         automatic.store(automaticPacket(runtime ? runtime->automaticSnapshot() : AutomaticSnapshot{}));
         musicalLoop.store(musicalLoopPacket(runtime ? runtime->musicalLoopSnapshot() : MusicalLoopSnapshot{}));
@@ -193,12 +201,13 @@ public:
         const auto source=runtime ? runtime->streamingSnapshot() : StreamingSnapshot{};
         const std::array<std::uint64_t,21> sourceValues{source.pcmBytes,source.encodedBytes,source.sources,source.cachedPages,source.underrunFrames,source.requests,source.droppedRequests,source.decodedPages,source.decodeFailures,static_cast<std::uint64_t>(source.lastFailure),source.historyRanges,source.historyDroppedRanges,source.historyComplete,source.historyBytes,source.preparationDecisions,source.droppedPreparationDecisions,source.preparationHistoryComplete,source.preparationHistoryBytes,source.futureClipRequirements,source.futureClipResourceLimits,source.futureClipReady};
         for(std::size_t n=0;n<sourceValues.size();++n){streaming[n*2].store(static_cast<std::uint32_t>(sourceValues[n]),std::memory_order_relaxed);streaming[n*2+1].store(static_cast<std::uint32_t>(sourceValues[n]>>32),std::memory_order_relaxed);}
-        for(std::size_t n=0;n<sources.size();++n)sources[n].store(sourceMonitorPacket(runtime ? runtime->sourceSnapshot(static_cast<int>(n)) : SourceVoiceSnapshot{}));
+        const std::size_t voiceLimit=runtime ? runtime->activeVoiceLimit() : 0;
+        for(std::size_t n=0;n<sources.size();++n){if(n>=voiceLimit && !publishedSourceActive_[n])continue;const auto pkt=sourceMonitorPacket(runtime ? runtime->sourceSnapshot(static_cast<int>(n)) : SourceVoiceSnapshot{});sources[n].store(pkt);publishedSourceActive_[n]=(pkt[1]!=0);}
         if(graphSchemaDirty)for(auto& effect:effects)effect.invalidate();
         if(runtime && runtime->graph())for(const auto& bus:runtime->graph()->buses)for(const auto& effect:bus.effects)
             effects[effect.index].store(effectPacket(runtime->effectSnapshot(effect.index)));
         album.store(albumFlowPacket(runtime ? runtime->albumFlowSnapshot() : AlbumFlowSnapshot{}));
-        graphSchemaDirty=false;
+        graphSchemaDirty=false; publishedSyncRev_=syncRev; publishedParamRev_=paramRev; publishedLayerRev_=layerRev;
         sequence.fetch_add(1,std::memory_order_release);
     }
 };

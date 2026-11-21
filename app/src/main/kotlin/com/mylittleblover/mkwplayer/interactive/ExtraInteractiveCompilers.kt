@@ -25,6 +25,7 @@ internal object ExtraInteractiveCompilers {
         item: ExtraMusicCatalog.OtherMusicItem.InteractiveTitle,
         bytesByStem: Map<String, ByteArray>,
         initialSegment: Int = TITLE_SEG_NORMAL,
+        segmentSwitchFadeOutMs: Int = 0,
     ): InteractivePlaybackPlan {
         val outroRefs = item.outros.map { it.asset }
         val orderedRefs = listOf(item.harmonica, item.main, item.brassCut) + outroRefs
@@ -150,27 +151,30 @@ internal object ExtraInteractiveCompilers {
         )
         val chosenEntry = if (initialSegment in entryPrepared) initialSegment else TITLE_SEG_NORMAL
 
-        return InteractivePlaybackPlan(
-            name = item.id,
-            spec = spec,
-            packet = packet,
-            assetPaths = assetPaths,
-            entry = chosenEntry,
-            next = mapOf(TITLE_SEG_EXTENDED to TITLE_SEG_NORMAL),
-            outros = item.outros.mapIndexed { idx, outro -> outro.index to (TITLE_SEG_OUTRO_BASE + idx) }.toMap(),
-            fast = null,
-            labels = mapOf(
-                TITLE_SEG_EXTENDED to "TitleExtended",
-                TITLE_SEG_NORMAL to "TitleNormal",
-                TITLE_SEG_BRASSCUT to "TitleBrassCut",
-            ) + item.outros.mapIndexed { idx, outro ->
-                (TITLE_SEG_OUTRO_BASE + idx) to "Outro%02d".format(outro.index)
-            }.toMap(),
-            streamed = true,
-            preparedAssets = entryPrepared.getValue(chosenEntry),
-            entryPreparedAssets = entryPrepared,
-            entryAutomaticNext = mapOf(TITLE_SEG_EXTENDED to TITLE_SEG_NORMAL),
-            customInitialSegments = listOf(TITLE_SEG_EXTENDED, TITLE_SEG_NORMAL, TITLE_SEG_BRASSCUT),
+        return InteractivePlaybackPlan.applySwitchFadeToPlan(
+            InteractivePlaybackPlan(
+                name = item.id,
+                spec = spec,
+                packet = packet,
+                assetPaths = assetPaths,
+                entry = chosenEntry,
+                next = mapOf(TITLE_SEG_EXTENDED to TITLE_SEG_NORMAL),
+                outros = item.outros.mapIndexed { idx, outro -> outro.index to (TITLE_SEG_OUTRO_BASE + idx) }.toMap(),
+                fast = null,
+                labels = mapOf(
+                    TITLE_SEG_EXTENDED to "TitleExtended",
+                    TITLE_SEG_NORMAL to "TitleNormal",
+                    TITLE_SEG_BRASSCUT to "TitleBrassCut",
+                ) + item.outros.mapIndexed { idx, outro ->
+                    (TITLE_SEG_OUTRO_BASE + idx) to "Outro%02d".format(outro.index)
+                }.toMap(),
+                streamed = true,
+                preparedAssets = entryPrepared.getValue(chosenEntry),
+                entryPreparedAssets = entryPrepared,
+                entryAutomaticNext = mapOf(TITLE_SEG_EXTENDED to TITLE_SEG_NORMAL),
+                customInitialSegments = listOf(TITLE_SEG_EXTENDED, TITLE_SEG_NORMAL, TITLE_SEG_BRASSCUT),
+            ),
+            segmentSwitchFadeOutMs,
         )
     }
 
@@ -179,6 +183,8 @@ internal object ExtraInteractiveCompilers {
         isBattle: Boolean,
         bytesByStem: Map<String, ByteArray>,
         initialSegment: Int = TWO_STATE_SEG_MAIN,
+        perfectBeatEnabled: Boolean = false,
+        segmentSwitchFadeOutMs: Int = 0,
     ): InteractivePlaybackPlan {
         val mainPath = "${track.main.stem}.bwav"
         val fastPath = "${track.fast.stem}.bwav"
@@ -209,7 +215,7 @@ internal object ExtraInteractiveCompilers {
             index = 400,
             sources = listOf(TWO_STATE_SEG_MAIN),
             destinations = listOf(TWO_STATE_SEG_FAST),
-            sync = G.SyncPoint.NextBeat,
+            sync = if (perfectBeatEnabled) G.SyncPoint.NextBar else G.SyncPoint.NextBeat,
             entry = G.EntryMode.EntryCue,
             fadeOut = G.Fade(beats = 0.5),
             postExit = true,
@@ -257,7 +263,10 @@ internal object ExtraInteractiveCompilers {
         } else {
             bytesByStem
         }
-        return FinalLapFanfareCompiler.extend(basePlan, extendBytes)
+        return InteractivePlaybackPlan.applySwitchFadeToPlan(
+            FinalLapFanfareCompiler.extend(basePlan, extendBytes, perfectBeatEnabled = perfectBeatEnabled),
+            segmentSwitchFadeOutMs,
+        )
     }
 
     fun compileOverlaidOpeningGraph(

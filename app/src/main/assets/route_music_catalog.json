@@ -1,0 +1,1648 @@
+{
+  "schemaVersion": 1,
+  "sourceUrl": "https://www.mariowiki.com/Route",
+  "themes": {
+    "beach": [
+      "KoopaTroopaBeach",
+      "PeachBeach",
+      "LagoonCity"
+    ],
+    "desert": [
+      "DesertHills",
+      "ShyGuyBazaar"
+    ],
+    "evil": [
+      "AirshipFortress",
+      "WarioShipyard",
+      "DinoBones",
+      "Lava"
+    ],
+    "ice": [
+      "DKPass",
+      "SnowMountain",
+      "IceBuildings"
+    ],
+    "mesa": [
+      "FirstCircuit",
+      "Coaster",
+      "Cave"
+    ],
+    "wooded": [
+      "DinoDinoJungle",
+      "BigTree"
+    ]
+  },
+  "exclusiveOriginCourses": [
+    "Cinema",
+    "RaftingRiver"
+  ],
+  "specialEdges": [
+    {
+      "from": "Central",
+      "to": "Rainbow",
+      "stem": "BGM_Rainbow_Area1_Pre",
+      "title": "To Rainbow Road"
+    }
+  ],
+  "gpEdges": [
+    {
+      "from": "FirstCircuit",
+      "to": "WestCity",
+      "candidates": [
+        "M006B",
+        "M002B",
+        "M411"
+      ]
+    },
+    {
+      "from": "WestCity",
+      "to": "Coaster",
+      "candidates": [
+        "M310",
+        "M471",
+        "M468"
+      ]
+    },
+    {
+      "from": "Coaster",
+      "to": "DonkeyKong",
+      "candidates": [
+        "M024E",
+        "M022B",
+        "M008B"
+      ]
+    },
+    {
+      "from": "DesertHills",
+      "to": "ShyGuyBazaar",
+      "candidates": [
+        "M018B",
+        "M550",
+        "M478"
+      ]
+    },
+    {
+      "from": "ShyGuyBazaar",
+      "to": "WarioStadium",
+      "candidates": [
+        "M547",
+        "M535",
+        "M526"
+      ]
+    },
+    {
+      "from": "WarioStadium",
+      "to": "AirshipFortress",
+      "candidates": [
+        "M011C",
+        "M467",
+        "M487"
+      ]
+    },
+    {
+      "from": "DKPass",
+      "to": "SnowMountain",
+      "candidates": [
+        "M014B",
+        "M488",
+        "M473"
+      ]
+    },
+    {
+      "from": "SnowMountain",
+      "to": "IceBuildings",
+      "candidates": [
+        "M315",
+        "M436",
+        "M522"
+      ]
+    },
+    {
+      "from": "IceBuildings",
+      "to": "WarioShipyard",
+      "candidates": [
+        "M472",
+        "M533",
+        "M521",
+        "M490"
+      ]
+    },
+    {
+      "from": "KoopaTroopaBeach",
+      "to": "DKJungleParkway",
+      "candidates": [
+        "M539",
+        "M037",
+        "M559"
+      ]
+    },
+    {
+      "from": "DKJungleParkway",
+      "to": "WestCity",
+      "candidates": [
+        "M548",
+        "M540",
+        "M464"
+      ]
+    },
+    {
+      "from": "WestCity",
+      "to": "Central",
+      "candidates": [
+        "M469",
+        "M477",
+        "M465",
+        "M530"
+      ]
+    },
+    {
+      "from": "PeachBeach",
+      "to": "LagoonCity",
+      "candidates": [
+        "M483",
+        "M026B",
+        "M476"
+      ]
+    },
+    {
+      "from": "LagoonCity",
+      "to": "DinoDinoJungle",
+      "candidates": [
+        "M319",
+        "M432",
+        "M306",
+        "M496"
+      ]
+    },
+    {
+      "from": "DinoDinoJungle",
+      "to": "StormClouds",
+      "candidates": [
+        "M009B",
+        "M013B",
+        "M035",
+        "M525"
+      ]
+    },
+    {
+      "from": "RaftingRiver",
+      "to": "Cave",
+      "candidates": [
+        "M439",
+        "M474",
+        "M531",
+        "M592"
+      ]
+    },
+    {
+      "from": "Cave",
+      "to": "Cinema",
+      "candidates": [
+        "M463",
+        "M489",
+        "M031"
+      ]
+    },
+    {
+      "from": "Cinema",
+      "to": "DinoBones",
+      "candidates": [
+        "M546",
+        "M561",
+        "M036",
+        "M438"
+      ]
+    },
+    {
+      "from": "MooMooFarm",
+      "to": "ChocoMountain",
+      "candidates": [
+        "M015B",
+        "M016B",
+        "M019B"
+      ]
+    },
+    {
+      "from": "ChocoMountain",
+      "to": "ToadFactory",
+      "candidates": [
+        "M004B",
+        "M470",
+        "M025B",
+        "M021B"
+      ]
+    },
+    {
+      "from": "ToadFactory",
+      "to": "Lava",
+      "candidates": [
+        "M597",
+        "M594",
+        "M534",
+        "M318",
+        "M313",
+        "M497"
+      ]
+    },
+    {
+      "from": "BigTree",
+      "to": "SFCMarioCircuit",
+      "candidates": [
+        "M010B",
+        "M020B",
+        "M493"
+      ]
+    },
+    {
+      "from": "SFCMarioCircuit",
+      "to": "Central",
+      "candidates": [
+        "M328",
+        "M007B",
+        "M402"
+      ]
+    }
+  ],
+  "tracks": [
+    {
+      "jukeboxCode": "M463",
+      "anyOriginDay": true,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M328",
+      "anyOriginDay": true,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M489",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M006B",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M483",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "beach"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M593",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [
+        "evil"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M597",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "evil"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M320",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "desert"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M001B",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [
+        "mesa"
+      ],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M005B",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M015B",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [
+        "mesa"
+      ],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M441",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M031",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [
+        "Cinema"
+      ],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M027",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "evil"
+      ],
+      "dayCourses": [
+        "Cinema"
+      ],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M529",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "evil",
+        "mesa"
+      ],
+      "dayCourses": [
+        "RaftingRiver"
+      ],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M494",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [
+        "Cinema"
+      ],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M469",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M007B",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": [
+        "RaftingRiver"
+      ]
+    },
+    {
+      "jukeboxCode": "M546",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [
+        "Cinema"
+      ],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M541",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "evil"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M004B",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M017B",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [
+        "mesa"
+      ],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M337",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [
+        "mesa"
+      ],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M009B",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M024E",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "evil",
+        "mesa"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M013B",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [
+        "wooded"
+      ],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M594",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [
+        "evil"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M315",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [
+        "ice"
+      ],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M016B",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "ice"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M534",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "evil"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M334",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M019B",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [
+        "mesa"
+      ],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M539",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "beach"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M018B",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "desert",
+        "mesa"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M435",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M014B",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "ice"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M548",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "wooded"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M402",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M540",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "wooded"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M591",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "evil"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M335",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [
+        "desert"
+      ],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M022B",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [
+        "mesa"
+      ],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M547",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "desert"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M339",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M574",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "beach",
+        "mesa"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M008B",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M032",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M037",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M431",
+      "anyOriginDay": true,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M436",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "ice"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M318",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "evil"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M331",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M561",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [
+        "Cinema"
+      ],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M319",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "beach"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M011C",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M336",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": [
+        "Cinema"
+      ]
+    },
+    {
+      "jukeboxCode": "M440",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M314",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M003B",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "evil"
+      ],
+      "dayCourses": [
+        "Cinema"
+      ],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M495",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M532",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "evil"
+      ],
+      "dayCourses": [
+        "RaftingRiver"
+      ],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M528",
+      "anyOriginDay": true,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M477",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M313",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "evil"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M542",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [
+        "wooded"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M571",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [
+        "mesa"
+      ],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M556",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "beach"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M522",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "ice"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M572",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [
+        "mesa"
+      ],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M432",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M523",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "desert"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M467",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M527",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M543",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "evil"
+      ],
+      "dayCourses": [
+        "Cinema",
+        "RaftingRiver"
+      ],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M472",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [
+        "evil"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M442",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "beach"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M535",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "desert"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M002B",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M482",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": [
+        "RaftingRiver"
+      ]
+    },
+    {
+      "jukeboxCode": "M340",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [
+        "evil"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M549",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M550",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "desert"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M497",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [
+        "evil"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M026B",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "beach"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M479",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M325",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "wooded"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M537",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M470",
+      "anyOriginDay": true,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M464",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "wooded"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M488",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "ice"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M492",
+      "anyOriginDay": true,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M036",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [
+        "Cinema"
+      ],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M484",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M012B",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M478",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "desert"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M010B",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M487",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M439",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [
+        "RaftingRiver"
+      ],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M035",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "wooded"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M465",
+      "anyOriginDay": true,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M559",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "beach"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M525",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [
+        "wooded"
+      ],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M461",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M310",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "beach"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M438",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [
+        "Cinema"
+      ],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M573",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [
+        "mesa"
+      ],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M476",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [
+        "beach"
+      ],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M306",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "beach"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M433",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M533",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "ice"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M530",
+      "anyOriginDay": true,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M526",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "desert"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M410",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [
+        "evil"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M486",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M474",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [
+        "RaftingRiver"
+      ],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M521",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "ice"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M020B",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "wooded"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M321",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "desert"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M025B",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [
+        "wooded"
+      ],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M411",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M490",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "ice"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M496",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M531",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [
+        "RaftingRiver"
+      ],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M595",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M471",
+      "anyOriginDay": true,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": [
+        "RaftingRiver"
+      ]
+    },
+    {
+      "jukeboxCode": "M473",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [
+        "ice"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M592",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [
+        "RaftingRiver"
+      ],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M468",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M493",
+      "anyOriginDay": false,
+      "anyOriginNight": false,
+      "dayThemes": [
+        "wooded"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M021B",
+      "anyOriginDay": true,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M596",
+      "anyOriginDay": false,
+      "anyOriginNight": true,
+      "dayThemes": [
+        "evil"
+      ],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M481",
+      "anyOriginDay": true,
+      "anyOriginNight": false,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    },
+    {
+      "jukeboxCode": "M538",
+      "anyOriginDay": true,
+      "anyOriginNight": true,
+      "dayThemes": [],
+      "dayCourses": [],
+      "likelyDayThemes": [],
+      "likelyDayCourses": []
+    }
+  ]
+}

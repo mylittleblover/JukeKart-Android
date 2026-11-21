@@ -1,13 +1,17 @@
 package com.mylittleblover.mkwplayer.ui.settings
 
+import android.os.SystemClock
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -18,10 +22,13 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.ui.Alignment
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.mylittleblover.mkwplayer.BuildConfig
 import com.mylittleblover.mkwplayer.R
@@ -37,8 +44,21 @@ internal fun AppSettingsScreen(
     testMode: UnlockTestMode = UnlockTestMode.NORMAL,
     testUnlockVisible: Boolean = false,
     onTestUnlock: (UnlockTestMode) -> Unit = {},
+    onTestCeremony: () -> Unit = {},
+    onTestUnlockVfx: () -> Unit = {},
+    onTestUnlockNotification: () -> Unit = {},
     outputTrim: com.mylittleblover.mkwplayer.audio.OutputTrim = com.mylittleblover.mkwplayer.audio.OutputTrim.default,
     onOutputTrim: (com.mylittleblover.mkwplayer.audio.OutputTrim) -> Unit = {},
+    playbackBehavior: com.mylittleblover.mkwplayer.audio.PlaybackBehaviorConfig = com.mylittleblover.mkwplayer.audio.PlaybackBehaviorConfig(),
+    onSegmentSwitchFadeOutMs: (Int) -> Unit = {},
+    onPerfectBeat: (Boolean) -> Unit = {},
+    dspConfig: com.mylittleblover.mkwplayer.audio.MasterDspStateConfig = com.mylittleblover.mkwplayer.audio.MasterDspStateConfig(),
+    onLiveVisualizer: (Boolean) -> Unit = {},
+    onOpenEqualizer: () -> Unit = {},
+    onExportBackup: () -> Unit = {},
+    onImportBackup: () -> Unit = {},
+    onExportM3u: () -> Unit = {},
+    backupStatusMessage: String? = null,
     sourceCount: Int? = null, playableCount: Int? = null, importProgress: String = "", importDetail: String? = null,
     importState: com.mylittleblover.mkwplayer.pack.PackImportUiState = com.mylittleblover.mkwplayer.pack.PackImportUiState(),
     onCancelImport: () -> Unit = {},
@@ -47,7 +67,20 @@ internal fun AppSettingsScreen(
     onDismissChangelog: () -> Unit = {},
 ) {
     var choosingLanguage by rememberSaveable { mutableStateOf(false) }
+    var devUnlocked by rememberSaveable { mutableStateOf(testMode != UnlockTestMode.NORMAL) }
     var devExpanded by rememberSaveable { mutableStateOf(testMode != UnlockTestMode.NORMAL) }
+    val tapTracker = remember { DevOptionsTapTracker() }
+    LaunchedEffect(testMode) {
+        if (testMode != UnlockTestMode.NORMAL) {
+            devUnlocked = true
+            tapTracker.seedUnlocked(true)
+        }
+    }
+    LaunchedEffect(devUnlocked) {
+        if (devUnlocked) tapTracker.seedUnlocked(true)
+    }
+    val context = LocalContext.current
+    var activeToast by remember { mutableStateOf<Toast?>(null) }
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val cardColors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
@@ -275,6 +308,219 @@ internal fun AppSettingsScreen(
                 }
             }
         }
+        item("segment-switch-fade") {
+            val initialSecondsText = remember(playbackBehavior.segmentSwitchFadeOutMs) {
+                val ms = playbackBehavior.segmentSwitchFadeOutMs
+                when {
+                    ms <= 0 -> "0"
+                    ms % 1000 == 0 -> (ms / 1000).toString()
+                    else -> String.format(java.util.Locale.ROOT, "%.2f", ms / 1000.0).trimEnd('0').trimEnd('.')
+                }
+            }
+            var customInput by remember(playbackBehavior.segmentSwitchFadeOutMs) {
+                mutableStateOf(initialSecondsText)
+            }
+            val parsedMs = remember(customInput) {
+                val secs = customInput.trim().toDoubleOrNull()
+                if (secs != null && secs.isFinite() && secs >= 0.0) {
+                    kotlin.math.round(secs * 1000.0).toInt().coerceIn(
+                        0,
+                        com.mylittleblover.mkwplayer.audio.PlaybackBehaviorSettings.MAX_SEGMENT_SWITCH_FADEOUT_MS,
+                    )
+                } else null
+            }
+            Card(Modifier.fillMaxWidth(), shape = cardShape, colors = cardColors) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        stringResource(R.string.settings_switch_fade_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        stringResource(R.string.settings_switch_fade_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = if (playbackBehavior.segmentSwitchFadeOutMs <= 0) {
+                            stringResource(R.string.settings_switch_fade_off)
+                        } else {
+                            stringResource(R.string.settings_switch_fade_seconds_fmt, initialSecondsText)
+                        },
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        listOf(0 to "0s", 500 to "0.5s", 1000 to "1s", 2000 to "2s", 5000 to "5s").forEach { (ms, label) ->
+                            FilterChip(
+                                selected = playbackBehavior.segmentSwitchFadeOutMs == ms,
+                                onClick = { onSegmentSwitchFadeOutMs(ms) },
+                                label = { Text(label) },
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = customInput,
+                            onValueChange = { raw ->
+                                customInput = raw.filter { ch -> ch.isDigit() || ch == '.' }.take(6)
+                            },
+                            label = { Text(stringResource(R.string.settings_switch_fade_custom_label)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.weight(1f),
+                        )
+                        FilledTonalButton(
+                            onClick = { parsedMs?.let(onSegmentSwitchFadeOutMs) },
+                            enabled = parsedMs != null && parsedMs != playbackBehavior.segmentSwitchFadeOutMs,
+                        ) {
+                            Text(stringResource(R.string.settings_switch_fade_apply))
+                        }
+                    }
+                }
+            }
+        }
+        item("perfect-beat") {
+            Card(
+                onClick = { onPerfectBeat(!playbackBehavior.perfectBeatEnabled) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = cardShape,
+                colors = cardColors,
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            stringResource(R.string.settings_perfect_beat_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            stringResource(R.string.settings_perfect_beat_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = playbackBehavior.perfectBeatEnabled,
+                        onCheckedChange = onPerfectBeat,
+                    )
+                }
+            }
+        }
+        item("live-visualizer") {
+            Card(
+                onClick = { onLiveVisualizer(!playbackBehavior.liveVisualizerEnabled) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = cardShape,
+                colors = cardColors,
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            stringResource(R.string.settings_visualizer_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            stringResource(R.string.settings_visualizer_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = playbackBehavior.liveVisualizerEnabled,
+                        onCheckedChange = onLiveVisualizer,
+                    )
+                }
+            }
+        }
+        item("equalizer-entry") {
+            val eqActive = dspConfig.eqEnabled || dspConfig.bassBoostPercent > 0 || dspConfig.loudnessDb >= 0.05f
+            val presetLabel = com.mylittleblover.mkwplayer.ui.components.EqualizerPresetLabel(dspConfig.preset)
+            Card(
+                onClick = onOpenEqualizer,
+                modifier = Modifier.fillMaxWidth(),
+                shape = cardShape,
+                colors = cardColors,
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            stringResource(R.string.settings_eq_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            stringResource(R.string.settings_eq_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            if (eqActive) stringResource(R.string.settings_eq_summary_on, presetLabel)
+                            else stringResource(R.string.settings_eq_summary_off),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (eqActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    FilledTonalButton(onClick = onOpenEqualizer) {
+                        Text(stringResource(R.string.settings_eq_title).substringBefore(" "))
+                    }
+                }
+            }
+        }
+        item("backup-restore") {
+            Card(Modifier.fillMaxWidth(), shape = cardShape, colors = cardColors) {
+                Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        stringResource(R.string.settings_backup_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        stringResource(R.string.settings_backup_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = onExportBackup, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.settings_backup_export), maxLines = 1)
+                        }
+                        FilledTonalButton(onClick = onImportBackup, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.settings_backup_import), maxLines = 1)
+                        }
+                    }
+                    OutlinedButton(onClick = onExportM3u, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.settings_backup_m3u), maxLines = 1)
+                    }
+                    if (!backupStatusMessage.isNullOrBlank()) {
+                        Text(
+                            backupStatusMessage,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+            }
+        }
         item("language-heading") {
             Card(
                 onClick = { choosingLanguage = true },
@@ -295,50 +541,70 @@ internal fun AppSettingsScreen(
                 }
             }
         }
-        item("unlock-test") {
-            Card(
-                Modifier.fillMaxWidth().animateContentSize(tween(200, easing = com.mylittleblover.mkwplayer.ui.AppMotion.easeOut)),
-                shape = cardShape,
-                colors = cardColors,
-            ) {
-                Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                    ListItem(
-                        colors = rowColors,
-                        headlineContent = {
-                            Text(stringResource(R.string.settings_dev_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        },
-                        supportingContent = {
-                            Text(stringResource(R.string.settings_unlock_test_title), style = MaterialTheme.typography.bodySmall)
-                        },
-                        trailingContent = {
-                            Icon(if (devExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = null)
-                        },
-                        modifier = Modifier.selectable(selected = devExpanded, role = Role.Button, onClick = { devExpanded = !devExpanded }),
-                    )
-                    AnimatedVisibility(devExpanded) {
-                        Column(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Column(Modifier.padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(stringResource(R.string.settings_unlock_test_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(stringResource(when (testMode) {
-                                    UnlockTestMode.NORMAL -> R.string.settings_unlock_test_normal
-                                    UnlockTestMode.FORCE_UNLOCKED -> R.string.settings_unlock_test_unlocked
-                                    UnlockTestMode.FORCE_LOCKED -> R.string.settings_unlock_test_locked
-                                }), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                                Text(stringResource(if (testUnlockVisible) R.string.settings_unlock_test_visible else R.string.settings_unlock_test_hidden), style = MaterialTheme.typography.bodySmall)
-                            }
-                            Column(Modifier.fillMaxWidth().selectableGroup()) {
-                                listOf(
-                                    UnlockTestMode.NORMAL to R.string.settings_unlock_test_restore,
-                                    UnlockTestMode.FORCE_UNLOCKED to R.string.settings_unlock_test_unlock,
-                                    UnlockTestMode.FORCE_LOCKED to R.string.settings_unlock_test_lock,
-                                ).forEach { (mode, label) ->
-                                    ListItem(
-                                        colors = rowColors,
-                                        headlineContent = { Text(stringResource(label)) },
-                                        trailingContent = { RadioButton(selected = mode == testMode, onClick = null) },
-                                        modifier = Modifier.selectable(selected = mode == testMode, role = Role.RadioButton,
-                                            onClick = { if (mode != testMode) onTestUnlock(mode) }).heightIn(min = 52.dp),
-                                    )
+        if (devUnlocked || testMode != UnlockTestMode.NORMAL) {
+            item("unlock-test") {
+                Card(
+                    Modifier.fillMaxWidth().animateContentSize(tween(200, easing = com.mylittleblover.mkwplayer.ui.AppMotion.easeOut)),
+                    shape = cardShape,
+                    colors = cardColors,
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                        ListItem(
+                            colors = rowColors,
+                            headlineContent = {
+                                Text(stringResource(R.string.settings_dev_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            },
+                            supportingContent = {
+                                Text(stringResource(R.string.settings_unlock_test_title), style = MaterialTheme.typography.bodySmall)
+                            },
+                            trailingContent = {
+                                Icon(if (devExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = null)
+                            },
+                            modifier = Modifier.selectable(selected = devExpanded, role = Role.Button, onClick = { devExpanded = !devExpanded }),
+                        )
+                        AnimatedVisibility(devExpanded) {
+                            Column(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Column(Modifier.padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(stringResource(R.string.settings_unlock_test_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(stringResource(when (testMode) {
+                                        UnlockTestMode.NORMAL -> R.string.settings_unlock_test_normal
+                                        UnlockTestMode.FORCE_UNLOCKED -> R.string.settings_unlock_test_unlocked
+                                        UnlockTestMode.FORCE_LOCKED -> R.string.settings_unlock_test_locked
+                                    }), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                                    Text(stringResource(if (testUnlockVisible) R.string.settings_unlock_test_visible else R.string.settings_unlock_test_hidden), style = MaterialTheme.typography.bodySmall)
+                                }
+                                Column(Modifier.fillMaxWidth().selectableGroup()) {
+                                    listOf(
+                                        UnlockTestMode.NORMAL to R.string.settings_unlock_test_restore,
+                                        UnlockTestMode.FORCE_UNLOCKED to R.string.settings_unlock_test_unlock,
+                                        UnlockTestMode.FORCE_LOCKED to R.string.settings_unlock_test_lock,
+                                    ).forEach { (mode, label) ->
+                                        ListItem(
+                                            colors = rowColors,
+                                            headlineContent = { Text(stringResource(label)) },
+                                            trailingContent = { RadioButton(selected = mode == testMode, onClick = null) },
+                                            modifier = Modifier.selectable(selected = mode == testMode, role = Role.RadioButton,
+                                                onClick = { if (mode != testMode) onTestUnlock(mode) }).heightIn(min = 52.dp),
+                                        )
+                                    }
+                                }
+                                OutlinedButton(
+                                    onClick = onTestCeremony,
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 4.dp),
+                                ) {
+                                    Text(stringResource(R.string.settings_unlock_test_ceremony_btn), maxLines = 1)
+                                }
+                                OutlinedButton(
+                                    onClick = onTestUnlockVfx,
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 4.dp),
+                                ) {
+                                    Text(stringResource(R.string.settings_unlock_test_vfx_btn), maxLines = 1)
+                                }
+                                OutlinedButton(
+                                    onClick = onTestUnlockNotification,
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 4.dp),
+                                ) {
+                                    Text(stringResource(R.string.settings_unlock_test_notif_btn), maxLines = 1)
                                 }
                             }
                         }
@@ -351,7 +617,36 @@ internal fun AppSettingsScreen(
                 Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleSmall)
-                    Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        stringResource(R.string.settings_version, BuildConfig.VERSION_NAME),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                val res = tapTracker.tap(SystemClock.elapsedRealtime())
+                                val msg = when (res) {
+                                    DevOptionsTapTracker.Result.Ignored -> null
+                                    is DevOptionsTapTracker.Result.Progress ->
+                                        context.getString(R.string.settings_dev_taps_remaining, res.remaining)
+                                    DevOptionsTapTracker.Result.UnlockedNow -> {
+                                        devUnlocked = true
+                                        devExpanded = true
+                                        context.getString(R.string.settings_dev_unlocked)
+                                    }
+                                    DevOptionsTapTracker.Result.AlreadyUnlocked -> {
+                                        devUnlocked = true
+                                        context.getString(R.string.settings_dev_already_unlocked)
+                                    }
+                                }
+                                if (msg != null) {
+                                    activeToast?.cancel()
+                                    activeToast = Toast.makeText(context, msg, Toast.LENGTH_SHORT).also { it.show() }
+                                }
+                            }
+                            .padding(vertical = 4.dp),
+                    )
                     Text(stringResource(R.string.map_art_notice), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }

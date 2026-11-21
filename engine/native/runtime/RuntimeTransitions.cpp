@@ -236,7 +236,9 @@ EngineStatus EngineRuntime::planTransition(Scene& source,int target,const Transi
     }
     if(!run.destination || (run.rule->bridge>=0 && !run.bridge)) return EngineStatus::VoiceLimit;
     ready=prepareTransitionPages(run);if(ready!=EngineStatus::Ok)return ready;
-    if(preparationGeneration_==std::numeric_limits<std::uint64_t>::max())return EngineStatus::ResourceLimit;
+    const bool hasBridge=run.rule->bridge>=0;
+    if(preparationGeneration_>=std::numeric_limits<std::uint64_t>::max()-(hasBridge ? 1 : 0))return EngineStatus::ResourceLimit;
+    if(hasBridge)run.bridgePreparationGeneration=++preparationGeneration_;
     run.preparationGeneration=++preparationGeneration_;
     if(transitionPreparation_)transitionPreparation_->ready();
     run.active=true; transition_=run;

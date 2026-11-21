@@ -187,4 +187,172 @@ class RoadJukeboxCatalogTest {
         assertTrue(report.canPlay)
         assertIs<RoadJukeboxCatalog.EdgeMusicResolution.MissingCandidateData>(report.legs.single().resolution)
     }
+
+    @Test
+    fun bundledRouteMusicCatalogMatchesWikiStructureAndJukeboxCatalog() {
+        val routeCatalogText = File("src/main/assets/route_music_catalog.json").readText()
+        val jukeboxJson = org.json.JSONObject(File("src/main/assets/jukebox_catalog.json").readText())
+        val jukeboxCodes = buildSet {
+            val tracks = jukeboxJson.getJSONArray("tracks")
+            for (t in 0 until tracks.length()) {
+                val code = tracks.getJSONObject(t).optString("jukeboxCode").trim()
+                if (code.isNotEmpty()) add(code)
+            }
+        }
+        val wiki = RoadJukeboxCatalog.RouteMusicCatalog.parse(routeCatalogText)!!
+        assertEquals(23, wiki.gpEdges.size)
+        assertEquals(1, wiki.specialEdges.size)
+        assertEquals(133, wiki.tracks.size)
+        assertEquals("BGM_Rainbow_Area1_Pre", wiki.specialFor("Central", "Rainbow")?.stem)
+        for (rule in wiki.tracks) {
+            assertTrue(rule.jukeboxCode in jukeboxCodes, "Missing jukebox code ${rule.jukeboxCode}")
+        }
+        for ((edge, candidates) in wiki.gpEdges) {
+            assertTrue(candidates.isNotEmpty(), "GP edge $edge has no candidates")
+            for (code in candidates) {
+                assertTrue(code in jukeboxCodes, "GP edge $edge references unknown code $code")
+            }
+        }
+    }
+
+    @Test
+    fun officialAndCustomRoutesFollowGpVsDayVsNightAndKnockoutDirectRules() {
+        val connections = connectionsCatalog()
+        val wiki = RoadJukeboxCatalog.RouteMusicCatalog.parse(
+            File("src/main/assets/route_music_catalog.json").readText(),
+        )!!
+        val installed = wiki.tracks.map { rule ->
+            trackItem(
+                key = "jb_${rule.jukeboxCode}",
+                hexDigit = 'a',
+                jukeboxCode = rule.jukeboxCode,
+                name = "Track ${rule.jukeboxCode}",
+            )
+        }
+
+        // 1. Official GP: Special Cup includes BigTree -> SFCMarioCircuit -> Central -> Rainbow
+        val specialCup = OfficialRoute(
+            id = "special_cup",
+            kind = OfficialRouteKind.GRAND_PRIX,
+            names = mapOf("en" to "Special Cup"),
+            stops = listOf(
+                OfficialStop("s1", 1, "BigTree"),
+                OfficialStop("s2", 2, "SFCMarioCircuit"),
+                OfficialStop("s3", 3, "Central"),
+                OfficialStop("s4", 4, "Rainbow"),
+            ),
+            requiresSpecialUnlock = true,
+            sourceUrl = "https://www.mariowiki.com/Special_Cup",
+        )
+        val gpReport = RoadJukeboxCatalog.inspectOfficialRoute(
+            route = specialCup,
+            connections = connections,
+            pool = RoadJukeboxCatalog.CandidatePool(),
+            installedJukebox = installed,
+            isStagePlayable = { true },
+            isStageHidden = { false },
+            wikiCatalog = wiki,
+            ruleMode = RoadJukeboxCatalog.RoadMusicRuleMode.AUTO,
+        )
+        assertTrue(gpReport.canPlay)
+        val leg0 = assertIs<RoadJukeboxCatalog.EdgeMusicResolution.KnownPoolComplete>(gpReport.legs[0].resolution)
+        assertEquals(RoadJukeboxCatalog.EffectiveRuleMode.GRAND_PRIX, leg0.ruleModeUsed)
+        assertTrue(leg0.candidates.isNotEmpty())
+        val leg1 = assertIs<RoadJukeboxCatalog.EdgeMusicResolution.KnownPoolComplete>(gpReport.legs[1].resolution)
+        assertEquals(RoadJukeboxCatalog.EffectiveRuleMode.GRAND_PRIX, leg1.ruleModeUsed)
+        val leg2Special = assertIs<RoadJukeboxCatalog.EdgeMusicResolution.SpecialRoadApproach>(gpReport.legs[2].resolution)
+        assertEquals("BGM_Rainbow_Area1_Pre", leg2Special.stem)
+
+        // 2. Official Rally in AUTO uses KNOCKOUT_DIRECT; switching to VS_DAY yields weighted VS Day candidates
+        val goldenRally = OfficialRoute(
+            id = "golden_rally",
+            kind = OfficialRouteKind.RALLY,
+            names = mapOf("en" to "Golden Rally"),
+            stops = listOf(
+                OfficialStop("r1", 1, "DesertHills"),
+                OfficialStop("r2", 2, "ShyGuyBazaar"),
+            ),
+            requiresSpecialUnlock = false,
+            sourceUrl = "https://www.mariowiki.com/Golden_Rally",
+        )
+        val rallyAuto = RoadJukeboxCatalog.inspectOfficialRoute(
+            route = goldenRally,
+            connections = connections,
+            pool = RoadJukeboxCatalog.CandidatePool(),
+            installedJukebox = installed,
+            isStagePlayable = { true },
+            isStageHidden = { false },
+            wikiCatalog = wiki,
+            ruleMode = RoadJukeboxCatalog.RoadMusicRuleMode.AUTO,
+        )
+        assertIs<RoadJukeboxCatalog.EdgeMusicResolution.KnockoutTourDirect>(rallyAuto.legs.single().resolution)
+
+        val rallyVsDay = RoadJukeboxCatalog.inspectOfficialRoute(
+            route = goldenRally,
+            connections = connections,
+            pool = RoadJukeboxCatalog.CandidatePool(),
+            installedJukebox = installed,
+            isStagePlayable = { true },
+            isStageHidden = { false },
+            wikiCatalog = wiki,
+            ruleMode = RoadJukeboxCatalog.RoadMusicRuleMode.VS_DAY,
+        )
+        val desertDay = assertIs<RoadJukeboxCatalog.EdgeMusicResolution.KnownPoolComplete>(rallyVsDay.legs.single().resolution)
+        assertEquals(RoadJukeboxCatalog.EffectiveRuleMode.VS_DAY, desertDay.ruleModeUsed)
+        assertTrue(desertDay.candidateTiers.values.any { it == RoadJukeboxCatalog.CandidateTier.EXCLUSIVE_ORDER })
+        assertTrue(desertDay.candidateTiers.values.any { it == RoadJukeboxCatalog.CandidateTier.THEMED_BOOSTED })
+        assertTrue(desertDay.candidateTiers.values.any { it == RoadJukeboxCatalog.CandidateTier.MAIN_ORDER })
+        assertTrue(desertDay.candidateWeights.zip(desertDay.candidates).all { (w, item) ->
+            val tier = desertDay.candidateTiers[item.key]
+            if (tier == RoadJukeboxCatalog.CandidateTier.EXCLUSIVE_ORDER || tier == RoadJukeboxCatalog.CandidateTier.THEMED_BOOSTED) {
+                w == 4
+            } else {
+                w == 1
+            }
+        })
+
+        // 3. Custom route in VS_NIGHT uses NIGHT_ORDER exclusively
+        val customNight = CustomRoute(
+            id = "custom_night",
+            name = "Night Cruise",
+            stops = listOf(
+                CustomRouteStop("DesertHills"),
+                CustomRouteStop("ShyGuyBazaar"),
+            ),
+            edges = listOf(CustomRouteEdgeConfig("DesertHills", "ShyGuyBazaar")),
+            roadRuleMode = RoadJukeboxCatalog.RoadMusicRuleMode.VS_NIGHT,
+        )
+        val nightReport = RoadJukeboxCatalog.inspectCustomRoute(
+            route = customNight,
+            connections = connections,
+            pool = RoadJukeboxCatalog.CandidatePool(),
+            installedJukebox = installed,
+            isStagePlayable = { true },
+            isStageHidden = { false },
+            wikiCatalog = wiki,
+        )
+        val nightRes = assertIs<RoadJukeboxCatalog.EdgeMusicResolution.KnownPoolComplete>(nightReport.legs.single().resolution)
+        assertEquals(RoadJukeboxCatalog.EffectiveRuleMode.VS_NIGHT, nightRes.ruleModeUsed)
+        assertEquals(wiki.tracks.count { it.anyOriginNight }, nightRes.candidates.size)
+        assertTrue(nightRes.candidateTiers.values.all { it == RoadJukeboxCatalog.CandidateTier.NIGHT_ORDER })
+    }
+
+    @Test
+    fun linearQueueHonorsWeightedRoadCandidateDistribution() {
+        val heavy = com.mylittleblover.mkwplayer.player.LinearQueue.Entry(key = "heavy", title = "Heavy")
+        val light = com.mylittleblover.mkwplayer.player.LinearQueue.Entry(key = "light", title = "Light")
+        val template = heavy.copy(
+            roadCandidateVariants = listOf(heavy, light),
+            roadCandidateWeights = listOf(4, 1),
+        )
+        val queue = com.mylittleblover.mkwplayer.player.LinearQueue(kotlin.random.Random(12345))
+        var heavyCount = 0
+        var lightCount = 0
+        repeat(500) {
+            val picked = queue.startSession(listOf(template), 0)!!
+            if (picked.key == "heavy") heavyCount++ else if (picked.key == "light") lightCount++
+        }
+        assertTrue(heavyCount > 350 && lightCount > 50, "Expected ~4:1 distribution, got heavy=$heavyCount light=$lightCount")
+    }
 }
+

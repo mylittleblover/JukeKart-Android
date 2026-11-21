@@ -48,6 +48,42 @@ object BwavHeader {
      * is a normal condition, not an exceptional one, and the caller has to decide
      * what to show for it.
      */
+    fun readFile(file: java.io.File): Result {
+        if (!file.isFile) return Result.Rejected("Audio file is missing: ${file.name}")
+        return try {
+            java.io.FileInputStream(file).use { input ->
+                val initial = ByteArray(256)
+                var read = 0
+                while (read < initial.size) {
+                    val n = input.read(initial, read, initial.size - read)
+                    if (n <= 0) break
+                    read += n
+                }
+                if (read < FILE_HEADER_BYTES) {
+                    return Result.Rejected("file is $read bytes, header needs $FILE_HEADER_BYTES")
+                }
+                val channels = u16(initial, 14)
+                if (channels < 1) return Result.Rejected("channel count is $channels")
+                if (channels > 64) return Result.Rejected("unsupported channel count $channels")
+                val headerEnd = FILE_HEADER_BYTES + channels * CHANNEL_HEADER_BYTES
+                if (headerEnd <= read) {
+                    return read(initial.copyOf(read))
+                }
+                val fullHeader = ByteArray(headerEnd)
+                System.arraycopy(initial, 0, fullHeader, 0, read)
+                var totalRead = read
+                while (totalRead < headerEnd) {
+                    val n = input.read(fullHeader, totalRead, headerEnd - totalRead)
+                    if (n <= 0) break
+                    totalRead += n
+                }
+                read(fullHeader.copyOf(totalRead))
+            }
+        } catch (e: Exception) {
+            Result.Rejected(e.message ?: "Could not read BWAV header")
+        }
+    }
+
     fun read(bytes: ByteArray): Result {
         if (bytes.size < FILE_HEADER_BYTES) {
             return Result.Rejected("file is ${bytes.size} bytes, header needs $FILE_HEADER_BYTES")

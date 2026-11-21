@@ -1,6 +1,7 @@
 package com.mylittleblover.mkwplayer.interactive
 
 import android.content.Context
+import com.mylittleblover.mkwplayer.graph.MusicGraphBuilder
 import java.util.Locale
 import org.json.JSONObject
 
@@ -8,7 +9,7 @@ import org.json.JSONObject
  * Bundled arrangement recipes for each course's Complete Medley ("完整组曲").
  *
  * Every clip plays at unity gain (`gainDb = 0.0`) inside a single linear graph segment,
- * reproducing the complete opening (`Pre_Short` -> `Pre` -> optional `Bridge` -> `Main`/patterns -> `Outro`)
+ * reproducing the complete opening (`Pre` -> optional `Bridge` -> `Main`/patterns -> `Outro`)
  * measured against the reference soundtrack with closest-event MINF snapping where needed.
  */
 internal object CourseMedleyCatalog {
@@ -19,6 +20,7 @@ internal object CourseMedleyCatalog {
         val sourceLength: Long,
         val fadeIn: Long = 0L,
         val fadeOut: Long = 0L,
+        val volumePoints: List<MusicGraphBuilder.EnvelopePoint> = emptyList(),
     )
 
     data class Medley(

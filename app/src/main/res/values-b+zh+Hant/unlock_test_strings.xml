@@ -9,4 +9,18 @@
     <string name="settings_unlock_test_unlock">直接解鎖（測試）</string>
     <string name="settings_unlock_test_lock">取消解鎖（測試）</string>
     <string name="settings_unlock_test_restore">恢復正常進度</string>
+    <string name="settings_dev_taps_remaining">再點擊 %1$d 次即可開啟開發者選項</string>
+    <string name="settings_dev_unlocked">開發者選項已開啟</string>
+    <string name="settings_dev_already_unlocked">開發者選項已處於開啟狀態</string>
+    <string name="settings_unlock_test_ceremony_btn">播放特別盃解鎖演出</string>
+    <string name="settings_unlock_test_vfx_btn">播放解鎖特效</string>
+    <string name="settings_unlock_test_notif_btn">彈出特別盃解鎖通知</string>
+    <string name="unlock_ceremony_badge">特別盃已解鎖</string>
+    <string name="unlock_ceremony_title">特別盃出現！</string>
+    <string name="unlock_ceremony_subtitle">請欣賞特別盃登場演出——樂曲結束後即可繼續操作。</string>
+    <string name="unlock_ceremony_locked_hint">解鎖演出進行中 · 無法停止或切換曲目</string>
+    <string name="unlock_congrats_title">特別盃已解鎖！</string>
+    <string name="unlock_congrats_body">你已聆聽所有符合條件的賽道。特別盃、彩虹之路及其相關紀念曲目現已在播放器中全面開放。</string>
+    <string name="unlock_congrats_enter">前往特別盃</string>
+    <string name="unlock_congrats_close">關閉</string>
 </resources>

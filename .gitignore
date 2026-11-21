@@ -6,6 +6,7 @@ __pycache__/
 build/
 app/build/
 app/build-audit/
+*.apk
 *.iml
 .idea/
 local.properties

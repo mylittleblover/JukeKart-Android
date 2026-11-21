@@ -50,13 +50,29 @@ internal object DirectBridgeCompiler {
             tracks = base.spec.tracks + directTracks, transitions = base.spec.transitions + transition)
         val paths = spec.tracks.filter { it.segment == direct || it.segment == main }
             .flatMap { it.clips }.map { spec.assets[it.asset].path }.toSet()
-        val allPrepared = base.preparedAssets + paths
-        require(spec.assets.filter { it.path in allPrepared }.sumOf { it.frames * it.channels * 4L } <= 128L * 1024 * 1024) {
+        val budgetBytes = 128L * 1024 * 1024
+        val directBytes = spec.assets.filter { it.path in paths }.sumOf { it.frames * it.channels * 4L }
+        require(directBytes <= budgetBytes) {
             "Direct Bridge sources exceed the prepared audio budget"
         }
+        val allPrepared = base.preparedAssets + paths
+        val combinedFitsBudget = spec.assets.filter { it.path in allPrepared }.sumOf { it.frames * it.channels * 4L } <= budgetBytes
         val packet = G.build(spec)
+        val updatedPreparedAssets = if (combinedFitsBudget) base.preparedAssets else emptySet()
+        val updatedEntryPrepared = if (combinedFitsBudget || base.preparedAssets.isEmpty()) {
+            base.entryPreparedAssets + (direct to paths)
+        } else {
+            val existingWithBase = base.entryPreparedAssets.mapValues { (segId, set) ->
+                if (segId == direct) set else set + base.preparedAssets
+            }
+            val originalEntryWithBase = if (base.entry !in existingWithBase && base.entry != direct) {
+                mapOf(base.entry to base.preparedAssets)
+            } else emptyMap()
+            existingWithBase + originalEntryWithBase + (direct to paths)
+        }
         return base.copy(spec = spec, packet = packet, labels = base.labels + (direct to label), directBridge = direct, originalEntry = base.originalEntry ?: base.entry,
-            entryPreparedAssets = base.entryPreparedAssets + (direct to paths),
+            preparedAssets = updatedPreparedAssets,
+            entryPreparedAssets = updatedEntryPrepared,
             entryAutomaticNext = base.entryAutomaticNext + (direct to main),
             standard = base.standard?.copy(packet = packet))
     }

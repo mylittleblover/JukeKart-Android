@@ -120,6 +120,31 @@ extern "C" JNIEXPORT jint JNICALL
 Java_com_mylittleblover_player2_platform_audio_NativeAudioLibrary_setOutputGain(JNIEnv*,jobject,jlong engine,jdouble gainDb,jdouble ceilingDb) {
     return static_cast<jint>(player2::api::setEngineOutputGain(handle(engine),gainDb,ceilingDb));
 }
+extern "C" JNIEXPORT jint JNICALL
+Java_com_mylittleblover_player2_platform_audio_NativeAudioLibrary_setPlaybackRate(JNIEnv*,jobject,jlong engine,jdouble speed,jdouble pitchSemitones) {
+    return static_cast<jint>(player2::api::setEnginePlaybackRate(handle(engine),speed,pitchSemitones));
+}
+extern "C" JNIEXPORT jint JNICALL
+Java_com_mylittleblover_player2_platform_audio_NativeAudioLibrary_setMasterDsp(JNIEnv* env,jobject,jlong engine,jboolean eqEnabled,jdoubleArray bands,jdouble bassBoostDb,jdouble loudnessDb) {
+    if(!engine || !bands || env->GetArrayLength(bands)<5) return static_cast<jint>(player2::api::EngineStatus::InvalidRequest);
+    double values[5]{};
+    env->GetDoubleArrayRegion(bands,0,5,values);
+    return static_cast<jint>(player2::api::setEngineMasterDsp(handle(engine),eqEnabled!=JNI_FALSE,values,bassBoostDb,loudnessDb));
+}
+extern "C" JNIEXPORT void JNICALL
+Java_com_mylittleblover_player2_platform_audio_NativeAudioLibrary_setVisualizerEnabled(JNIEnv*,jobject,jlong engine,jboolean enabled) {
+    player2::api::setEngineVisualizerEnabled(handle(engine),enabled!=JNI_FALSE);
+}
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_mylittleblover_player2_platform_audio_NativeAudioLibrary_visualizerSpectrum(JNIEnv* env,jobject,jlong engine,jfloatArray outBands) {
+    if(!engine || !outBands) return JNI_FALSE;
+    const jsize count=env->GetArrayLength(outBands);
+    if(count<=0 || count>32) return JNI_FALSE;
+    float bands[32]{};
+    if(!player2::api::engineVisualizerSpectrum(handle(engine),bands,static_cast<std::size_t>(count))) return JNI_FALSE;
+    env->SetFloatArrayRegion(outBands,0,count,bands);
+    return JNI_TRUE;
+}
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_mylittleblover_player2_platform_audio_NativeAudioLibrary_limitedSampleCount(JNIEnv*,jobject,jlong engine) {
     return static_cast<jlong>(player2::api::engineLimitedSampleCount(handle(engine)));

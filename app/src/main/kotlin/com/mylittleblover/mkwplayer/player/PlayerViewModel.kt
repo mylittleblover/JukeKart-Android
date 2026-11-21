@@ -23,6 +23,8 @@ import com.mylittleblover.mkwplayer.interactive.InteractiveAudioIdentities
 import com.mylittleblover.mkwplayer.interactive.PackInteractiveSources
 import com.mylittleblover.mkwplayer.library.CoursePreset
 import com.mylittleblover.mkwplayer.library.CoursePresetStore
+import com.mylittleblover.mkwplayer.library.PlaylistEntryConfig
+import com.mylittleblover.mkwplayer.library.PlaylistItemRef
 import com.mylittleblover.mkwplayer.library.PresetRefs
 import com.mylittleblover.mkwplayer.library.UserPlaylist
 import com.mylittleblover.mkwplayer.library.LibraryStore
@@ -56,6 +58,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.security.MessageDigest
 
@@ -109,6 +113,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         /** Special Cup progress and the offer, or null before a library exists. */
         val unlock: UnlockUi? = null,
         val unlockTestMode: UnlockTestMode = UnlockTestMode.NORMAL,
+        val debugUnlockBannerVisible: Boolean = false,
         /** What the last pack import did, or null when none has run. */
         val pack: PackUi? = null,
         /** Cached chronological jukebox catalog built from installed packs + bundled OST metadata. */
@@ -134,6 +139,25 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val libraryGeneration: Int = 0,
         /** Live single-task streaming pack import state (#91-#97). */
         val importState: PackImportUiState = PackImportUiState(),
+        val playbackRate: com.mylittleblover.mkwplayer.audio.PlaybackRateConfig =
+            com.mylittleblover.mkwplayer.audio.PlaybackRateConfig(),
+        val dspConfig: com.mylittleblover.mkwplayer.audio.MasterDspStateConfig =
+            com.mylittleblover.mkwplayer.audio.MasterDspStateConfig(),
+        val liveVisualizerEnabled: Boolean = false,
+        val abLoopStartFrame: Long? = null,
+        val abLoopEndFrame: Long? = null,
+        val playStats: Map<String, com.mylittleblover.mkwplayer.library.TrackPlayStat> = emptyMap(),
+        val sleepTimer: SleepTimerState = SleepTimerState(),
+        val interactiveTimer: InteractiveTimerState = InteractiveTimerState(),
+    )
+
+    /** Fast-ticking playback position/source clock separated from discrete [Ui] to prevent 200ms root recompositions. */
+    data class ProgressUi(
+        val position: String = "--:--",
+        val total: String = "--:--",
+        val progress: Float = 0f,
+        val sourceFrame: Long? = null,
+        val fadeRemainingFrames: Long? = null,
     )
 
     data class ContinueListeningUi(
@@ -240,6 +264,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val canEnd: Boolean = false,
         val hasSpeakerOverlay: Boolean = false,
         val speakerEnabled: Boolean = false,
+        val isRainbowMelodyOverlay: Boolean = false,
         val isBattleTrack: Boolean = false,
         val pendingSyncPoint: com.mylittleblover.mkwplayer.graph.MusicGraphBuilder.SyncPoint? = null,
         val pendingSourceCue: String? = null,
@@ -286,6 +311,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      * and getting nothing is indistinguishable from a broken app.
      */
     fun selectStage(code: String) {
+        if (isCeremonyLocked) return
         if(isSpecialStageLocked(code)) return
         if(nativePerformance?.isFading==true) return
         packPlaybackRequest++
@@ -354,6 +380,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
     /** Resolve the selected course by its stable code before starting any playback. */
     fun startStagePerformance(code: String, startingStage: String? = null) {
+        if (isCeremonyLocked) return
         if(isSpecialStageLocked(code)) return
         if(nativePerformance?.isFading==true) return
         val logical=code.removeSuffix("_00")
@@ -375,6 +402,16 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     private val _ui = MutableStateFlow(Ui())
     val ui: StateFlow<Ui> = _ui.asStateFlow()
 
+    private val _progressUi = MutableStateFlow(ProgressUi())
+    val progressUi: StateFlow<ProgressUi> = _progressUi.asStateFlow()
+
+    private val _browseCatalog = MutableStateFlow<com.mylittleblover.mkwplayer.library.BrowseCatalog?>(null)
+    val browseCatalog: StateFlow<com.mylittleblover.mkwplayer.library.BrowseCatalog?> = _browseCatalog.asStateFlow()
+
+    private val _spectrumBars = MutableStateFlow(FloatArray(SPECTRUM_BAND_COUNT))
+    val spectrumBars: StateFlow<FloatArray> = _spectrumBars.asStateFlow()
+    private var visualizerJob: Job? = null
+
     private data class Prepared(
         val name: String,
         val bytes: ByteArray,
@@ -390,6 +427,54 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     private var flowCompiled: StageFlowCompiler.Compiled? = null
     private var flowBytes: Map<String, ByteArray> = emptyMap()
     private var interactivePlan: InteractivePlaybackPlan? = null
+    private var indexedInteractivePlan: InteractivePlaybackPlan? = null
+    private var indexedPlanSegments: Map<Int, com.mylittleblover.mkwplayer.graph.MusicGraphBuilder.Segment> = emptyMap()
+    private var indexedPlanTransitions: Map<Long, com.mylittleblover.mkwplayer.graph.MusicGraphBuilder.Transition> = emptyMap()
+    private var cachedFlowPosSec: Long = -1L; private var cachedFlowPosRate: Int = -1; private var cachedFlowPosText: String = "--:--"
+    private var cachedFlowTotalFrames: Long = -1L; private var cachedFlowTotalRate: Int = -1; private var cachedFlowTotalText: String = "--:--"
+    private var cachedLinearPosSec: Long = -1L; private var cachedLinearPosRate: Int = -1; private var cachedLinearPosText: String = "--:--"
+    private var cachedLinearTotalFrames: Long = -1L; private var cachedLinearTotalRate: Int = -1; private var cachedLinearTotalText: String = "--:--"
+    private fun ensurePlanIndex(plan: InteractivePlaybackPlan) {
+        if (indexedInteractivePlan === plan) return
+        indexedInteractivePlan = plan
+        indexedPlanSegments = plan.spec.segments.associateBy { it.index }
+        val edges = HashMap<Long, com.mylittleblover.mkwplayer.graph.MusicGraphBuilder.Transition>(plan.spec.transitions.size * 2)
+        for (t in plan.spec.transitions) {
+            for (src in t.sources) {
+                for (dst in t.destinations) {
+                    val key = (src.toLong() shl 32) or (dst.toLong() and 0xFFFFFFFFL)
+                    if (key !in edges) edges[key] = t
+                }
+            }
+        }
+        indexedPlanTransitions = edges
+    }
+    private fun formatFlowPos(frames: Long, rate: Int): String {
+        val sec = if (rate > 0) frames / rate else -1L
+        if (sec == cachedFlowPosSec && rate == cachedFlowPosRate) return cachedFlowPosText
+        cachedFlowPosSec = sec; cachedFlowPosRate = rate
+        cachedFlowPosText = EngineSnapshot.formatPosition(frames, rate)
+        return cachedFlowPosText
+    }
+    private fun formatFlowTotal(frames: Long, rate: Int): String {
+        if (frames == cachedFlowTotalFrames && rate == cachedFlowTotalRate) return cachedFlowTotalText
+        cachedFlowTotalFrames = frames; cachedFlowTotalRate = rate
+        cachedFlowTotalText = EngineSnapshot.formatPosition(frames, rate)
+        return cachedFlowTotalText
+    }
+    private fun formatLinearPos(frames: Long, rate: Int): String {
+        val sec = if (rate > 0) frames / rate else -1L
+        if (sec == cachedLinearPosSec && rate == cachedLinearPosRate) return cachedLinearPosText
+        cachedLinearPosSec = sec; cachedLinearPosRate = rate
+        cachedLinearPosText = EngineSnapshot.formatPosition(frames, rate)
+        return cachedLinearPosText
+    }
+    private fun formatLinearTotal(frames: Long, rate: Int): String {
+        if (frames == cachedLinearTotalFrames && rate == cachedLinearTotalRate) return cachedLinearTotalText
+        cachedLinearTotalFrames = frames; cachedLinearTotalRate = rate
+        cachedLinearTotalText = EngineSnapshot.formatPosition(frames, rate)
+        return cachedLinearTotalText
+    }
     private var nativePerformance: NativeInteractiveDriver? = null
     private val minfCatalog by lazy {
         getApplication<Application>().assets.open("interactive_minf.json").bufferedReader().use { MinfCatalog.parse(it.readText()) }
@@ -397,8 +482,19 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     private val interactiveIdentities by lazy {
         getApplication<Application>().assets.open("interactive_audio_identities.json").bufferedReader().use { InteractiveAudioIdentities.parse(it.readText()) }
     }
-    private val finalLapFanfareBytes: ByteArray by lazy {
-        getApplication<Application>().assets.open("audio/${com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.ASSET}").use { it.readBytes() }
+    private fun loadFinalLapFanfareBytes(): ByteArray? {
+        val assetPath = "audio/${com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.ASSET}"
+        runCatching {
+            getApplication<Application>().assets.open(assetPath).use { it.readBytes() }
+        }.getOrNull()?.let { return it }
+        val dir = pack?.directory
+        if (dir != null) {
+            val packFile = java.io.File(dir, "audio/${com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.SHA256}")
+            if (packFile.isFile) {
+                runCatching { packFile.readBytes() }.getOrNull()?.let { return it }
+            }
+        }
+        return null
     }
 
     /** The unified merged internal pack library, or null when using loose files. */
@@ -449,6 +545,10 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         com.mylittleblover.mkwplayer.interactive.CourseMedleyCatalog.load(getApplication())
     }
 
+    internal val extraMedleyCatalog: com.mylittleblover.mkwplayer.interactive.ExtraMedleyCatalog.Catalog by lazy {
+        com.mylittleblover.mkwplayer.interactive.ExtraMedleyCatalog.load(getApplication())
+    }
+
     val localizedNames: com.mylittleblover.mkwplayer.routes.LocalizedNames? by lazy {
         runCatching {
             getApplication<Application>().assets.open("localized_names.json").bufferedReader().use {
@@ -474,9 +574,17 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         }.getOrNull()
     }
 
+    val routeMusicCatalog: com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RouteMusicCatalog? by lazy {
+        runCatching {
+            getApplication<Application>().assets.open("route_music_catalog.json").bufferedReader().use {
+                com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RouteMusicCatalog.parse(it.readText())
+            }
+        }.getOrNull()
+    }
+
     @Volatile
     var roadJukeboxPool: com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.CandidatePool =
-        com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.loadInternalPool(getApplication<Application>().filesDir)
+        com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.CandidatePool()
         private set
 
     fun reloadRoadJukeboxPool() {
@@ -494,19 +602,30 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         return plan.overlayTrackIndices.associateWith { db }
     }
 
-    private fun refreshJukeboxCatalog() {
+    private fun loadJukeboxCatalogSync(): com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.Catalog {
         val registry = com.mylittleblover.mkwplayer.pack.PackRegistry(
             java.io.File(getApplication<Application>().filesDir, PACK_ROOT),
         )
-        val loaded = com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.load(registry, jukeboxMetadata)
+        return com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.load(registry, jukeboxMetadata)
+    }
+
+    private fun applyJukeboxCatalog(loaded: com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.Catalog) {
         _ui.value = _ui.value.copy(jukebox = loaded)
         linearCoordinator.configureSessionStore(linearSessionStore)
         linearCoordinator.attach(getApplication(), loaded)
         refreshContinueListening()
     }
 
+    private fun refreshJukeboxCatalog() {
+        viewModelScope.launch {
+            val loaded = withContext(Dispatchers.IO) { loadJukeboxCatalogSync() }
+            applyJukeboxCatalog(loaded)
+        }
+    }
+
     /** Plays a single Jukebox track by its pack key, freezing its source game's list as the queue. */
     fun openJukeboxTrack(key: String, languageTag: String = java.util.Locale.getDefault().toLanguageTag()) {
+        if (isCeremonyLocked) return
         val catalog = jukebox
         if (!catalog.tracksByKey.containsKey(key)) {
             _ui.value = _ui.value.copy(
@@ -533,6 +652,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         languageTag: String,
         shuffle: Boolean? = null,
     ) {
+        if (isCeremonyLocked) return
         if (nativePerformance?.isFading == true) return
         val entries = game.items.map { item -> LinearPlaybackCoordinator.entryFor(item, game, languageTag) }
         if (entries.isEmpty()) return
@@ -552,6 +672,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
     /** Plays all installed Jukebox arrangements chronologically across all games. */
     fun playAllJukebox(languageTag: String, shuffle: Boolean = false) {
+        if (isCeremonyLocked) return
         if (nativePerformance?.isFading == true) return
         val catalog = jukebox
         val entries = catalog.games.flatMap { game ->
@@ -577,6 +698,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         game: com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.Game,
         languageTag: String,
     ) {
+        if (isCeremonyLocked) return
         if (!_ui.value.allowPlayNext) return
         val entry = LinearPlaybackCoordinator.entryFor(item, game, languageTag)
         val wasIdle = !_ui.value.canStop && _ui.value.queue.current == null
@@ -587,22 +709,27 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     }
 
     fun skipNext() {
+        if (isCeremonyLocked) return
         linearCoordinator.skipNext()
     }
 
     fun skipPrevious() {
+        if (isCeremonyLocked) return
         linearCoordinator.skipPrevious()
     }
 
     fun toggleShuffle() {
+        if (isCeremonyLocked) return
         linearCoordinator.toggleShuffle()
     }
 
     fun cycleRepeatMode() {
+        if (isCeremonyLocked) return
         linearCoordinator.cycleRepeatMode()
     }
 
     fun replayOrResumeLinear() {
+        if (isCeremonyLocked) return
         if (_ui.value.canResume) {
             resume()
         } else {
@@ -611,14 +738,17 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     }
 
     fun removeTempQueueItem(index: Int) {
+        if (isCeremonyLocked) return
         linearCoordinator.removeTempAt(index)
     }
 
     fun jumpToTempQueueItem(index: Int) {
+        if (isCeremonyLocked) return
         linearCoordinator.jumpToTemp(index)
     }
 
     fun jumpToUpcomingQueueItem(index: Int) {
+        if (isCeremonyLocked) return
         linearCoordinator.jumpToUpcoming(index)
     }
 
@@ -645,9 +775,233 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      * once at start-up and again on every change. Re-applying the same numbers costs a queued command and
      * changes nothing audible, which is cheaper than tracking whether it was applied and getting that wrong.
      */
+    private var playbackBehavior: com.mylittleblover.mkwplayer.audio.PlaybackBehaviorConfig =
+        com.mylittleblover.mkwplayer.audio.PlaybackBehaviorSettings.current(getApplication())
+
     fun applyOutputTrim(trim: com.mylittleblover.mkwplayer.audio.OutputTrim) {
         PlaybackHolder.get().setOutputTrim(trim)
     }
+
+    fun applyPlaybackBehavior(config: com.mylittleblover.mkwplayer.audio.PlaybackBehaviorConfig) {
+        playbackBehavior = config
+        setLiveVisualizerEnabled(config.liveVisualizerEnabled)
+    }
+
+    fun setPlaybackRate(config: com.mylittleblover.mkwplayer.audio.PlaybackRateConfig) {
+        val saved = com.mylittleblover.mkwplayer.audio.AudioEffectSettings.saveRate(getApplication(), config)
+        session.setPlaybackRate(saved)
+        _ui.value = _ui.value.copy(playbackRate = saved)
+    }
+
+    fun resetPlaybackRate() {
+        setPlaybackRate(com.mylittleblover.mkwplayer.audio.PlaybackRateConfig())
+    }
+
+    fun setMasterDsp(config: com.mylittleblover.mkwplayer.audio.MasterDspStateConfig) {
+        val saved = com.mylittleblover.mkwplayer.audio.AudioEffectSettings.saveDsp(getApplication(), config)
+        session.setMasterDsp(saved)
+        _ui.value = _ui.value.copy(dspConfig = saved)
+    }
+
+    fun setLiveVisualizerEnabled(enabled: Boolean) {
+        val updatedBehavior = com.mylittleblover.mkwplayer.audio.PlaybackBehaviorSettings
+            .setLiveVisualizerEnabled(getApplication(), enabled)
+        playbackBehavior = updatedBehavior
+        session.setVisualizerEnabled(enabled)
+        _ui.value = _ui.value.copy(liveVisualizerEnabled = enabled)
+        syncVisualizerPolling(session.state.value.playing)
+    }
+
+    fun syncPreferencesAfterBackupRestore() {
+        val ctx = getApplication<Application>()
+        val trim = com.mylittleblover.mkwplayer.audio.OutputTrimSettings.current(ctx)
+        val behavior = com.mylittleblover.mkwplayer.audio.PlaybackBehaviorSettings.current(ctx)
+        val dsp = com.mylittleblover.mkwplayer.audio.AudioEffectSettings.currentDsp(ctx)
+        val rateCfg = com.mylittleblover.mkwplayer.audio.AudioEffectSettings.currentRate(ctx)
+        playbackBehavior = behavior
+        session.setOutputTrim(trim)
+        session.setMasterDsp(dsp)
+        session.setPlaybackRate(rateCfg)
+        session.setVisualizerEnabled(behavior.liveVisualizerEnabled)
+        com.mylittleblover.mkwplayer.library.PlayStatsRepository.reload(ctx)
+        _ui.value = _ui.value.copy(
+            dspConfig = dsp,
+            playbackRate = rateCfg,
+            liveVisualizerEnabled = behavior.liveVisualizerEnabled,
+            playStats = com.mylittleblover.mkwplayer.library.PlayStatsRepository.readSnapshot(ctx),
+        )
+        syncVisualizerPolling(session.state.value.playing)
+    }
+
+    fun removeUpcomingQueueItem(index: Int) {
+        if (isCeremonyLocked) return
+        linearCoordinator.removeUpcomingAt(index)
+    }
+
+    fun moveTempQueueItem(from: Int, to: Int) {
+        if (isCeremonyLocked) return
+        linearCoordinator.moveTemp(from, to)
+    }
+
+    fun moveUpcomingQueueItem(from: Int, to: Int) {
+        if (isCeremonyLocked) return
+        linearCoordinator.moveUpcoming(from, to)
+    }
+
+    fun clearUpcomingQueue() {
+        if (isCeremonyLocked) return
+        linearCoordinator.clearUpcoming()
+    }
+
+    fun setAbLoopA() {
+        if (isCeremonyLocked) return
+        linearCoordinator.setAbLoopPointA()
+    }
+
+    fun setAbLoopB() {
+        if (isCeremonyLocked) return
+        linearCoordinator.setAbLoopPointB()
+    }
+
+    fun clearAbLoop() {
+        if (isCeremonyLocked) return
+        linearCoordinator.clearAbLoop()
+    }
+
+    fun startSleepTimerMinutes(minutes: Int) {
+        val cleanMinutes = minutes.coerceIn(1, 480)
+        PlaybackTimers.engine.startSleepCountdown(cleanMinutes * 60_000L)
+    }
+
+    fun startSleepTimerAfterCurrentTrack() {
+        PlaybackTimers.engine.startSleepAfterCurrentTrack()
+    }
+
+    fun extendSleepTimerMinutes(minutes: Int = 5) {
+        PlaybackTimers.engine.extendSleep(minutes.coerceIn(1, 120) * 60_000L)
+    }
+
+    fun cancelSleepTimer() {
+        PlaybackTimers.engine.cancelSleep()
+    }
+
+    fun startInteractiveTimerSeconds(seconds: Long, action: InteractiveTimedAction) {
+        if (isCeremonyLocked || _ui.value.linearMode || !_ui.value.canStop) return
+        val courseKey = currentStageCode ?: interactivePlan?.name ?: _ui.value.title.takeIf { it.isNotBlank() }
+        PlaybackTimers.engine.startInteractiveTimer(
+            durationMs = seconds.coerceIn(1L, 10_800L) * 1_000L,
+            action = action,
+            courseKey = courseKey,
+            currentlyPlaying = session.state.value.playing,
+        )
+    }
+
+    fun cancelInteractiveTimer() {
+        PlaybackTimers.engine.cancelInteractiveTimer()
+    }
+
+    private fun recordCanonicalPlayStat(canonicalId: String) {
+        val clean = canonicalId.trim()
+        if (clean.isEmpty()) return
+        val ctx = getApplication<Application>()
+        viewModelScope.launch(Dispatchers.IO) {
+            com.mylittleblover.mkwplayer.library.PlayStatsRepository.recordPlay(ctx, clean)
+        }
+    }
+
+    private fun recordLinearPlayStat(entry: LinearQueue.Entry) {
+        if (entry.key == CEREMONY_ENTRY_KEY) return
+        val canonicalId = when {
+            !entry.courseCode.isNullOrBlank() -> entry.courseCode.removeSuffix("_00")
+            entry.sourceType == LinearSessionStore.SourceType.JUKEBOX ->
+                "${PlaylistItemRef.PREFIX_JUKEBOX}${entry.sourceTrackKey ?: entry.key}"
+            entry.key.startsWith(PlaylistItemRef.PREFIX_SFC) ||
+                entry.key.startsWith(PlaylistItemRef.PREFIX_BATTLE) ||
+                entry.key.startsWith(PlaylistItemRef.PREFIX_EXTRA) ||
+                entry.key.startsWith(PlaylistItemRef.PREFIX_JUKEBOX) -> entry.key
+            else -> entry.key
+        }
+        recordCanonicalPlayStat(canonicalId)
+    }
+
+    private fun fadeOutLinearAndStop() {
+        viewModelScope.launch(Dispatchers.Main.immediate) {
+            if (isCeremonyLocked || !session.state.value.active) return@launch
+            val savedTrim = com.mylittleblover.mkwplayer.audio.OutputTrimSettings.current(getApplication())
+            if (session.state.value.playing) {
+                val steps = listOf(-3.0, -7.0, -12.0, -18.0, -26.0, -38.0)
+                for (delta in steps) {
+                    if (!session.state.value.active || !session.state.value.playing) break
+                    session.setOutputTrim(
+                        com.mylittleblover.mkwplayer.audio.OutputTrim(
+                            gainDb = (savedTrim.gainDb + delta).coerceAtLeast(-54.0),
+                            ceilingDb = savedTrim.ceilingDb,
+                        ),
+                    )
+                    delay(140L)
+                }
+            }
+            stopTransport(cancelPendingOpen = true)
+            session.setOutputTrim(savedTrim)
+        }
+    }
+
+    private fun triggerInteractiveTimedAction(action: InteractiveTimedAction) {
+        if (isCeremonyLocked || _ui.value.linearMode || !_ui.value.canStop) return
+        when (action) {
+            is InteractiveTimedAction.FadeStop -> {
+                if (action.fadeSeconds <= 0) {
+                    stop()
+                } else if (canFadeStop) {
+                    val closest = listOf(1, 3, 5, 10).minByOrNull { kotlin.math.abs(it - action.fadeSeconds) } ?: 3
+                    fadeStopPerformance(closest)
+                } else {
+                    stop()
+                }
+            }
+            InteractiveTimedAction.Advance -> advancePerformance()
+            InteractiveTimedAction.ToggleFast -> toggleFast()
+            is InteractiveTimedAction.TakeOutro -> {
+                if (action.number != null) takeOutro(action.number) else takeOutro()
+            }
+            is InteractiveTimedAction.SelectRegion -> selectMusicRegion(action.region)
+            is InteractiveTimedAction.SelectVersion -> selectRecordingVersion(action.version)
+            InteractiveTimedAction.ToggleSpeakerOverlay -> toggleSpeakerOverlay()
+        }
+    }
+
+    private fun syncVisualizerPolling(playing: Boolean) {
+        val wantPoll = _ui.value.liveVisualizerEnabled && playing && session.state.value.active
+        if (!wantPoll) {
+            visualizerJob?.cancel()
+            visualizerJob = null
+            if (_spectrumBars.value.any { it != 0f }) {
+                _spectrumBars.value = FloatArray(SPECTRUM_BAND_COUNT)
+            }
+            return
+        }
+        if (visualizerJob?.isActive == true) return
+        visualizerJob = viewModelScope.launch {
+            val scratch = FloatArray(SPECTRUM_BAND_COUNT)
+            while (true) {
+                if (_ui.value.liveVisualizerEnabled && session.state.value.playing && session.visualizerSpectrum(scratch)) {
+                    _spectrumBars.value = scratch.copyOf()
+                } else {
+                    break
+                }
+                delay(40L)
+            }
+            _spectrumBars.value = FloatArray(SPECTRUM_BAND_COUNT)
+            visualizerJob = null
+        }
+    }
+
+    private fun currentInteractiveOptions(allowPreludeToFast: Boolean = true): InteractivePlaybackPlan.Options =
+        InteractivePlaybackPlan.Options(
+            segmentSwitchFadeOutMs = playbackBehavior.segmentSwitchFadeOutMs,
+            perfectBeatEnabled = playbackBehavior.perfectBeatEnabled,
+            allowPreludeToFast = allowPreludeToFast,
+        )
 
     /** A pack that has been installed and verified, kept together so a track can be prepared on demand. */
     private data class InstalledPack(val manifest: PackManifest, val directory: java.io.File)
@@ -679,24 +1033,86 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
     private val unlockTestStore = UnlockTestStore(java.io.File(application.filesDir, "unlock-test-mode.json"))
     private var naturalUnlockUi: UnlockUi? = null
+    private var testingCeremonyPlaying: Boolean = false
+    private val isCeremonyLocked: Boolean
+        get() = testingCeremonyPlaying ||
+            naturalUnlockUi?.ceremonyPlaying == true ||
+            _ui.value.unlock?.ceremonyPlaying == true ||
+            session.uninterruptible
+
+    private var lastCreditedStage: String? = null
+    private var lastCreditedFrame: Long = -1L
+    private var lastUnlockSavedMs: Long = 0L
+    private var lastTimingSnapshotMs: Long = 0L
+    private val unlockSaveMutex = Mutex()
+
+    private fun saveUnlockAsync(state: SpecialCupUnlock.UnlockState) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val problem = unlockSaveMutex.withLock {
+                unlockStore.save(state)
+            }
+            if (problem != null) {
+                withContext(Dispatchers.Main.immediate) {
+                    _ui.value = _ui.value.copy(detail = problem)
+                }
+            }
+        }
+    }
 
     private fun projectUnlock(natural: UnlockUi?): UnlockUi? {
         naturalUnlockUi = natural
         // A research pack with an unfinished scope must never earn the formal gate by accident.
-        val formal = if(pack?.manifest?.unlock?.frozen == false) natural?.copy(visible=false, canEnter=false) else natural
-        return _ui.value.unlockTestMode.apply(formal)
+        val formal = if (pack?.manifest?.unlock?.frozen == false) natural?.copy(visible = false, canEnter = false) else natural
+        val projected = _ui.value.unlockTestMode.apply(formal)
+        return if (testingCeremonyPlaying) {
+            (projected ?: formal)?.copy(ceremonyPlaying = true, canEnter = false)
+                ?: UnlockUi(
+                    progress = "",
+                    remaining = null,
+                    ruleNotice = "",
+                    offered = true,
+                    ceremonyPlaying = true,
+                    ceremonyCompleted = false,
+                    congratulationOwed = false,
+                    canEnter = false,
+                    visible = false,
+                    hiddenReason = null,
+                )
+        } else {
+            projected
+        }
     }
 
     fun setUnlockTestMode(mode: UnlockTestMode) {
-        unlockTestStore.write(mode).fold(onSuccess = {
-            _ui.value = _ui.value.copy(unlockTestMode=mode, unlock=mode.apply(
-                if(pack?.manifest?.unlock?.frozen == false) naturalUnlockUi?.copy(visible=false,canEnter=false) else naturalUnlockUi))
-            if(isSpecialStageLocked(currentStageCode.orEmpty())) releaseTransport()
-        }, onFailure = { _ui.value = _ui.value.copy(detail=it.message) })
+        if (isCeremonyLocked) return
+        _ui.value = _ui.value.copy(unlockTestMode = mode)
+        _ui.value = _ui.value.copy(unlock = projectUnlock(naturalUnlockUi))
+        val activeStage = currentStageCode
+            ?: _ui.value.linearTrack?.courseCode
+            ?: _ui.value.linearTrack?.key?.let(com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog::extraIdFromEntryKey)
+            ?: ""
+        val activeExtraLocked = activeStage.isNotEmpty() &&
+            !com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.isVisible(
+                activeStage,
+                com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(_ui.value.unlock),
+            )
+        val activeSpecialRouteLocked = _ui.value.linearContextId == "special_cup" &&
+            !com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(_ui.value.unlock)
+        if (isSpecialStageLocked(activeStage) || activeExtraLocked || activeSpecialRouteLocked) {
+            releaseTransport()
+        }
+        refreshContinueListening()
+        viewModelScope.launch(Dispatchers.IO) {
+            unlockTestStore.write(mode).onFailure { err ->
+                withContext(Dispatchers.Main.immediate) {
+                    _ui.value = _ui.value.copy(detail = err.message)
+                }
+            }
+        }
     }
 
     private fun isSpecialStageLocked(code: String): Boolean =
-        code.removePrefix("BGM_Stage_").removeSuffix("_00").equals("Rainbow",true) &&
+        code.removePrefix("BGM_Stage_").removeSuffix("_00").equals("Rainbow", true) &&
             !com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(_ui.value.unlock)
 
     /** The cup's rules and progress, or null until there is a library to derive eligibility from. */
@@ -708,52 +1124,194 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     /**
      * Feeds a transport sample to the cup.
      *
-     * Only playing samples count, and only for the stage the sample belongs to. The result is
-     * persisted immediately: losing thirty seconds of listening to a crash would be indistinguishable
-     * from the rule not working.
+     * Only playing samples count, and only for the stage the sample belongs to. Counts both
+     * interactive stage playback and linear course medleys / route stops / presets.
      */
     private fun creditListening(state: PlaybackSession.State) {
+        if (isCeremonyLocked) return
         val bridge = listening ?: return
-        val prefix = currentStageCode ?: state.title.takeIf { it.isNotEmpty() }?.let(StageFlowDiscovery::prefixOf) ?: return
+        val activeLinear = _ui.value.linearTrack
+        val linearCourse = if (_ui.value.linearMode &&
+            (activeLinear?.sourceType == LinearSessionStore.SourceType.MEDLEY ||
+                activeLinear?.sourceType == LinearSessionStore.SourceType.PRESET)
+        ) {
+            activeLinear.courseCode
+        } else {
+            null
+        }
+        val rawPrefix = currentStageCode
+            ?: linearCourse
+            ?: state.title.takeIf { it.isNotEmpty() && !_ui.value.linearMode }?.let(StageFlowDiscovery::prefixOf)
+            ?: return
+        val prefix = rawPrefix.removePrefix("BGM_Stage_").removeSuffix("_00")
+        if (prefix.isBlank()) return
+
+        val beforeCompleted = bridge.snapshot.completedStages.size
+        val beforeEntitled = bridge.snapshot.entitled
+        val beforeCeremony = bridge.snapshot.ceremony
 
         if (bridge.snapshot.currentStage != prefix) {
-            bridge.begin(prefix, state.totalFrames, state.sampleRate.coerceAtLeast(48_000))
+            bridge.begin(prefix, state.totalFrames.coerceAtLeast(0L), state.sampleRate.coerceAtLeast(48_000))
+        } else if (prefix == lastCreditedStage && state.positionFrames < lastCreditedFrame) {
+            // Restarted or looped from earlier position in the same stage: reset cursor before sampling.
+            bridge.stopped()
         }
         if (!state.playing && !state.paused) bridge.stopped()
 
         val outcome = bridge.sample(state.positionFrames, state.playing)
+        lastCreditedStage = prefix
+        lastCreditedFrame = state.positionFrames
         val offered = outcome.offeredNow || _ui.value.unlock?.offered == true
 
         if (outcome.ignoredReason == null) {
-            _ui.value = _ui.value.copy(unlock = projectUnlock(UnlockUi.from(bridge, offered)))
-            unlockStore.save(outcome.state)?.let { _ui.value = _ui.value.copy(detail = it) }
+            val milestone = outcome.state.completedStages.size != beforeCompleted ||
+                outcome.state.entitled != beforeEntitled ||
+                outcome.state.ceremony != beforeCeremony ||
+                outcome.offeredNow
+            val nextUnlock = projectUnlock(UnlockUi.from(bridge, offered))
+            if (milestone || nextUnlock != _ui.value.unlock) {
+                _ui.value = _ui.value.copy(unlock = nextUnlock)
+            }
+            val nowMs = android.os.SystemClock.elapsedRealtime()
+            val stageInProgress = prefix !in outcome.state.completedStages
+            if (milestone || (stageInProgress && nowMs - lastUnlockSavedMs >= 5_000L)) {
+                lastUnlockSavedMs = nowMs
+                saveUnlockAsync(outcome.state)
+            }
+            if (outcome.newlyEntitled) {
+                postUnlockReadyNotification()
+            }
         }
     }
 
     init {
-        unlockTestStore.read().fold(onSuccess = { _ui.value = _ui.value.copy(unlockTestMode=it) },
-            onFailure = { _ui.value = _ui.value.copy(detail=it.message) })
-        // The catalog is bundled data, so it is read once rather than re-parsed on every
-        // recomposition. A missing or broken asset leaves it null and the UI omits the
-        // section instead of showing an empty one.
-        val catalog = try {
-            getApplication<Application>().assets.open(CATALOG_ASSET).bufferedReader().use {
-                CatalogLoader.parse(it.readText())
+        val appCtx = getApplication<Application>()
+        val initTrim = com.mylittleblover.mkwplayer.audio.OutputTrimSettings.current(appCtx)
+        val initRate = com.mylittleblover.mkwplayer.audio.AudioEffectSettings.currentRate(appCtx)
+        val initDsp = com.mylittleblover.mkwplayer.audio.AudioEffectSettings.currentDsp(appCtx)
+        val initBehavior = com.mylittleblover.mkwplayer.audio.PlaybackBehaviorSettings.current(appCtx)
+        playbackBehavior = initBehavior
+        session.setOutputTrim(initTrim)
+        session.setPlaybackRate(initRate)
+        session.setMasterDsp(initDsp)
+        session.setVisualizerEnabled(initBehavior.liveVisualizerEnabled)
+        com.mylittleblover.mkwplayer.library.PlayStatsRepository.reload(appCtx)
+        _ui.value = _ui.value.copy(
+            playbackRate = initRate,
+            dspConfig = initDsp,
+            liveVisualizerEnabled = initBehavior.liveVisualizerEnabled,
+            playStats = com.mylittleblover.mkwplayer.library.PlayStatsRepository.readSnapshot(appCtx),
+            sleepTimer = PlaybackTimers.sleepState.value,
+            interactiveTimer = PlaybackTimers.interactiveState.value,
+        )
+
+        PlaybackTimers.onSleepExpired = {
+            viewModelScope.launch(Dispatchers.Main.immediate) {
+                if (isCeremonyLocked || !session.state.value.active) return@launch
+                if (!_ui.value.linearMode && canFadeStop) {
+                    fadeStopPerformance(3)
+                } else {
+                    fadeOutLinearAndStop()
+                }
             }
-        } catch (e: Exception) {
-            null
         }
-        if (catalog != null) {
-            _ui.value = _ui.value.copy(catalog = catalog)
-            browser = CatalogBrowser(catalog)
-            refreshCatalog()
+        PlaybackTimers.onInteractiveActionTriggered = { action ->
+            viewModelScope.launch(Dispatchers.Main.immediate) {
+                triggerInteractiveTimedAction(action)
+            }
+        }
+        linearCoordinator.onTrackOpened = { entry ->
+            recordLinearPlayStat(entry)
+        }
+        viewModelScope.launch {
+            com.mylittleblover.mkwplayer.library.PlayStatsRepository.stats.collect { stats ->
+                _ui.value = _ui.value.copy(playStats = stats)
+            }
+        }
+        viewModelScope.launch {
+            PlaybackTimers.sleepState.collect { timer ->
+                _ui.value = _ui.value.copy(sleepTimer = timer)
+            }
+        }
+        viewModelScope.launch {
+            PlaybackTimers.interactiveState.collect { timer ->
+                _ui.value = _ui.value.copy(interactiveTimer = timer)
+            }
         }
 
-        // Restore before the first frame so the list is never briefly empty on launch.
-        val loaded = store.load()
-        if (loaded.rows.isNotEmpty()) {
+        PackImportCoordinator.configureCommitHandler { installed ->
+            withContext(Dispatchers.Main.immediate) {
+                applyCommittedPackUpdate(installed)
+            }
+        }
+        linearCoordinator.onSessionCompletedNaturally = { endedEntry ->
+            if (endedEntry?.key == CEREMONY_ENTRY_KEY || isCeremonyLocked) {
+                onCeremonyAudioCompleted()
+            }
+        }
+
+        viewModelScope.launch {
+            data class ColdInitResult(
+                val testMode: UnlockTestMode,
+                val testModeError: String?,
+                val catalog: CatalogLoader.Catalog?,
+                val loaded: LibraryStore.Loaded,
+                val merged: InternalPackLibrary.MergedLibrary?,
+                val jukeboxCatalog: com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.Catalog,
+                val roadPool: com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.CandidatePool,
+                val builtBrowse: com.mylittleblover.mkwplayer.library.BrowseCatalog?,
+                val restoredUnlock: UnlockStore.Loaded,
+            )
+            val initResult = withContext(Dispatchers.IO) {
+                val testRes = unlockTestStore.read()
+                val catalog = try {
+                    getApplication<Application>().assets.open(CATALOG_ASSET).bufferedReader().use {
+                        CatalogLoader.parse(it.readText())
+                    }
+                } catch (e: Exception) {
+                    null
+                }
+                val loaded = store.load()
+                val packRoot = java.io.File(getApplication<Application>().filesDir, PACK_ROOT)
+                val merged = InternalPackLibrary(packRoot).loadOrMaterialize()
+                val pool = com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.loadInternalPool(
+                    getApplication<Application>().filesDir,
+                )
+                // Warm lazy JSON catalogs off the main thread so cold start and first compose never stall.
+                val anchors = mapAnchors
+                val official = officialRouteCatalog
+                val names = localizedNames
+                stageConnections
+                routeMusicCatalog
+                extraCatalog
+                courseMedleyCatalog
+                val builtBrowse = if (official != null && names != null && anchors != null) {
+                    com.mylittleblover.mkwplayer.library.BrowseCatalog.create(official, names, anchors)
+                } else {
+                    null
+                }
+                val jukeboxCatalog = loadJukeboxCatalogSync()
+                val restoredUnlock = unlockStore.load()
+                PackImportCoordinator.checkPendingCheckpoint(getApplication(), packRoot)
+                ColdInitResult(
+                    testMode = testRes.getOrDefault(UnlockTestMode.NORMAL),
+                    testModeError = testRes.exceptionOrNull()?.message,
+                    catalog = catalog,
+                    loaded = loaded,
+                    merged = merged,
+                    jukeboxCatalog = jukeboxCatalog,
+                    roadPool = pool,
+                    builtBrowse = builtBrowse,
+                    restoredUnlock = restoredUnlock,
+                )
+            }
+
+            roadJukeboxPool = initResult.roadPool
+            _browseCatalog.value = initResult.builtBrowse
             _ui.value = _ui.value.copy(
-                tracks = loaded.rows.map {
+                unlockTestMode = initResult.testMode,
+                catalog = initResult.catalog,
+                tracks = initResult.loaded.rows.map {
                     Track(
                         key = it.key,
                         name = it.name,
@@ -763,35 +1321,26 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                         reason = it.reason,
                     )
                 },
+                pack = initResult.merged?.let { merged ->
+                    PackUi(
+                        name = merged.manifest.name,
+                        trackCount = merged.manifest.tracks.size,
+                        playableCount = PackPlayback.playableTracks(merged.manifest).size,
+                    )
+                },
+                detail = initResult.testModeError ?: initResult.loaded.problem ?: _ui.value.detail,
             )
-        }
-        loaded.problem?.let { _ui.value = _ui.value.copy(detail = it) }
-
-        // Restore the unified multi-pack internal library without opening audio (#84, #85).
-        val packRoot = java.io.File(getApplication<Application>().filesDir, PACK_ROOT)
-        val merged = InternalPackLibrary(packRoot).loadOrMaterialize()
-        if (merged != null) {
-            pack = InstalledPack(merged.manifest, merged.directory)
-            mergedFingerprints = merged.activePackFingerprints
-            _ui.value = _ui.value.copy(pack = PackUi(
-                name = merged.manifest.name,
-                trackCount = merged.manifest.tracks.size,
-                playableCount = PackPlayback.playableTracks(merged.manifest).size,
-            ))
-        }
-
-        // Check for interrupted checkpoint from prior launch and wire single-task coordinator (#91-#97).
-        PackImportCoordinator.configureCommitHandler { installed ->
-            withContext(Dispatchers.Main.immediate) {
-                applyCommittedPackUpdate(installed)
+            initResult.catalog?.let {
+                browser = CatalogBrowser(it)
+                refreshCatalog()
             }
+            initResult.merged?.let { merged ->
+                pack = InstalledPack(merged.manifest, merged.directory)
+                mergedFingerprints = merged.activePackFingerprints
+            }
+            applyJukeboxCatalog(initResult.jukeboxCatalog)
+            establishCup(initResult.loaded.tracks, initResult.restoredUnlock)
         }
-        PackImportCoordinator.checkPendingCheckpoint(getApplication(), packRoot)
-
-        // The cup's eligibility depends on what the user actually has, so it is derived after the
-        // library is restored. Reading the stored progress first means the offer survives a restart.
-        establishCup(loaded.tracks)
-        refreshJukeboxCatalog()
 
         viewModelScope.launch {
             PackImportCoordinator.state.collect { imp ->
@@ -854,7 +1403,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                         linearMode = true,
                         linearTrack = linear.current,
                         queue = linear.queue,
-                        canSeek = totalFrames > 0L,
+                        canSeek = !isCeremonyLocked && totalFrames > 0L,
                         totalFrames = totalFrames,
                         sampleRate = rate,
                         artworkName = linear.current.artworkName ?: _ui.value.artworkName,
@@ -865,6 +1414,8 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                         allowShuffle = linear.allowShuffle,
                         allowSingleRepeat = linear.allowSingleRepeat,
                         allowRepeatToggle = linear.allowRepeatToggle,
+                        abLoopStartFrame = linear.abLoopStartFrame,
+                        abLoopEndFrame = linear.abLoopEndFrame,
                         continueListening = null,
                         detail = linear.error,
                     )
@@ -873,6 +1424,16 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                         startPolling()
                     }
                 } else {
+                    if (isCeremonyLocked && linear.error != null) {
+                        session.uninterruptible = false
+                        val wasTesting = testingCeremonyPlaying
+                        testingCeremonyPlaying = false
+                        if (listening?.snapshot?.ceremony == SpecialCupUnlock.CeremonyPhase.PLAYING) {
+                            leaveCeremony()
+                        } else if (wasTesting) {
+                            _ui.value = _ui.value.copy(unlock = projectUnlock(naturalUnlockUi))
+                        }
+                    }
                     _ui.value = _ui.value.copy(
                         linearTrack = linear.current,
                         queue = linear.queue,
@@ -883,6 +1444,8 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                         allowShuffle = linear.allowShuffle,
                         allowSingleRepeat = linear.allowSingleRepeat,
                         allowRepeatToggle = linear.allowRepeatToggle,
+                        abLoopStartFrame = linear.abLoopStartFrame,
+                        abLoopEndFrame = linear.abLoopEndFrame,
                         detail = linear.error ?: _ui.value.detail,
                         status = if (linear.error != null) "Cannot open this track" else _ui.value.status,
                     )
@@ -898,11 +1461,18 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      * have" -- a stored list would go stale the moment a stage was added, and the cup would then be
      * earnable without hearing it.
      */
-    private fun establishCup(tracks: List<LibraryStore.TrackRow> = emptyList()) {
+    private fun establishCup(
+        tracks: List<LibraryStore.TrackRow> = emptyList(),
+        preloadedUnlock: UnlockStore.Loaded? = null,
+    ) {
         val names = _ui.value.tracks.map { it.name }.ifEmpty { tracks.map { it.title } }
-        val eligible = pack?.manifest?.let { manifest ->
+        val rawEligible = pack?.manifest?.let { manifest ->
             manifest.unlock.stages.toSet().ifEmpty { manifest.stages.map { it.code }.toSet() }
         } ?: SpecialCupRules.eligibleStages(names)
+        val eligible = rawEligible
+            .map { it.removePrefix("BGM_Stage_").removeSuffix("_00") }
+            .filter { it.isNotBlank() && !SpecialCupRules.isExcludedFromUnlock(it) }
+            .toSet()
         if (eligible.isEmpty()) {
             cup = null
             listening = null
@@ -910,7 +1480,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             return
         }
 
-        val restored = unlockStore.load()
+        val restored = preloadedUnlock ?: unlockStore.load()
         restored.problem?.let { _ui.value = _ui.value.copy(detail = it) }
 
         val rules = SpecialCupUnlock(eligible).let { fresh ->
@@ -926,6 +1496,186 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             restored.state?.ceremony == SpecialCupUnlock.CeremonyPhase.PLAYING ||
             restored.state?.ceremony == SpecialCupUnlock.CeremonyPhase.COMPLETED
         _ui.value = _ui.value.copy(unlock = projectUnlock(UnlockUi.from(bridge, offered)))
+        if (restored.repairedCeremony && pack?.directory != null) {
+            startSpecialCupUnlockCeremony()
+        }
+    }
+
+    private fun findSpecialCupAppearsItem(): com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.LinearAsset? =
+        extraCatalog.otherMusic
+            .filterIsInstance<com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.LinearAsset>()
+            .firstOrNull { it.id == "special_cup_appears" }
+
+    /** Starts the uninterruptible Special Cup unlock ceremony and plays #111 Special Cup Appears. */
+    fun startSpecialCupUnlockCeremony(): Boolean {
+        if (isCeremonyLocked) return false
+        val item = findSpecialCupAppearsItem()
+        val dir = pack?.directory
+        val audioFile = if (item != null && dir != null) java.io.File(dir, "audio/${item.asset.sha256}") else null
+        if (item == null || dir == null || audioFile == null || !audioFile.isFile) {
+            _ui.value = _ui.value.copy(detail = "Special Cup unlock audio is missing from the installed pack.")
+            return false
+        }
+        _ui.value = _ui.value.copy(debugUnlockBannerVisible = false)
+        if (!enterCeremony()) return false
+        cancelUnlockNotification()
+        playCeremonyAudio(item, dir)
+        return true
+    }
+
+    private var pendingUnlockNotification = false
+
+    private fun postUnlockReadyNotification() {
+        val context = getApplication<Application>()
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            val granted = context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                pendingUnlockNotification = true
+                requestNotificationPermissionIfNeeded()
+                return
+            }
+        }
+        pendingUnlockNotification = false
+        val nm = context.getSystemService(android.app.NotificationManager::class.java) ?: return
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val ch = android.app.NotificationChannel(
+                UNLOCK_CHANNEL_ID,
+                context.getString(com.mylittleblover.mkwplayer.R.string.unlock_notif_channel),
+                android.app.NotificationManager.IMPORTANCE_DEFAULT,
+            )
+            nm.createNotificationChannel(ch)
+        }
+        val launchIntent = android.content.Intent(context, com.mylittleblover.mkwplayer.MainActivity::class.java)
+            .putExtra(com.mylittleblover.mkwplayer.MainActivity.EXTRA_ENTER_CEREMONY, true)
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        val pendingIntent = android.app.PendingIntent.getActivity(
+            context,
+            UNLOCK_NOTIFICATION_ID,
+            launchIntent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = androidx.core.app.NotificationCompat.Builder(context, UNLOCK_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle(context.getString(com.mylittleblover.mkwplayer.R.string.unlock_notif_title))
+            .setContentText(context.getString(com.mylittleblover.mkwplayer.R.string.unlock_notif_body))
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_DEFAULT)
+            .build()
+        nm.notify(UNLOCK_NOTIFICATION_ID, notification)
+    }
+
+    /** Developer setting helper to pop up the Special Cup unlock reminder notification and top in-app banner. */
+    fun triggerUnlockNotificationForTesting() {
+        postUnlockReadyNotification()
+        _ui.value = _ui.value.copy(debugUnlockBannerVisible = true)
+    }
+
+    /** Enters the unlock ceremony from the top banner (supports debug banner preview when locked). */
+    fun enterUnlockFromBanner() {
+        _ui.value = _ui.value.copy(debugUnlockBannerVisible = false)
+        cancelUnlockNotification()
+        val snap = listening?.snapshot
+        if (snap != null && snap.entitled && snap.ceremony != SpecialCupUnlock.CeremonyPhase.PLAYING) {
+            startSpecialCupUnlockCeremony()
+        } else {
+            replayCeremonyForTesting()
+        }
+    }
+
+    fun dismissDebugUnlockBanner() {
+        _ui.value = _ui.value.copy(debugUnlockBannerVisible = false)
+    }
+
+    private fun cancelUnlockNotification() {
+        pendingUnlockNotification = false
+        val nm = getApplication<Application>().getSystemService(android.app.NotificationManager::class.java)
+        nm?.cancel(UNLOCK_NOTIFICATION_ID)
+    }
+
+    private fun syncSessionArtworkMetadata() {
+        val uiNow = _ui.value
+        session.updateMetadata(
+            artworkName = uiNow.artworkName ?: currentStageCode?.let { extraCatalog.courseArtwork[it.removeSuffix("_00")] },
+            courseCode = currentStageCode ?: uiNow.linearTrack?.courseCode,
+            packDirPath = pack?.directory?.path,
+            subtitle = uiNow.flow?.summary?.takeIf { it.isNotBlank() } ?: uiNow.linearTrack?.subtitle,
+        )
+    }
+
+    /** Developer setting helper to preview/replay the Special Cup unlock ceremony VFX & uninterruptible audio. */
+    fun replayCeremonyForTesting() {
+        if (isCeremonyLocked) return
+        val rules = cup
+        val bridge = listening
+        if (rules != null && bridge != null &&
+            rules.withState(bridge.snapshot).isEntitled &&
+            bridge.snapshot.ceremony != SpecialCupUnlock.CeremonyPhase.PLAYING
+        ) {
+            startSpecialCupUnlockCeremony()
+            return
+        }
+        val item = findSpecialCupAppearsItem()
+        val dir = pack?.directory
+        if (item == null || dir == null || !java.io.File(dir, "audio/${item.asset.sha256}").isFile) {
+            _ui.value = _ui.value.copy(detail = "Import a soundtrack pack with track #111 to test the unlock ceremony.")
+            return
+        }
+        testingCeremonyPlaying = true
+        _ui.value = _ui.value.copy(unlock = projectUnlock(naturalUnlockUi))
+        playCeremonyAudio(item, dir)
+    }
+
+    private fun playCeremonyAudio(
+        item: com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.LinearAsset,
+        dir: java.io.File,
+    ) {
+        val title = item.localizedName(java.util.Locale.getDefault().toLanguageTag())
+        val entry = LinearQueue.Entry(
+            key = CEREMONY_ENTRY_KEY,
+            title = title,
+            subtitle = "",
+            sourceType = LinearSessionStore.SourceType.EXTRA,
+            ostIndex = item.ostIndex,
+            durationMs = item.durationMs,
+            artworkName = item.artwork,
+            assetSha256 = item.asset.sha256,
+            loop = false,
+        )
+        prepareForLinearPlayback()
+        session.uninterruptible = true
+        linearCoordinator.startExtraQueue(
+            entries = listOf(entry),
+            startIndex = 0,
+            packDir = dir,
+            repeatMode = LinearQueue.RepeatMode.OFF,
+            shuffleOverride = false,
+            context = LinearPlaybackCoordinator.SessionContext(
+                contextKind = LinearSessionStore.ContextKind.EXTRA,
+                contextId = item.id,
+                contextTitle = title,
+                packFingerprints = currentPackFingerprints(),
+                allowPlayNext = false,
+                allowShuffle = false,
+                allowSingleRepeat = false,
+                allowRepeatToggle = false,
+            ),
+        )
+        startPolling()
+    }
+
+    private fun onCeremonyAudioCompleted() {
+        session.uninterruptible = false
+        val wasTesting = testingCeremonyPlaying
+        testingCeremonyPlaying = false
+        if (wasTesting) {
+            _ui.value = _ui.value.copy(unlock = projectUnlock(naturalUnlockUi))
+        }
+        val bridge = listening
+        if (bridge != null && bridge.snapshot.ceremony == SpecialCupUnlock.CeremonyPhase.PLAYING) {
+            ceremonyReachedEnd()
+        }
     }
 
     /** Enters the ceremony. Fails loudly rather than pretending when the cup is not open. */
@@ -935,7 +1685,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         if (bridge.snapshot.ceremony == SpecialCupUnlock.CeremonyPhase.PLAYING) return false
         val next = rules.withState(bridge.snapshot).beginCeremony()
         bridge.seed(next)
-        unlockStore.save(next)?.let { _ui.value = _ui.value.copy(detail = it) }
+        saveUnlockAsync(next)
         _ui.value = _ui.value.copy(unlock = projectUnlock(UnlockUi.from(bridge, offered = true)))
         return true
     }
@@ -947,7 +1697,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         if (bridge.snapshot.ceremony != SpecialCupUnlock.CeremonyPhase.PLAYING) return
         val next = rules.withState(bridge.snapshot).leaveCeremonyEarly()
         bridge.seed(next)
-        unlockStore.save(next)?.let { _ui.value = _ui.value.copy(detail = it) }
+        saveUnlockAsync(next)
         _ui.value = _ui.value.copy(unlock = projectUnlock(UnlockUi.from(bridge, offered = true)))
     }
 
@@ -963,7 +1713,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         if (bridge.snapshot.ceremony != SpecialCupUnlock.CeremonyPhase.PLAYING) return
         val next = rules.withState(bridge.snapshot).finishCeremony(reachedEnd = true)
         bridge.seed(next)
-        unlockStore.save(next)?.let { _ui.value = _ui.value.copy(detail = it) }
+        saveUnlockAsync(next)
         _ui.value = _ui.value.copy(unlock = projectUnlock(UnlockUi.from(bridge, offered = true)))
     }
 
@@ -974,7 +1724,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         if (!rules.withState(bridge.snapshot).owesCongratulations) return
         val next = rules.withState(bridge.snapshot).markCongratulated()
         bridge.seed(next)
-        unlockStore.save(next)?.let { _ui.value = _ui.value.copy(detail = it) }
+        saveUnlockAsync(next)
         _ui.value = _ui.value.copy(unlock = projectUnlock(UnlockUi.from(bridge, offered = true)))
     }
 
@@ -1018,6 +1768,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      * main thread, then selects it.
      */
     fun add(uri: Uri) {
+        if (isCeremonyLocked) return
         _ui.value = _ui.value.copy(busy = true, status = "Reading file...", detail = null)
         viewModelScope.launch {
             val outcome = withContext(Dispatchers.IO) { inspect(uri) }
@@ -1121,6 +1872,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      * transport would keep running against a file nobody can see or select.
      */
     fun remove(key: String) {
+        if (isCeremonyLocked) return
         val track = _ui.value.tracks.firstOrNull { it.key == key } ?: return
         val wasSelected = _ui.value.selectedKey == key
         if (wasSelected) {
@@ -1149,7 +1901,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      * than giving the flow code a special case it would then have to keep working.
      */
     fun openFlow(uris: List<Uri>) {
-        if(nativePerformance?.isFading==true) return
+        if (isCeremonyLocked || nativePerformance?.isFading == true) return
         val request = ++packPlaybackRequest
         if (uris.isEmpty()) return
         _ui.value = _ui.value.copy(busy = true, status = "Reading files...", detail = null)
@@ -1251,7 +2003,8 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
         val outcome = withContext(Dispatchers.IO) {
             val bytes = try {
-                val withFf = sourceBytes + (ffAsset to finalLapFanfareBytes)
+                val ffBytes = loadFinalLapFanfareBytes()
+                val withFf = if (ffBytes != null) sourceBytes + (ffAsset to ffBytes) else sourceBytes
                 val ks = extraCatalog.koopaSpeaker
                 if (ks != null && packDir != null && flow.name == "BGM_Stage_${ks.stageCode}") {
                     val normalFile = java.io.File(packDir, "audio/${ks.normalAsset.sha256}")
@@ -1268,12 +2021,17 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                     withFf
                 }
             } catch (e: Exception) {
-                return@withContext FlowPrepareOutcome.Failed("Cannot load FinalLapFF", e.message)
+                return@withContext FlowPrepareOutcome.Failed("Cannot load interactive audio", e.message)
             }
 
             val plan = try {
                 if (minfCatalog.part(flow.name.removePrefix("BGM_Stage_"), "Full") != null) {
-                    var built = InteractivePlaybackPlan.normal(flow, bytes, minfCatalog).startingAt(startingStage)
+                    var built = InteractivePlaybackPlan.normal(
+                        flow = flow,
+                        bytes = bytes,
+                        catalog = minfCatalog,
+                        options = currentInteractiveOptions(),
+                    ).startingAt(startingStage)
                     val ks = extraCatalog.koopaSpeaker
                     if (ks != null && flow.name == "BGM_Stage_${ks.stageCode}") {
                         val normalBytes = bytes["${ks.normalAsset.stem}.bwav"]
@@ -1299,10 +2057,10 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                 return@withContext FlowPrepareOutcome.Failed("Cannot prepare this flow", e.message)
             }
 
-            val wantSpeaker = if (plan?.overlayTrackIndices.isNullOrEmpty() || previousPlanName != plan?.name) {
-                false
-            } else {
-                previousSpeaker
+            val wantSpeaker = when {
+                plan?.overlayTrackIndices.isNullOrEmpty() -> false
+                previousPlanName != plan?.name -> plan?.overlayDefaultEnabled == true
+                else -> previousSpeaker
             }
             val initialGains = if (plan == null || plan.overlayTrackIndices.isEmpty()) {
                 emptyMap()
@@ -1370,6 +2128,9 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         this.flowBytes = bundle.bytes
         totalFrames = FlowPresentation.totalFrames(flow)
         rate = state.sampleRate
+        val stageId = flow.name.removePrefix("BGM_Stage_").removeSuffix("_00")
+        PlaybackTimers.engine.syncInteractiveContext(true, stageId)
+        recordCanonicalPlayStat(stageId)
 
         _ui.value = _ui.value.copy(
             title = displayTitle,
@@ -1408,6 +2169,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             }.joinToString(" ").ifEmpty { null },
         )
 
+        syncSessionArtworkMetadata()
         PlaybackService.start(getApplication())
         requestNotificationPermissionIfNeeded()
         startPolling()
@@ -1428,11 +2190,30 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     ): Boolean {
         if(isSpecialStageLocked("Rainbow")) return false
         if(nativePerformance?.isFading==true) return false
+        val previousPlanName = interactivePlan?.name
+        val previousSpeaker = speakerEnabled
+        var preparedWantSpeaker = true
         val outcome = withContext(Dispatchers.IO) {
             val plan = try {
-                InteractivePlaybackPlan.rainbow(bytes, minfCatalog).startingAt(startingStage)
+                InteractivePlaybackPlan.rainbow(
+                    bytes = bytes,
+                    catalog = minfCatalog,
+                    options = currentInteractiveOptions(),
+                ).startingAt(startingStage)
             } catch (e: Exception) {
                 return@withContext RainbowPrepareOutcome.Failed("Cannot prepare Rainbow", e.message)
+            }
+            val wantSpeaker = when {
+                plan.overlayTrackIndices.isEmpty() -> false
+                previousPlanName != plan.name -> plan.overlayDefaultEnabled
+                else -> previousSpeaker
+            }
+            preparedWantSpeaker = wantSpeaker
+            val initialGains = if (plan.overlayTrackIndices.isEmpty()) {
+                emptyMap()
+            } else {
+                val db = if (wantSpeaker) 0.0 else -96.0
+                plan.overlayTrackIndices.associateWith { db }
             }
             val frames = plan.spec.segments.sumOf { it.exit }
             when (
@@ -1446,6 +2227,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                     autoAdvance = plan.automaticNext,
                     preparedAssets = plan.preparedAssets + plan.entryPreparedAssets[plan.entry].orEmpty(),
                     prequeueInitial = plan.entry in plan.entryAutomaticNext,
+                    initialLayerGains = initialGains,
                 )
             ) {
                 is PlaybackSession.PrepareResult.Failed ->
@@ -1470,14 +2252,21 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val state = session.commitPrepared(prepared)
         if(state.detail!=null) { _ui.value=_ui.value.copy(status="Cannot play Rainbow",detail=state.detail);return false }
         linearCoordinator.yieldToExternalTransport()
+        PlaybackTimers.engine.syncInteractiveContext(true, "Rainbow")
+        recordCanonicalPlayStat("Rainbow")
+        speakerEnabled = preparedWantSpeaker
         interactivePlan=plan;nativePerformance=null;performance=null;flow=null;flowCompiled=null;flowBytes=bytes
         totalFrames=frames;rate=48000
         val sections=plan.spec.segments.map { FlowPresentation.Section(it.index,plan.labels.getValue(it.index),it.exit,48000) }
         _ui.value=_ui.value.copy(title=displayTitle,status="Playing",detail=notes.joinToString("; ").ifEmpty { null },
             canPause=true,canStop=true,outputActive=session.hasOutput,
-            linearMode=false,linearTrack=null,canSeek=false,totalFrames=frames,sampleRate=48000,artworkName=null,
+            linearMode=false,linearTrack=null,canSeek=false,totalFrames=frames,sampleRate=48000,artworkName=extraCatalog.courseArtwork["Rainbow"],
             flow=FlowUi(displayTitle,sections,plan.entry,"Area1 → Area2 → Area3 → Final","MINF timing; bar exits confirmed",true,
-                outros=plan.outros.keys.sorted(), availableStageKeys=sections.map { it.label }))
+                outros=plan.outros.keys.sorted(), hasFast = plan.fast != null, availableStageKeys=sections.map { it.label },
+                hasSpeakerOverlay=plan.overlayTrackIndices.isNotEmpty(),
+                speakerEnabled=speakerEnabled,
+                isRainbowMelodyOverlay=true))
+        syncSessionArtworkMetadata()
         PlaybackService.start(getApplication());requestNotificationPermissionIfNeeded();startPolling()
         return true
     }
@@ -1490,7 +2279,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      * app cannot read.
      */
     fun openFlowFromFolder() {
-        if(nativePerformance?.isFading==true) return
+        if (isCeremonyLocked || nativePerformance?.isFading == true) return
         val request = ++packPlaybackRequest
         val folder = java.io.File(getApplication<Application>().filesDir, FLOW_FOLDER)
         _ui.value = _ui.value.copy(busy = true, status = "Scanning folder...", detail = null)
@@ -1544,7 +2333,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      * (#95, #97), and automatic commit without confirmation dialogs (#92).
      */
     fun importPack(uri: Uri) {
-        if (nativePerformance?.isFading == true) return
+        if (isCeremonyLocked || nativePerformance?.isFading == true) return
         requestNotificationPermissionIfNeeded()
         val app = getApplication<Application>()
         val result = PackImportCoordinator.startUriImport(
@@ -1721,10 +2510,15 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         )
 
         // Open first stage only on initial empty library import so active playback isn't disrupted (#92).
-        if (hadNothingActiveBefore && !stoppedActivePlayback) {
-            val firstStage = installed.manifest.stages.firstNotNullOfOrNull { stage ->
-                effectiveManifest.tracksOf(stage).firstOrNull { track -> playable.any { it.key == track.key } }
-            } ?: playable.firstOrNull { track -> installed.manifest.tracks.any { it.key == track.key } }
+        if (hadNothingActiveBefore && !stoppedActivePlayback && !isCeremonyLocked) {
+            val firstStage = installed.manifest.stages
+                .filter { !isSpecialStageLocked(it.code) }
+                .firstNotNullOfOrNull { stage ->
+                    effectiveManifest.tracksOf(stage).firstOrNull { track -> playable.any { it.key == track.key } }
+                } ?: playable.firstOrNull { track ->
+                installed.manifest.tracks.any { it.key == track.key } &&
+                    !isSpecialStageLocked(track.title)
+            }
             if (firstStage != null) {
                 if (firstStage.kind == com.mylittleblover.mkwplayer.registry.ResourceKind.JUKEBOX) {
                     openJukeboxTrack(firstStage.key)
@@ -1766,17 +2560,17 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
     /** Newest selection waits without blocking the service's foreground promotion. */
     fun openPackTrack(track: PackManifest.Track,perform: Boolean=false,startingStage: String?=null) {
-        if(nativePerformance?.isFading==true) return
+        if (isCeremonyLocked || nativePerformance?.isFading == true) return
         val request=++packPlaybackRequest
         viewModelScope.launch {
             PlaybackService.awaitForegroundPromotion()
-            if(request!=packPlaybackRequest || nativePerformance?.isFading==true) return@launch
+            if (isCeremonyLocked || request != packPlaybackRequest || nativePerformance?.isFading == true) return@launch
             if(openPackTrackNow(track,startingStage,request) && perform) startPerformance()
         }
     }
 
     private suspend fun openPackTrackNow(track: PackManifest.Track,startingStage: String?=null,request: Long): Boolean {
-        if(nativePerformance?.isFading==true) return false
+        if (isCeremonyLocked || nativePerformance?.isFading == true) return false
         val installed = pack ?: return false
         val outcome = withContext(Dispatchers.IO) {
             when (val prepared = PackPlayback.prepare(installed.manifest, track, installed.directory)) {
@@ -1792,7 +2586,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                 }
             }
         }
-        if (request != packPlaybackRequest || nativePerformance?.isFading == true) return false
+        if (isCeremonyLocked || request != packPlaybackRequest || nativePerformance?.isFading == true) return false
         return when (outcome) {
             is PackOpenOutcome.Refused -> {
                 _ui.value = _ui.value.copy(status = "Cannot open this track", detail = outcome.reason)
@@ -1818,8 +2612,14 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
     /** Opens the first track of the imported pack. */
     fun openFirstPackStage() {
+        if (isCeremonyLocked) return
         val installed = pack ?: return
-        val track = PackPlayback.playableTracks(installed.manifest).firstOrNull()
+        val playable = PackPlayback.playableTracks(installed.manifest).toSet()
+        val track = installed.manifest.stages
+            .filter { !isSpecialStageLocked(it.code) }
+            .firstNotNullOfOrNull { stage ->
+                installed.manifest.tracksOf(stage).firstOrNull { it in playable }
+            } ?: playable.firstOrNull { !isSpecialStageLocked(it.title) }
         if (track == null) {
             _ui.value = _ui.value.copy(
                 status = "Nothing to play",
@@ -1832,6 +2632,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
     /** Requests a section of the open flow. */
     fun playSection(segment: Int) {
+        if (isCeremonyLocked) return
         if(interactivePlan!=null) {
             startPerformance()
             val plan=interactivePlan!!
@@ -1874,7 +2675,10 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      * Refuses with a stated reason rather than doing nothing, because a Start button that silently fails is
      * indistinguishable from a broken app.
      */
+    private var pendingInteractiveStatId: String? = null
+
     fun startPerformance() {
+        if (isCeremonyLocked) return
         if(isSpecialStageLocked(currentStageCode.orEmpty())) return
         interactivePlan?.let { plan ->
             if(!session.state.value.loaded) {
@@ -1924,10 +2728,15 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                 }
                 return
             }
+            pendingInteractiveStatId?.let { id ->
+                pendingInteractiveStatId = null
+                recordCanonicalPlayStat(id)
+            }
             if(nativePerformance==null) nativePerformance=NativeInteractiveDriver(plan.spec,plan.entry,plan.next,plan.outros,plan.fast,
                 request={ segment -> session.playSegment(segment).detail },versions=plan.versions,outroVariants=plan.outroVariants,regions=plan.regions,cancelRequest=session::cancelPendingTransition,mandatoryAutomaticSources=plan.entryAutomaticNext.keys,advanceViaOutro=plan.advanceViaOutro)
             session.interactiveObservation()?.let { nativePerformance!!.observe(it) }
             publishNativePerformance(fromAction=true)
+            syncSessionArtworkMetadata()
             PlaybackService.start(getApplication())
             requestNotificationPermissionIfNeeded()
             startPolling()
@@ -1954,6 +2763,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
     /** The next-stage event: leave the looping prelude for the main loop. */
     fun advancePerformance() {
+        if (isCeremonyLocked) return
         nativePerformance?.let { publishNativePerformance(it.advance(),true);return }
         val driver = performance ?: return
         apply(driver.advance(), driver)
@@ -1961,6 +2771,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
     /** Switches between the main loop and its fast arrangement. */
     fun toggleFast() {
+        if (isCeremonyLocked) return
         nativePerformance?.let { publishNativePerformance(it.enterFast(),true);return }
         val driver = performance ?: return
         apply(driver.toggleFast(), driver)
@@ -1968,6 +2779,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
     /** Takes the ending nearest to where the main loop has got to. */
     fun takeOutro() {
+        if (isCeremonyLocked) return
         nativePerformance?.let { publishNativePerformance(it.takeOutro(),true);return }
         val driver = performance ?: return
         apply(driver.takeOutro(), driver)
@@ -1975,6 +2787,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
     /** Takes a specific Outro number (0-indexed, e.g. 0, 1, 2 for Title Outros). */
     fun takeOutro(number: Int) {
+        if (isCeremonyLocked) return
         nativePerformance?.let {
             publishNativePerformance(it.takeOutro(number), true)
             return
@@ -1982,6 +2795,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     }
 
     fun toggleSpeakerOverlay() {
+        if (isCeremonyLocked) return
         val plan = interactivePlan ?: return
         if (plan.overlayTrackIndices.isEmpty()) return
         speakerEnabled = !speakerEnabled
@@ -2000,7 +2814,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         languageTag: String = java.util.Locale.getDefault().toLanguageTag(),
         autoStart: Boolean = false,
     ) {
-        if (nativePerformance?.isFading == true) return
+        if (isCeremonyLocked || nativePerformance?.isFading == true) return
         val item = extraCatalog.otherMusic
             .filterIsInstance<com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.InteractiveTitle>()
             .firstOrNull()
@@ -2025,7 +2839,11 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                             byPath["${ref.stem}.bwav"] = bytes
                         }
                     }
-                    val plan = com.mylittleblover.mkwplayer.interactive.ExtraInteractiveCompilers.compileTitlePlan(item, byStem)
+                    val plan = com.mylittleblover.mkwplayer.interactive.ExtraInteractiveCompilers.compileTitlePlan(
+                        item = item,
+                        bytesByStem = byStem,
+                        segmentSwitchFadeOutMs = playbackBehavior.segmentSwitchFadeOutMs,
+                    )
                     plan to byPath
                 }
             }
@@ -2045,6 +2863,8 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             this@PlayerViewModel.flowBytes = bytesByPath
             this@PlayerViewModel.totalFrames = item.main.frames
             this@PlayerViewModel.rate = item.main.sampleRate
+            pendingInteractiveStatId = "extra:title"
+            PlaybackTimers.engine.syncInteractiveContext(true, "extra:title")
 
             val localizedTitle = item.localizedName(languageTag)
             _ui.value = _ui.value.copy(
@@ -2088,7 +2908,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         languageTag: String = java.util.Locale.getDefault().toLanguageTag(),
         autoStart: Boolean = true,
     ) {
-        if (nativePerformance?.isFading == true) return
+        if (isCeremonyLocked || nativePerformance?.isFading == true) return
         val dir = pack?.directory
         if (dir == null) {
             _ui.value = _ui.value.copy(status = "Cannot open track", detail = "No installed pack carries this track.")
@@ -2104,26 +2924,28 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                     val mainBytes = mainFile.readBytes()
                     val fastBytes = fastFile.readBytes()
                     val ffAsset = com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.ASSET
-                    val ffBytes = finalLapFanfareBytes
-                    val byStem = mapOf(
-                        track.main.stem to mainBytes,
-                        track.fast.stem to fastBytes,
-                        ffAsset to ffBytes,
-                    )
-                    val byPath = mapOf(
-                        "${track.main.stem}.bwav" to mainBytes,
-                        "${track.fast.stem}.bwav" to fastBytes,
-                        ffAsset to ffBytes,
-                    )
+                    val ffBytes = loadFinalLapFanfareBytes()
+                    val byStem = buildMap {
+                        put(track.main.stem, mainBytes)
+                        put(track.fast.stem, fastBytes)
+                        if (ffBytes != null) put(ffAsset, ffBytes)
+                    }
+                    val byPath = buildMap {
+                        put("${track.main.stem}.bwav", mainBytes)
+                        put("${track.fast.stem}.bwav", fastBytes)
+                        if (ffBytes != null) put(ffAsset, ffBytes)
+                    }
                     val plan = com.mylittleblover.mkwplayer.interactive.ExtraInteractiveCompilers.compileTwoStateLoopPlan(
                         track = track,
                         isBattle = isBattle,
                         bytesByStem = byStem,
+                        perfectBeatEnabled = playbackBehavior.perfectBeatEnabled,
+                        segmentSwitchFadeOutMs = playbackBehavior.segmentSwitchFadeOutMs,
                     )
                     plan to byPath
                 }
             }
-            if (request != packPlaybackRequest) return@launch
+            if (isCeremonyLocked || request != packPlaybackRequest) return@launch
             val (plan, bytesByPath) = loaded.getOrElse { err ->
                 _ui.value = _ui.value.copy(status = "Cannot prepare track", detail = err.message)
                 return@launch
@@ -2139,6 +2961,9 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             this@PlayerViewModel.flowBytes = bytesByPath
             this@PlayerViewModel.totalFrames = track.main.frames
             this@PlayerViewModel.rate = track.main.sampleRate
+            val canonicalTrackId = if (isBattle) "battle:${track.id}" else "sfc:${track.id}"
+            pendingInteractiveStatId = canonicalTrackId
+            PlaybackTimers.engine.syncInteractiveContext(true, plan.name)
 
             val localizedTitle = track.localizedName(languageTag)
             _ui.value = _ui.value.copy(
@@ -2187,16 +3012,27 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             packFingerprints = currentPackFingerprints(),
         ),
     ) {
+        if (isCeremonyLocked) return
         val dir = pack?.directory
         if (dir == null || entries.isEmpty()) return
         if (nativePerformance?.isFading == true) return
+        val unlocked = com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(_ui.value.unlock)
+        val requestedEntry = entries.getOrNull(startIndex)
+        val visibleEntries = entries.filter { entry ->
+            val extraId = com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.extraIdFromEntryKey(entry.key)
+            val hiddenExtra = extraId != null && !com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.isVisible(extraId, unlocked)
+            val hiddenCourse = entry.courseCode != null && isSpecialStageLocked(entry.courseCode)
+            !hiddenExtra && !hiddenCourse
+        }
+        if (visibleEntries.isEmpty()) return
+        val mappedStart = requestedEntry?.let { visibleEntries.indexOf(it) }?.takeIf { it >= 0 } ?: 0
         packPlaybackRequest++
         nativePerformance = null
         performance = null
         interactivePlan = null
         flow = null
         flowCompiled = null
-        val target = entries[startIndex.coerceIn(0, entries.lastIndex)]
+        val target = visibleEntries[mappedStart]
         _ui.value = _ui.value.copy(
             title = target.title,
             artworkName = target.artworkName,
@@ -2206,8 +3042,8 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             detail = null,
         )
         linearCoordinator.startExtraQueue(
-            entries = entries,
-            startIndex = startIndex,
+            entries = visibleEntries,
+            startIndex = mappedStart,
             packDir = dir,
             repeatMode = repeatMode,
             shuffleOverride = shuffle,
@@ -2238,6 +3074,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         suiteLabel: String,
         rallyLabel: String,
     ): Boolean {
+        if (isCeremonyLocked) return false
         val dir = pack?.directory ?: return false
         val catalog = courseMedleyCatalog
         val unlockedSet = unlockedCourses.map { it.removeSuffix("_00") }.toSet()
@@ -2283,11 +3120,106 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         return true
     }
 
+    private fun isEditorTargetLocked(code: String): Boolean {
+        return if (code.startsWith("extra:")) {
+            val targetId = code.removePrefix("extra:")
+            val unlocked = com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(_ui.value.unlock)
+            !com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.isVisible(targetId, unlocked)
+        } else {
+            isSpecialStageLocked(code)
+        }
+    }
+
+    private fun editorSourceResolver(dir: java.io.File): CourseFlowRecipeBuilder.SourceResolver {
+        val base = CourseFlowRecipeBuilder.packSourceResolver(pack?.manifest, interactiveIdentities, dir)
+        val manifestAssets = pack?.manifest?.assets?.associateBy { it.digest.sha256 }.orEmpty()
+        return object : CourseFlowRecipeBuilder.SourceResolver {
+            override fun findByFileName(fileName: String): CourseFlowRecipeBuilder.AssetHeader? {
+                base.findByFileName(fileName)?.let { return it }
+                val stem = fileName.removeSuffix(".bwav")
+                if (fileName.equals(com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.ASSET, ignoreCase = true) ||
+                    stem.equals("BGM_Seq_FinalLapFF", ignoreCase = true)
+                ) {
+                    val bytes = loadFinalLapFanfareBytes()
+                    if (bytes != null) {
+                        val header = (com.mylittleblover.mkwplayer.audio.BwavHeader.read(bytes)
+                            as? com.mylittleblover.mkwplayer.audio.BwavHeader.Result.Ok)?.info
+                        return CourseFlowRecipeBuilder.AssetHeader(
+                            stem = "BGM_Seq_FinalLapFF",
+                            digest = com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.SHA256,
+                            frames = header?.frames?.toLong() ?: 268_759L,
+                            sampleRate = header?.sampleRate ?: 48_000,
+                            loopStart = null,
+                            loopEnd = null,
+                        )
+                    }
+                }
+                val digest = resolveAudioSha256(stem) ?: return null
+                val audioFile = java.io.File(dir, "audio/$digest")
+                if (!audioFile.isFile) return null
+                val header = runCatching {
+                    audioFile.inputStream().use { input ->
+                        val head = ByteArray(1024)
+                        val count = input.read(head)
+                        if (count <= 0) return@use null
+                        (com.mylittleblover.mkwplayer.audio.BwavHeader.read(head.copyOf(count))
+                            as? com.mylittleblover.mkwplayer.audio.BwavHeader.Result.Ok)?.info
+                    }
+                }.getOrNull()
+                if (header != null) {
+                    return CourseFlowRecipeBuilder.AssetHeader(
+                        stem = stem,
+                        digest = digest,
+                        frames = header.frames.toLong(),
+                        sampleRate = header.sampleRate,
+                        loopStart = header.loopStart?.toLong(),
+                        loopEnd = header.loopEnd?.toLong(),
+                    )
+                }
+                val asset = manifestAssets[digest] ?: return null
+                return CourseFlowRecipeBuilder.AssetHeader(
+                    stem = stem,
+                    digest = digest,
+                    frames = asset.frames,
+                    sampleRate = asset.sampleRate,
+                    loopStart = null,
+                    loopEnd = null,
+                )
+            }
+        }
+    }
+
+    private fun inspectTargetForEditor(
+        code: String,
+        dir: java.io.File,
+        resolver: CourseFlowRecipeBuilder.SourceResolver,
+    ): CourseFlowRecipeBuilder.CourseInventory? {
+        return if (code.startsWith("extra:")) {
+            CourseFlowRecipeBuilder.inspectExtra(
+                extraId = code,
+                extraCatalog = extraCatalog,
+                extraMedleyCatalog = extraMedleyCatalog,
+                packDir = dir,
+                hasFanfareAsset = loadFinalLapFanfareBytes() != null,
+            )
+        } else {
+            CourseFlowRecipeBuilder.inspectCourse(code, minfCatalog, courseMedleyCatalog, resolver)
+        }
+    }
+
+    private fun artworkForEditorTarget(code: String): String? {
+        if (!code.startsWith("extra:")) return extraCatalog.courseArtwork[code.removeSuffix("_00")]
+        val targetId = code.removePrefix("extra:")
+        return extraCatalog.sfcCourses.firstOrNull { it.id == targetId }?.artwork
+            ?: extraCatalog.battleTracks.firstOrNull { it.id == targetId }?.artwork
+            ?: extraCatalog.otherMusic.firstOrNull { it.id == targetId }?.artwork
+    }
+
     internal fun inspectCourseForEditor(code: String): CourseFlowRecipeBuilder.CourseInventory? {
         val dir = pack?.directory ?: return null
-        if (isSpecialStageLocked(code)) return null
-        val resolver = CourseFlowRecipeBuilder.packSourceResolver(pack?.manifest, interactiveIdentities, dir)
-        return CourseFlowRecipeBuilder.inspectCourse(code, minfCatalog, courseMedleyCatalog, resolver)
+        if (isEditorTargetLocked(code)) return null
+        val resolver = editorSourceResolver(dir)
+        return inspectTargetForEditor(code, dir, resolver)
     }
 
     internal fun previewCustomPreset(
@@ -2295,13 +3227,24 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         courseTitle: String,
         suiteLabel: String,
     ): Boolean {
+        if (isCeremonyLocked) return false
         val dir = pack?.directory ?: return false
-        if (isSpecialStageLocked(preset.courseCode)) return false
-        val resolver = CourseFlowRecipeBuilder.packSourceResolver(pack?.manifest, interactiveIdentities, dir)
-        val inventory = CourseFlowRecipeBuilder.inspectCourse(preset.courseCode, minfCatalog, courseMedleyCatalog, resolver)
-        val resolved = CourseFlowRecipeBuilder.compileUserPreset(preset, inventory, minfCatalog, resolver)
+        if (isEditorTargetLocked(preset.courseCode)) return false
+        val resolver = editorSourceResolver(dir)
+        val inventory = inspectTargetForEditor(preset.courseCode, dir, resolver) ?: return false
+        val resolved = CourseFlowRecipeBuilder.compileUserPreset(
+            preset = preset,
+            inventory = inventory,
+            minf = minfCatalog,
+            resolver = resolver,
+            segmentSwitchFadeOutMs = playbackBehavior.segmentSwitchFadeOutMs,
+        )
             ?: return false
-        val logical = preset.courseCode.removeSuffix("_00")
+        val logical = if (preset.courseCode.startsWith("extra:")) {
+            preset.courseCode
+        } else {
+            preset.courseCode.removeSuffix("_00")
+        }
         val entry = LinearQueue.Entry(
             key = "preset:${preset.id}",
             title = courseTitle,
@@ -2310,7 +3253,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             courseCode = logical,
             presetId = preset.id,
             durationMs = resolved.medley.durationMs,
-            artworkName = extraCatalog.courseArtwork[logical],
+            artworkName = artworkForEditorTarget(logical),
             courseMedley = resolved,
         )
         playExtraLinearQueue(
@@ -2329,9 +3272,185 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         return true
     }
 
+    private fun resolveAudioSha256(stem: String): String? {
+        interactiveIdentities.digestForFileName("$stem.bwav")?.let { return it }
+        extraCatalog.sfcCourses.forEach { t ->
+            if (t.main.stem.equals(stem, ignoreCase = true)) return t.main.sha256
+            if (t.fast.stem.equals(stem, ignoreCase = true)) return t.fast.sha256
+        }
+        extraCatalog.battleTracks.forEach { t ->
+            if (t.main.stem.equals(stem, ignoreCase = true)) return t.main.sha256
+            if (t.fast.stem.equals(stem, ignoreCase = true)) return t.fast.sha256
+        }
+        extraCatalog.koopaSpeaker?.let { ks ->
+            if (ks.normalAsset.stem.equals(stem, ignoreCase = true)) return ks.normalAsset.sha256
+            if (ks.fastAsset.stem.equals(stem, ignoreCase = true)) return ks.fastAsset.sha256
+        }
+        extraCatalog.otherMusic.forEach { item ->
+            when (item) {
+                is com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.InteractiveTitle -> {
+                    listOf(item.harmonica, item.main, item.brassCut).firstOrNull { it.stem.equals(stem, ignoreCase = true) }?.let { return it.sha256 }
+                    item.outros.firstOrNull { it.asset.stem.equals(stem, ignoreCase = true) }?.let { return it.asset.sha256 }
+                }
+                is com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.ChainedSequence ->
+                    item.parts.firstOrNull { it.asset.stem.equals(stem, ignoreCase = true) }?.let { return it.asset.sha256 }
+                is com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.OverlaidOpening -> {
+                    if (item.op.stem.equals(stem, ignoreCase = true)) return item.op.sha256
+                    if (item.telop.stem.equals(stem, ignoreCase = true)) return item.telop.sha256
+                }
+                is com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.LinearAsset ->
+                    if (item.asset.stem.equals(stem, ignoreCase = true)) return item.asset.sha256
+            }
+        }
+        extraCatalog.shortSounds.firstOrNull { it.asset.stem.equals(stem, ignoreCase = true) }?.let { return it.asset.sha256 }
+        extraCatalog.nintendoMusicSpecial.firstOrNull { it.asset.stem.equals(stem, ignoreCase = true) }?.let { return it.asset.sha256 }
+        return null
+    }
+
+    internal suspend fun loadWaveformForStem(
+        stem: String,
+        bucketCount: Int = 1200,
+    ): com.mylittleblover.mkwplayer.audio.BwavWaveformExtractor.WaveformPeaks? =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val dir = pack?.directory ?: return@withContext null
+            val digest = resolveAudioSha256(stem) ?: return@withContext null
+            val file = java.io.File(dir, "audio/$digest")
+            com.mylittleblover.mkwplayer.audio.BwavWaveformExtractor.extract(file, digest, bucketCount)
+        }
+
+    internal fun compileAndExportPreset(
+        preset: CoursePreset,
+    ): Pair<com.mylittleblover.mkwplayer.interactive.CourseMedleyCompiler.ResolvedMedley, String>? {
+        val dir = pack?.directory ?: return null
+        if (isEditorTargetLocked(preset.courseCode)) return null
+        val resolver = editorSourceResolver(dir)
+        val inventory = inspectTargetForEditor(preset.courseCode, dir, resolver) ?: return null
+        val resolved = CourseFlowRecipeBuilder.compileUserPreset(
+            preset = preset,
+            inventory = inventory,
+            minf = minfCatalog,
+            resolver = resolver,
+            segmentSwitchFadeOutMs = playbackBehavior.segmentSwitchFadeOutMs,
+        ) ?: return null
+        return resolved to CourseFlowRecipeBuilder.exportPresetConfigJson(preset, resolved)
+    }
+
+    internal fun previewCourseSeam(
+        preset: CoursePreset,
+        seamIndex: Int,
+        courseTitle: String,
+        suiteLabel: String,
+    ): Boolean {
+        if (isCeremonyLocked) return false
+        val dir = pack?.directory ?: return false
+        if (isEditorTargetLocked(preset.courseCode)) return false
+        val resolver = editorSourceResolver(dir)
+        val inventory = inspectTargetForEditor(preset.courseCode, dir, resolver) ?: return false
+        val resolved = CourseFlowRecipeBuilder.compileSeamPreview(
+            preset = preset,
+            seamIndex = seamIndex,
+            inventory = inventory,
+            minf = minfCatalog,
+            resolver = resolver,
+            segmentSwitchFadeOutMs = playbackBehavior.segmentSwitchFadeOutMs,
+        ) ?: return false
+        val logical = if (preset.courseCode.startsWith("extra:")) {
+            preset.courseCode
+        } else {
+            preset.courseCode.removeSuffix("_00")
+        }
+        val entry = LinearQueue.Entry(
+            key = "seam:${preset.id}:$seamIndex",
+            title = courseTitle,
+            subtitle = suiteLabel,
+            sourceType = LinearSessionStore.SourceType.PRESET,
+            courseCode = logical,
+            presetId = preset.id,
+            durationMs = resolved.medley.durationMs,
+            artworkName = artworkForEditorTarget(logical),
+            courseMedley = resolved,
+        )
+        playExtraLinearQueue(
+            entries = listOf(entry),
+            startIndex = 0,
+            repeatMode = LinearQueue.RepeatMode.OFF,
+            shuffle = false,
+            context = LinearPlaybackCoordinator.SessionContext(
+                contextKind = LinearSessionStore.ContextKind.COURSE_MEDLEY,
+                contextId = "${preset.id}_seam_$seamIndex",
+                contextTitle = suiteLabel,
+                packFingerprints = currentPackFingerprints(),
+            ),
+        )
+        requestNotificationPermissionIfNeeded()
+        return true
+    }
+
+    internal fun extraMedleysForTarget(
+        targetId: String,
+    ): List<com.mylittleblover.mkwplayer.interactive.ExtraMedleyCatalog.ExtraMedleyEntry> {
+        val unlocked = com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(_ui.value.unlock)
+        if (!com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.isVisible(targetId, unlocked)) {
+            return emptyList()
+        }
+        return extraMedleyCatalog.forTarget(targetId)
+    }
+
+    internal fun playExtraMedley(
+        medleyId: String,
+        title: String,
+        subtitle: String,
+        artworkName: String?,
+    ): Boolean {
+        if (isCeremonyLocked) return false
+        val dir = pack?.directory ?: return false
+        val item = extraMedleyCatalog.byMedleyId(medleyId) ?: return false
+        val unlocked = com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(_ui.value.unlock)
+        if (!com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.isVisible(item.targetId, unlocked)) {
+            return false
+        }
+        val digests = linkedMapOf<String, String>()
+        for (stem in item.medley.uniqueStems) {
+            val sha = resolveAudioSha256(stem) ?: return false
+            if (!java.io.File(dir, "audio/$sha").isFile) return false
+            digests[stem] = sha
+        }
+        val resolved = com.mylittleblover.mkwplayer.interactive.CourseMedleyCompiler.ResolvedMedley(
+            medley = item.medley,
+            sampleRate = extraMedleyCatalog.sampleRate,
+            stemDigests = digests,
+        )
+        val entry = LinearQueue.Entry(
+            key = "extra_medley:${item.medley.id}",
+            title = title,
+            subtitle = subtitle,
+            sourceType = LinearSessionStore.SourceType.MEDLEY,
+            courseCode = item.medley.courseCode,
+            medleyId = item.medley.id,
+            durationMs = item.medley.durationMs,
+            artworkName = item.artwork ?: artworkName,
+            courseMedley = resolved,
+        )
+        playExtraLinearQueue(
+            entries = listOf(entry),
+            startIndex = 0,
+            repeatMode = LinearQueue.RepeatMode.OFF,
+            shuffle = false,
+            context = LinearPlaybackCoordinator.SessionContext(
+                contextKind = LinearSessionStore.ContextKind.COURSE_MEDLEY,
+                contextId = item.medley.id,
+                contextTitle = title,
+                packFingerprints = currentPackFingerprints(),
+            ),
+        )
+        requestNotificationPermissionIfNeeded()
+        return true
+    }
+
     /**
      * Launches linear playback of a user playlist (#50-#53, #61) with frozen queue state,
-     * per-entry preset compilation, and opt-in native cross-track handover where verified.
+     * supporting courses (with presets & optional native cross-track handover), Jukebox tracks,
+     * Two-State retro/battle tracks, and Other/Short/Special extra tracks.
      */
     fun playUserPlaylist(
         playlist: UserPlaylist,
@@ -2343,64 +3462,289 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         rallyLabel: String,
         nativeTransitionPrefix: String,
     ): Boolean {
+        if (isCeremonyLocked) return false
         val dir = pack?.directory ?: return false
         if (playlist.courseIds.isEmpty()) return false
-        val resolver = CourseFlowRecipeBuilder.packSourceResolver(pack?.manifest, interactiveIdentities, dir)
-        val rawEntries = playlist.courseIds.mapIndexedNotNull { idx, rawCourseId ->
-            val logical = rawCourseId.removeSuffix("_00")
-            if (isSpecialStageLocked(logical)) return@mapIndexedNotNull null
-            val config = playlist.configAt(idx)
-            val resolved = CourseFlowRecipeBuilder.resolvePresetRef(
-                courseCode = logical,
-                presetRef = config.presetId,
-                userPresets = presets,
-                minf = minfCatalog,
-                medleyCatalog = courseMedleyCatalog,
-                resolver = resolver,
-            ) ?: return@mapIndexedNotNull null
+        val resolver = editorSourceResolver(dir)
+        val unlocked = com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(_ui.value.unlock)
+        val gamesById = jukebox.games.associateBy { it.id }
 
-            val matchingUserPreset = if (PresetRefs.isUser(config.presetId)) {
-                presets.firstOrNull { it.id == config.presetId && it.courseCode.equals(logical, ignoreCase = true) }
+        fun compileExtraInteractiveEntry(
+            idx: Int,
+            targetId: String,
+            title: String,
+            artwork: String,
+            defaultAsset: com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.AssetRef,
+            config: PlaylistEntryConfig,
+        ): LinearQueue.Entry? {
+            if (!com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.isVisible(targetId, unlocked)) return null
+            val editorCode = "extra:$targetId"
+            val userPreset = if (PresetRefs.isUser(config.presetId)) {
+                presets.firstOrNull { it.id == config.presetId && it.courseCode.equals(editorCode, ignoreCase = true) }
             } else {
                 null
             }
-            val effectiveRef = matchingUserPreset?.id
-                ?: if (config.presetId == PresetRefs.SYSTEM_KNOCKOUT && resolved.medley.isKnockoutVariant) {
-                    PresetRefs.SYSTEM_KNOCKOUT
-                } else {
-                    PresetRefs.SYSTEM_DEFAULT
+            if (userPreset != null) {
+                val inventory = inspectTargetForEditor(editorCode, dir, resolver)
+                val resolved = inventory?.let {
+                    CourseFlowRecipeBuilder.compileUserPreset(
+                        preset = userPreset,
+                        inventory = it,
+                        minf = minfCatalog,
+                        resolver = resolver,
+                        segmentSwitchFadeOutMs = playbackBehavior.segmentSwitchFadeOutMs,
+                    )
                 }
-            val presetDisplayName = when {
-                matchingUserPreset != null -> matchingUserPreset.name
-                effectiveRef == PresetRefs.SYSTEM_KNOCKOUT -> rallyLabel
-                else -> suiteLabel
+                if (resolved != null) {
+                    return LinearQueue.Entry(
+                        key = "pl:${playlist.id}:$idx:$editorCode:${userPreset.id}",
+                        title = title,
+                        subtitle = "${playlist.name} · ${userPreset.name}",
+                        sourceType = LinearSessionStore.SourceType.PRESET,
+                        courseCode = editorCode,
+                        presetId = userPreset.id,
+                        arrangement = userPreset.name,
+                        durationMs = resolved.medley.durationMs,
+                        artworkName = artwork,
+                        courseMedley = resolved,
+                    )
+                }
             }
-            val courseName = localizedNames?.name(logical, languageTag) ?: logical
-            val nativeEnabled = config.nativeTransitionEnabled ?: playlist.nativeTransitionDefault
-            LinearQueue.Entry(
-                key = "pl:${playlist.id}:$idx:$logical:$effectiveRef",
-                title = courseName,
-                subtitle = "${playlist.name} · $presetDisplayName",
-                sourceType = if (matchingUserPreset != null) {
-                    LinearSessionStore.SourceType.PRESET
-                } else {
-                    LinearSessionStore.SourceType.MEDLEY
-                },
-                courseCode = logical,
-                presetId = effectiveRef,
-                medleyId = resolved.medley.id.takeIf { matchingUserPreset == null },
-                nativeTransitionEnabled = nativeEnabled,
-                nativeTransitionOverride = config.nativeTransitionEnabled,
-                nativeTransitionSourceLabel = if (nativeEnabled && resolved.outroHandoverFrame != null) {
-                    "$nativeTransitionPrefix · $presetDisplayName"
-                } else {
-                    null
-                },
-                arrangement = presetDisplayName,
-                durationMs = resolved.medley.durationMs,
-                artworkName = extraCatalog.courseArtwork[logical],
-                courseMedley = resolved,
+            val builtInMedley = extraMedleyCatalog.forTarget(targetId).firstOrNull()
+            if (builtInMedley != null) {
+                val digests = linkedMapOf<String, String>()
+                var allPresent = true
+                for (stem in builtInMedley.medley.uniqueStems) {
+                    val sha = resolveAudioSha256(stem)
+                    if (sha == null || !java.io.File(dir, "audio/$sha").isFile) {
+                        allPresent = false
+                        break
+                    }
+                    digests[stem] = sha
+                }
+                if (allPresent) {
+                    val resolved = com.mylittleblover.mkwplayer.interactive.CourseMedleyCompiler.ResolvedMedley(
+                        medley = builtInMedley.medley,
+                        sampleRate = extraMedleyCatalog.sampleRate,
+                        stemDigests = digests,
+                    )
+                    return LinearQueue.Entry(
+                        key = "pl:${playlist.id}:$idx:$editorCode:${builtInMedley.medley.id}",
+                        title = title,
+                        subtitle = "${playlist.name} · $suiteLabel",
+                        sourceType = LinearSessionStore.SourceType.MEDLEY,
+                        courseCode = editorCode,
+                        medleyId = builtInMedley.medley.id,
+                        arrangement = suiteLabel,
+                        durationMs = builtInMedley.medley.durationMs,
+                        artworkName = artwork,
+                        courseMedley = resolved,
+                    )
+                }
+            }
+            if (!java.io.File(dir, "audio/${defaultAsset.sha256}").isFile) return null
+            val durationMs = if (defaultAsset.sampleRate > 0) {
+                defaultAsset.frames * 1000L / defaultAsset.sampleRate
+            } else 0L
+            return LinearQueue.Entry(
+                key = "pl:${playlist.id}:$idx:extra:$targetId",
+                title = title,
+                subtitle = playlist.name,
+                sourceType = LinearSessionStore.SourceType.EXTRA,
+                durationMs = durationMs,
+                artworkName = artwork,
+                assetSha256 = defaultAsset.sha256,
+                loop = defaultAsset.loop,
+                loopStart = defaultAsset.loopStart,
+                loopEnd = defaultAsset.loopEnd,
             )
+        }
+
+        val rawEntries = playlist.courseIds.mapIndexedNotNull { idx, rawItemId ->
+            val config = playlist.configAt(idx)
+            when (val ref = PlaylistItemRef.parse(rawItemId)) {
+                is PlaylistItemRef.Course -> {
+                    val logical = ref.logicalCode
+                    if (isSpecialStageLocked(logical)) return@mapIndexedNotNull null
+                    val resolved = CourseFlowRecipeBuilder.resolvePresetRef(
+                        courseCode = logical,
+                        presetRef = config.presetId,
+                        userPresets = presets,
+                        minf = minfCatalog,
+                        medleyCatalog = courseMedleyCatalog,
+                        resolver = resolver,
+                        segmentSwitchFadeOutMs = playbackBehavior.segmentSwitchFadeOutMs,
+                    ) ?: return@mapIndexedNotNull null
+
+                    val matchingUserPreset = if (PresetRefs.isUser(config.presetId)) {
+                        presets.firstOrNull { it.id == config.presetId && it.courseCode.equals(logical, ignoreCase = true) }
+                    } else {
+                        null
+                    }
+                    val effectiveRef = matchingUserPreset?.id
+                        ?: if (config.presetId == PresetRefs.SYSTEM_KNOCKOUT && resolved.medley.isKnockoutVariant) {
+                            PresetRefs.SYSTEM_KNOCKOUT
+                        } else {
+                            PresetRefs.SYSTEM_DEFAULT
+                        }
+                    val presetDisplayName = when {
+                        matchingUserPreset != null -> matchingUserPreset.name
+                        effectiveRef == PresetRefs.SYSTEM_KNOCKOUT -> rallyLabel
+                        else -> suiteLabel
+                    }
+                    val courseName = localizedNames?.name(logical, languageTag) ?: logical
+                    val nativeEnabled = config.nativeTransitionEnabled ?: playlist.nativeTransitionDefault
+                    LinearQueue.Entry(
+                        key = "pl:${playlist.id}:$idx:$logical:$effectiveRef",
+                        title = courseName,
+                        subtitle = "${playlist.name} · $presetDisplayName",
+                        sourceType = if (matchingUserPreset != null) {
+                            LinearSessionStore.SourceType.PRESET
+                        } else {
+                            LinearSessionStore.SourceType.MEDLEY
+                        },
+                        courseCode = logical,
+                        presetId = effectiveRef,
+                        medleyId = resolved.medley.id.takeIf { matchingUserPreset == null },
+                        nativeTransitionEnabled = nativeEnabled,
+                        nativeTransitionOverride = config.nativeTransitionEnabled,
+                        nativeTransitionSourceLabel = if (nativeEnabled && resolved.outroHandoverFrame != null) {
+                            "$nativeTransitionPrefix · $presetDisplayName"
+                        } else {
+                            null
+                        },
+                        arrangement = presetDisplayName,
+                        durationMs = resolved.medley.durationMs,
+                        artworkName = extraCatalog.courseArtwork[logical],
+                        courseMedley = resolved,
+                    )
+                }
+                is PlaylistItemRef.Jukebox -> {
+                    val item = jukebox.itemsByKey[ref.trackKey] ?: return@mapIndexedNotNull null
+                    val trackDir = jukebox.packByKey[ref.trackKey] ?: dir
+                    if (!java.io.File(trackDir, "audio/${item.track.primary.sha256}").isFile) return@mapIndexedNotNull null
+                    val game = gamesById[item.gameId]
+                    val gameTitle = game?.localizedName(languageTag) ?: item.gameId
+                    LinearQueue.Entry(
+                        key = "pl:${playlist.id}:$idx:${item.key}",
+                        title = item.localizedDisplayName(languageTag),
+                        subtitle = "${playlist.name} · $gameTitle",
+                        sourceType = LinearSessionStore.SourceType.JUKEBOX,
+                        gameId = item.gameId,
+                        gameTitle = gameTitle,
+                        yearLabel = game?.yearLabel?.takeIf { it.isNotBlank() },
+                        arrangement = item.localizedArrangement(languageTag),
+                        durationMs = item.durationMs,
+                        artworkName = item.ostIndex?.let { "t_%03d.webp".format(java.util.Locale.ROOT, it) },
+                        assetSha256 = item.track.primary.sha256,
+                        sourceTrackKey = item.key,
+                    )
+                }
+                is PlaylistItemRef.SfcTrack -> {
+                    val track = extraCatalog.sfcCourses.firstOrNull { it.id == ref.trackId } ?: return@mapIndexedNotNull null
+                    compileExtraInteractiveEntry(
+                        idx = idx,
+                        targetId = track.id,
+                        title = track.localizedName(languageTag),
+                        artwork = track.artwork,
+                        defaultAsset = track.main,
+                        config = config,
+                    )
+                }
+                is PlaylistItemRef.BattleTrack -> {
+                    val track = extraCatalog.battleTracks.firstOrNull { it.id == ref.trackId } ?: return@mapIndexedNotNull null
+                    compileExtraInteractiveEntry(
+                        idx = idx,
+                        targetId = track.id,
+                        title = track.localizedName(languageTag),
+                        artwork = track.artwork,
+                        defaultAsset = track.main,
+                        config = config,
+                    )
+                }
+                is PlaylistItemRef.ExtraTrack -> {
+                    val extraId = ref.extraId
+                    if (!com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.isVisible(extraId, unlocked)) {
+                        return@mapIndexedNotNull null
+                    }
+                    val other = extraCatalog.otherMusic.firstOrNull { it.id == extraId }
+                    if (other != null) {
+                        val title = other.localizedName(languageTag)
+                        when (other) {
+                            is com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.InteractiveTitle -> {
+                                compileExtraInteractiveEntry(
+                                    idx = idx,
+                                    targetId = other.id,
+                                    title = title,
+                                    artwork = other.artwork,
+                                    defaultAsset = other.main,
+                                    config = config,
+                                )
+                            }
+                            is com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.LinearAsset -> {
+                                if (!java.io.File(dir, "audio/${other.asset.sha256}").isFile) return@mapIndexedNotNull null
+                                LinearQueue.Entry(
+                                    key = "pl:${playlist.id}:$idx:extra:${other.id}",
+                                    title = title,
+                                    subtitle = playlist.name,
+                                    sourceType = LinearSessionStore.SourceType.EXTRA,
+                                    durationMs = other.durationMs,
+                                    artworkName = other.artwork,
+                                    assetSha256 = other.asset.sha256,
+                                    loop = other.asset.loop,
+                                    loopStart = other.asset.loopStart,
+                                    loopEnd = other.asset.loopEnd,
+                                )
+                            }
+                            is com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.OverlaidOpening -> {
+                                if (!java.io.File(dir, "audio/${other.op.sha256}").isFile ||
+                                    !java.io.File(dir, "audio/${other.telop.sha256}").isFile
+                                ) return@mapIndexedNotNull null
+                                LinearQueue.Entry(
+                                    key = "pl:${playlist.id}:$idx:extra:${other.id}",
+                                    title = title,
+                                    subtitle = playlist.name,
+                                    sourceType = LinearSessionStore.SourceType.EXTRA,
+                                    durationMs = other.durationMs,
+                                    artworkName = other.artwork,
+                                    overlaidOpening = other,
+                                )
+                            }
+                            is com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.ChainedSequence -> {
+                                if (other.parts.any { !java.io.File(dir, "audio/${it.asset.sha256}").isFile }) {
+                                    return@mapIndexedNotNull null
+                                }
+                                LinearQueue.Entry(
+                                    key = "pl:${playlist.id}:$idx:extra:${other.id}",
+                                    title = title,
+                                    subtitle = playlist.name,
+                                    sourceType = LinearSessionStore.SourceType.EXTRA,
+                                    durationMs = other.durationMs,
+                                    artworkName = other.artwork,
+                                    chainedSequence = other,
+                                )
+                            }
+                        }
+                    } else {
+                        val simple = extraCatalog.shortSounds.firstOrNull { it.id == extraId }
+                            ?: extraCatalog.nintendoMusicSpecial.firstOrNull { it.id == extraId }
+                            ?: return@mapIndexedNotNull null
+                        if (!java.io.File(dir, "audio/${simple.asset.sha256}").isFile) return@mapIndexedNotNull null
+                        LinearQueue.Entry(
+                            key = "pl:${playlist.id}:$idx:extra:${simple.id}",
+                            title = simple.localizedName(languageTag),
+                            subtitle = playlist.name,
+                            sourceType = LinearSessionStore.SourceType.EXTRA,
+                            durationMs = simple.durationMs,
+                            artworkName = simple.artwork,
+                            assetSha256 = simple.asset.sha256,
+                            loop = simple.asset.loop,
+                            loopStart = simple.asset.loopStart,
+                            loopEnd = simple.asset.loopEnd,
+                        )
+                    }
+                }
+            }
         }
         if (rawEntries.isEmpty()) return false
         val clampedStart = startIndex.coerceIn(0, rawEntries.lastIndex)
@@ -2421,17 +3765,329 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         return true
     }
 
+    private fun resolveEntriesForRefs(
+        rawRefs: List<String>,
+        presets: List<CoursePreset>,
+        languageTag: String,
+        suiteLabel: String,
+        rallyLabel: String,
+        queueSubtitle: String,
+        nativeTransitionPrefix: String,
+    ): List<LinearQueue.Entry> {
+        val dir = pack?.directory ?: return emptyList()
+        val resolver = editorSourceResolver(dir)
+        val unlocked = com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(_ui.value.unlock)
+        val gamesById = jukebox.games.associateBy { it.id }
+
+        fun compileExtraEntry(
+            idx: Int,
+            targetId: String,
+            title: String,
+            artwork: String,
+            defaultAsset: com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.AssetRef,
+        ): LinearQueue.Entry? {
+            if (!com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.isVisible(targetId, unlocked)) return null
+            val editorCode = "extra:$targetId"
+            val builtInMedley = extraMedleyCatalog.forTarget(targetId).firstOrNull()
+            if (builtInMedley != null) {
+                val digests = linkedMapOf<String, String>()
+                var allPresent = true
+                for (stem in builtInMedley.medley.uniqueStems) {
+                    val sha = resolveAudioSha256(stem)
+                    if (sha == null || !java.io.File(dir, "audio/$sha").isFile) {
+                        allPresent = false
+                        break
+                    }
+                    digests[stem] = sha
+                }
+                if (allPresent) {
+                    val resolved = com.mylittleblover.mkwplayer.interactive.CourseMedleyCompiler.ResolvedMedley(
+                        medley = builtInMedley.medley,
+                        sampleRate = extraMedleyCatalog.sampleRate,
+                        stemDigests = digests,
+                    )
+                    return LinearQueue.Entry(
+                        key = "ref:$idx:$editorCode:${builtInMedley.medley.id}:${java.util.UUID.randomUUID()}",
+                        title = title,
+                        subtitle = "$queueSubtitle · $suiteLabel",
+                        sourceType = LinearSessionStore.SourceType.MEDLEY,
+                        courseCode = editorCode,
+                        medleyId = builtInMedley.medley.id,
+                        arrangement = suiteLabel,
+                        durationMs = builtInMedley.medley.durationMs,
+                        artworkName = artwork,
+                        courseMedley = resolved,
+                    )
+                }
+            }
+            if (!java.io.File(dir, "audio/${defaultAsset.sha256}").isFile) return null
+            val durationMs = if (defaultAsset.sampleRate > 0) {
+                defaultAsset.frames * 1000L / defaultAsset.sampleRate
+            } else 0L
+            return LinearQueue.Entry(
+                key = "ref:$idx:extra:$targetId:${java.util.UUID.randomUUID()}",
+                title = title,
+                subtitle = queueSubtitle,
+                sourceType = LinearSessionStore.SourceType.EXTRA,
+                durationMs = durationMs,
+                artworkName = artwork,
+                assetSha256 = defaultAsset.sha256,
+                loop = defaultAsset.loop,
+                loopStart = defaultAsset.loopStart,
+                loopEnd = defaultAsset.loopEnd,
+            )
+        }
+
+        return rawRefs.mapIndexedNotNull { idx, rawItemId ->
+            when (val ref = PlaylistItemRef.parse(rawItemId)) {
+                is PlaylistItemRef.Course -> {
+                    val logical = ref.logicalCode
+                    if (isSpecialStageLocked(logical)) return@mapIndexedNotNull null
+                    val resolved = CourseFlowRecipeBuilder.resolvePresetRef(
+                        courseCode = logical,
+                        presetRef = PresetRefs.SYSTEM_DEFAULT,
+                        userPresets = presets,
+                        minf = minfCatalog,
+                        medleyCatalog = courseMedleyCatalog,
+                        resolver = resolver,
+                        segmentSwitchFadeOutMs = playbackBehavior.segmentSwitchFadeOutMs,
+                    ) ?: return@mapIndexedNotNull null
+                    val courseName = localizedNames?.name(logical, languageTag) ?: logical
+                    LinearQueue.Entry(
+                        key = "ref:$idx:$logical:${java.util.UUID.randomUUID()}",
+                        title = courseName,
+                        subtitle = suiteLabel,
+                        sourceType = LinearSessionStore.SourceType.MEDLEY,
+                        courseCode = logical,
+                        presetId = PresetRefs.SYSTEM_DEFAULT,
+                        medleyId = resolved.medley.id,
+                        arrangement = suiteLabel,
+                        durationMs = resolved.medley.durationMs,
+                        artworkName = extraCatalog.courseArtwork[logical],
+                        courseMedley = resolved,
+                    )
+                }
+                is PlaylistItemRef.Jukebox -> {
+                    val item = jukebox.itemsByKey[ref.trackKey] ?: return@mapIndexedNotNull null
+                    val trackDir = jukebox.packByKey[ref.trackKey] ?: dir
+                    if (!java.io.File(trackDir, "audio/${item.track.primary.sha256}").isFile) return@mapIndexedNotNull null
+                    val game = gamesById[item.gameId]
+                    val gameTitle = game?.localizedName(languageTag) ?: item.gameId
+                    LinearQueue.Entry(
+                        key = "ref:$idx:${item.key}:${java.util.UUID.randomUUID()}",
+                        title = item.localizedDisplayName(languageTag),
+                        subtitle = gameTitle,
+                        sourceType = LinearSessionStore.SourceType.JUKEBOX,
+                        gameId = item.gameId,
+                        gameTitle = gameTitle,
+                        yearLabel = game?.yearLabel?.takeIf { it.isNotBlank() },
+                        arrangement = item.localizedArrangement(languageTag),
+                        durationMs = item.durationMs,
+                        artworkName = item.ostIndex?.let { "t_%03d.webp".format(java.util.Locale.ROOT, it) },
+                        assetSha256 = item.track.primary.sha256,
+                        sourceTrackKey = item.key,
+                    )
+                }
+                is PlaylistItemRef.SfcTrack -> {
+                    val track = extraCatalog.sfcCourses.firstOrNull { it.id == ref.trackId } ?: return@mapIndexedNotNull null
+                    compileExtraEntry(idx, track.id, track.localizedName(languageTag), track.artwork, track.main)
+                }
+                is PlaylistItemRef.BattleTrack -> {
+                    val track = extraCatalog.battleTracks.firstOrNull { it.id == ref.trackId } ?: return@mapIndexedNotNull null
+                    compileExtraEntry(idx, track.id, track.localizedName(languageTag), track.artwork, track.main)
+                }
+                is PlaylistItemRef.ExtraTrack -> {
+                    val extraId = ref.extraId
+                    if (!com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.isVisible(extraId, unlocked)) {
+                        return@mapIndexedNotNull null
+                    }
+                    val other = extraCatalog.otherMusic.firstOrNull { it.id == extraId }
+                    if (other != null) {
+                        val title = other.localizedName(languageTag)
+                        when (other) {
+                            is com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.InteractiveTitle ->
+                                compileExtraEntry(idx, other.id, title, other.artwork, other.main)
+                            is com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.LinearAsset -> {
+                                if (!java.io.File(dir, "audio/${other.asset.sha256}").isFile) return@mapIndexedNotNull null
+                                LinearQueue.Entry(
+                                    key = "ref:$idx:extra:${other.id}:${java.util.UUID.randomUUID()}",
+                                    title = title,
+                                    subtitle = queueSubtitle,
+                                    sourceType = LinearSessionStore.SourceType.EXTRA,
+                                    durationMs = other.durationMs,
+                                    artworkName = other.artwork,
+                                    assetSha256 = other.asset.sha256,
+                                    loop = other.asset.loop,
+                                    loopStart = other.asset.loopStart,
+                                    loopEnd = other.asset.loopEnd,
+                                )
+                            }
+                            is com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.OverlaidOpening -> {
+                                if (!java.io.File(dir, "audio/${other.op.sha256}").isFile ||
+                                    !java.io.File(dir, "audio/${other.telop.sha256}").isFile
+                                ) return@mapIndexedNotNull null
+                                LinearQueue.Entry(
+                                    key = "ref:$idx:extra:${other.id}:${java.util.UUID.randomUUID()}",
+                                    title = title,
+                                    subtitle = queueSubtitle,
+                                    sourceType = LinearSessionStore.SourceType.EXTRA,
+                                    durationMs = other.durationMs,
+                                    artworkName = other.artwork,
+                                    overlaidOpening = other,
+                                )
+                            }
+                            is com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.ChainedSequence -> {
+                                if (other.parts.any { !java.io.File(dir, "audio/${it.asset.sha256}").isFile }) {
+                                    return@mapIndexedNotNull null
+                                }
+                                LinearQueue.Entry(
+                                    key = "ref:$idx:extra:${other.id}:${java.util.UUID.randomUUID()}",
+                                    title = title,
+                                    subtitle = queueSubtitle,
+                                    sourceType = LinearSessionStore.SourceType.EXTRA,
+                                    durationMs = other.durationMs,
+                                    artworkName = other.artwork,
+                                    chainedSequence = other,
+                                )
+                            }
+                        }
+                    } else {
+                        val simple = extraCatalog.shortSounds.firstOrNull { it.id == extraId }
+                            ?: extraCatalog.nintendoMusicSpecial.firstOrNull { it.id == extraId }
+                            ?: return@mapIndexedNotNull null
+                        if (!java.io.File(dir, "audio/${simple.asset.sha256}").isFile) return@mapIndexedNotNull null
+                        LinearQueue.Entry(
+                            key = "ref:$idx:extra:${simple.id}:${java.util.UUID.randomUUID()}",
+                            title = simple.localizedName(languageTag),
+                            subtitle = queueSubtitle,
+                            sourceType = LinearSessionStore.SourceType.EXTRA,
+                            durationMs = simple.durationMs,
+                            artworkName = simple.artwork,
+                            assetSha256 = simple.asset.sha256,
+                            loop = simple.asset.loop,
+                            loopStart = simple.asset.loopStart,
+                            loopEnd = simple.asset.loopEnd,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun playNextRefs(
+        rawRefs: List<String>,
+        presets: List<CoursePreset>,
+        languageTag: String,
+        suiteLabel: String,
+        rallyLabel: String,
+        queueSubtitle: String,
+        nativeTransitionPrefix: String,
+    ): Boolean {
+        if (isCeremonyLocked || !_ui.value.allowPlayNext) return false
+        val dir = pack?.directory ?: return false
+        val entries = resolveEntriesForRefs(rawRefs, presets, languageTag, suiteLabel, rallyLabel, queueSubtitle, nativeTransitionPrefix)
+        if (entries.isEmpty()) return false
+        if (_ui.value.queue.current == null || !_ui.value.linearMode) {
+            playExtraLinearQueue(entries, 0, LinearQueue.RepeatMode.LIST, false)
+        } else {
+            linearCoordinator.enqueueNextBatch(entries, dir)
+        }
+        return true
+    }
+
+    fun addToQueueRefs(
+        rawRefs: List<String>,
+        presets: List<CoursePreset>,
+        languageTag: String,
+        suiteLabel: String,
+        rallyLabel: String,
+        queueSubtitle: String,
+        nativeTransitionPrefix: String,
+    ): Boolean {
+        if (isCeremonyLocked || !_ui.value.allowPlayNext) return false
+        val dir = pack?.directory ?: return false
+        val entries = resolveEntriesForRefs(rawRefs, presets, languageTag, suiteLabel, rallyLabel, queueSubtitle, nativeTransitionPrefix)
+        if (entries.isEmpty()) return false
+        if (_ui.value.queue.current == null || !_ui.value.linearMode) {
+            playExtraLinearQueue(entries, 0, LinearQueue.RepeatMode.LIST, false)
+        } else {
+            linearCoordinator.enqueueEndBatch(entries, dir)
+        }
+        return true
+    }
+
+    fun playSelectedRefs(
+        rawRefs: List<String>,
+        presets: List<CoursePreset>,
+        languageTag: String,
+        suiteLabel: String,
+        rallyLabel: String,
+        queueSubtitle: String,
+        nativeTransitionPrefix: String,
+        shuffle: Boolean = false,
+    ): Boolean {
+        if (isCeremonyLocked) return false
+        val entries = resolveEntriesForRefs(rawRefs, presets, languageTag, suiteLabel, rallyLabel, queueSubtitle, nativeTransitionPrefix)
+        if (entries.isEmpty()) return false
+        playExtraLinearQueue(entries, 0, LinearQueue.RepeatMode.LIST, shuffle)
+        requestNotificationPermissionIfNeeded()
+        return true
+    }
+
     sealed interface RoutePlayResult {
         data object Started : RoutePlayResult
         data class Blocked(val reason: String) : RoutePlayResult
     }
 
     fun allInstalledJukeboxItems(): List<Pair<com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.TrackItem, com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog.Game>> =
-        jukebox.games.flatMap { game -> game.items.map { item -> item to game } }
+        jukebox.allItems
+
+    internal fun isPresetSelectableForCourse(
+        courseCode: String,
+        presetRef: String?,
+        userPresets: List<CoursePreset>,
+    ): Boolean {
+        val logical = courseCode.removeSuffix("_00")
+        if (isSpecialStageLocked(logical)) return false
+        val catalog = courseMedleyCatalog
+        val medleys = catalog.forCourse(logical)
+        val dir = pack?.directory
+        return when (presetRef) {
+            null, PresetRefs.SYSTEM_DEFAULT -> {
+                val target = medleys.firstOrNull { !it.isKnockoutVariant } ?: return false
+                dir == null || com.mylittleblover.mkwplayer.interactive.CourseMedleyCompiler.resolveMedley(
+                    medley = target,
+                    sampleRate = catalog.sampleRate,
+                    identities = interactiveIdentities,
+                    packDir = dir,
+                ) != null
+            }
+            PresetRefs.SYSTEM_KNOCKOUT -> {
+                val target = medleys.firstOrNull { it.isKnockoutVariant } ?: return false
+                dir == null || com.mylittleblover.mkwplayer.interactive.CourseMedleyCompiler.resolveMedley(
+                    medley = target,
+                    sampleRate = catalog.sampleRate,
+                    identities = interactiveIdentities,
+                    packDir = dir,
+                ) != null
+            }
+            else -> {
+                val preset = userPresets.firstOrNull {
+                    it.id == presetRef && it.courseCode.equals(logical, ignoreCase = true)
+                } ?: return false
+                if (dir == null) return true
+                val resolver = CourseFlowRecipeBuilder.packSourceResolver(pack?.manifest, interactiveIdentities, dir)
+                val inventory = CourseFlowRecipeBuilder.inspectCourse(logical, minfCatalog, catalog, resolver)
+                CourseFlowRecipeBuilder.compileUserPreset(preset, inventory, minfCatalog, resolver) != null
+            }
+        }
+    }
 
     fun inspectOfficialRoute(
         route: com.mylittleblover.mkwplayer.routes.OfficialRoute,
         sessionOverrides: Map<Int, String> = emptyMap(),
+        ruleMode: com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RoadMusicRuleMode =
+            com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RoadMusicRuleMode.AUTO,
     ): com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RouteValidationReport {
         val dir = pack?.directory
         val items = jukebox.games.flatMap { it.items }
@@ -2447,16 +4103,20 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                 val resolvedDir = jukebox.packByKey[item.track.key] ?: dir
                 resolvedDir != null && java.io.File(resolvedDir, "audio/${item.track.primary.sha256}").isFile
             },
+            wikiCatalog = routeMusicCatalog,
+            ruleMode = ruleMode,
         )
     }
 
     fun inspectCustomRoute(
         route: com.mylittleblover.mkwplayer.routes.CustomRoute,
+        ruleModeOverride: com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RoadMusicRuleMode? = null,
     ): com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RouteValidationReport {
         val dir = pack?.directory
         val items = jukebox.games.flatMap { it.items }
+        val effectiveRoute = ruleModeOverride?.let { route.copy(roadRuleMode = it) } ?: route
         return com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.inspectCustomRoute(
-            route = route,
+            route = effectiveRoute,
             connections = stageConnections,
             pool = roadJukeboxPool,
             installedJukebox = items,
@@ -2466,6 +4126,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                 val resolvedDir = jukebox.packByKey[item.track.key] ?: dir
                 resolvedDir != null && java.io.File(resolvedDir, "audio/${item.track.primary.sha256}").isFile
             },
+            wikiCatalog = routeMusicCatalog,
         )
     }
 
@@ -2478,16 +4139,34 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         suiteLabel: String,
         rallyLabel: String,
         roadPrefix: String,
+        ruleMode: com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RoadMusicRuleMode =
+            com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RoadMusicRuleMode.AUTO,
     ): RoutePlayResult {
+        if (isCeremonyLocked) {
+            return RoutePlayResult.Blocked("Special Cup unlock ceremony is playing.")
+        }
+        if (route.requiresSpecialUnlock && !com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(_ui.value.unlock)) {
+            return RoutePlayResult.Blocked("Special Cup is locked.")
+        }
         if (nativePerformance?.isFading == true) {
             return RoutePlayResult.Blocked("Playback is currently fading out.")
         }
-        val report = inspectOfficialRoute(route, sessionOverrides)
+        val report = inspectOfficialRoute(route, sessionOverrides, ruleMode)
         if (!report.canPlay) {
             val reason = report.blockingReason ?: "Route cannot be played."
             _ui.value = _ui.value.copy(detail = reason)
             return RoutePlayResult.Blocked(reason)
         }
+        val unlocked = com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(_ui.value.unlock)
+        val openingId = com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.openingIdForOfficialRoute(route.id, route.kind)
+        val openingItem = if (openingId != null && com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.isVisible(openingId, unlocked)) {
+            extraCatalog.otherMusic
+                .filterIsInstance<com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.OverlaidOpening>()
+                .firstOrNull { it.id == openingId }
+        } else {
+            null
+        }
+        val routeTitle = route.displayName(languageTag)
         val stops = route.stops.map {
             com.mylittleblover.mkwplayer.routes.CustomRouteStop(it.stageCode, null)
         }
@@ -2501,6 +4180,8 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             rallyLabel = rallyLabel,
             roadPrefix = roadPrefix,
             customSubstituteTag = "",
+            opening = openingItem,
+            routeTitle = routeTitle,
         ) ?: return RoutePlayResult.Blocked("Missing required course medley audio.").also {
             _ui.value = _ui.value.copy(detail = it.reason)
         }
@@ -2512,7 +4193,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             context = LinearPlaybackCoordinator.SessionContext(
                 contextKind = LinearSessionStore.ContextKind.OFFICIAL_ROUTE,
                 contextId = route.id,
-                contextTitle = route.displayName(languageTag),
+                contextTitle = routeTitle,
                 nativeTransitionDefault = false,
                 packFingerprints = currentPackFingerprints(),
                 allowPlayNext = false,
@@ -2534,6 +4215,9 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         roadPrefix: String,
         customSubstituteTag: String,
     ): RoutePlayResult {
+        if (isCeremonyLocked) {
+            return RoutePlayResult.Blocked("Special Cup unlock ceremony is playing.")
+        }
         if (nativePerformance?.isFading == true) {
             return RoutePlayResult.Blocked("Playback is currently fading out.")
         }
@@ -2587,11 +4271,30 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         rallyLabel: String,
         roadPrefix: String,
         customSubstituteTag: String,
+        opening: com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.OverlaidOpening? = null,
+        routeTitle: String? = null,
     ): List<LinearQueue.Entry>? {
         val dir = pack?.directory ?: return null
-        val resolver = CourseFlowRecipeBuilder.packSourceResolver(pack?.manifest, interactiveIdentities, dir)
+        val resolver = editorSourceResolver(dir)
         val gamesById = jukebox.games.associateBy { it.id }
         val entries = mutableListOf<LinearQueue.Entry>()
+
+        if (opening != null) {
+            val opFile = java.io.File(dir, "audio/${opening.op.sha256}")
+            val telopFile = java.io.File(dir, "audio/${opening.telop.sha256}")
+            if (opFile.isFile && telopFile.isFile) {
+                entries += LinearQueue.Entry(
+                    key = "$routeId:opening:${opening.id}",
+                    title = opening.localizedName(languageTag),
+                    subtitle = routeTitle.orEmpty(),
+                    sourceType = LinearSessionStore.SourceType.EXTRA,
+                    ostIndex = opening.ostIndex,
+                    durationMs = opening.durationMs,
+                    artworkName = opening.artwork,
+                    overlaidOpening = opening,
+                )
+            }
+        }
 
         for (i in stops.indices) {
             val stop = stops[i]
@@ -2604,26 +4307,45 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                 minf = minfCatalog,
                 medleyCatalog = courseMedleyCatalog,
                 resolver = resolver,
+                segmentSwitchFadeOutMs = playbackBehavior.segmentSwitchFadeOutMs,
             ) ?: return null
-            val displayCourse = localizedNames?.name(logical, languageTag) ?: logical
-            val presetDisplayName = when (presetRef) {
-                com.mylittleblover.mkwplayer.library.PresetRefs.SYSTEM_KNOCKOUT -> rallyLabel
-                com.mylittleblover.mkwplayer.library.PresetRefs.SYSTEM_DEFAULT -> suiteLabel
-                else -> userPresets.firstOrNull { it.id == presetRef }?.name ?: suiteLabel
+            val matchingUserPreset = if (PresetRefs.isUser(presetRef)) {
+                userPresets.firstOrNull { it.id == presetRef && it.courseCode.equals(logical, ignoreCase = true) }
+            } else {
+                null
             }
+            val effectiveRef = matchingUserPreset?.id
+                ?: if (presetRef == PresetRefs.SYSTEM_KNOCKOUT && resolved.medley.isKnockoutVariant) {
+                    PresetRefs.SYSTEM_KNOCKOUT
+                } else {
+                    PresetRefs.SYSTEM_DEFAULT
+                }
+            val displayCourse = localizedNames?.name(logical, languageTag) ?: logical
+            val presetDisplayName = when {
+                matchingUserPreset != null -> matchingUserPreset.name
+                effectiveRef == PresetRefs.SYSTEM_KNOCKOUT -> rallyLabel
+                else -> suiteLabel
+            }
+            val outgoingDirect = report.legs.getOrNull(i)?.resolution is
+                com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.EdgeMusicResolution.KnockoutTourDirect
+            val incomingDirect = i > 0 && report.legs.getOrNull(i - 1)?.resolution is
+                com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.EdgeMusicResolution.KnockoutTourDirect
+            val handoverOut = outgoingDirect && resolved.outroHandoverFrame != null
+            val enableHandover = handoverOut || incomingDirect
             entries += LinearQueue.Entry(
                 key = "$routeId:stop:$i:$logical",
                 title = displayCourse,
                 subtitle = presetDisplayName,
-                sourceType = if (com.mylittleblover.mkwplayer.library.PresetRefs.isUser(presetRef)) {
+                sourceType = if (matchingUserPreset != null) {
                     LinearSessionStore.SourceType.PRESET
                 } else {
                     LinearSessionStore.SourceType.MEDLEY
                 },
                 courseCode = logical,
-                presetId = stop.presetId,
-                medleyId = resolved.medley.id,
-                nativeTransitionEnabled = false,
+                presetId = effectiveRef,
+                medleyId = resolved.medley.id.takeIf { matchingUserPreset == null },
+                nativeTransitionEnabled = enableHandover,
+                nativeTransitionSourceLabel = if (handoverOut) "Outro → Next Pre" else null,
                 arrangement = presetDisplayName,
                 durationMs = resolved.medley.durationMs,
                 artworkName = extraCatalog.courseArtwork[logical],
@@ -2662,14 +4384,22 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                         entries += roadEntry(override, legLabel)
                     } else if (res.candidates.isNotEmpty()) {
                         val variants = res.candidates.map { roadEntry(it, legLabel) }
-                        entries += variants.first().copy(roadCandidateVariants = variants)
+                        val weights = if (res.candidateWeights.size == variants.size) {
+                            res.candidateWeights
+                        } else {
+                            emptyList()
+                        }
+                        entries += variants.first().copy(
+                            roadCandidateVariants = variants,
+                            roadCandidateWeights = weights,
+                        )
                     }
                 }
                 is com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.EdgeMusicResolution.CustomSubstitute -> {
                     val subLabel = if (customSubstituteTag.isNotBlank()) "$legLabel · $customSubstituteTag" else legLabel
                     entries += roadEntry(res.track, subLabel)
                 }
-                else -> Unit // Candidate missing or muted -> cleanly skipped (#73)
+                else -> Unit // Special approach / Knockout Direct / Missing / Muted -> cleanly handled
             }
         }
         return entries.takeIf { it.isNotEmpty() }
@@ -2728,7 +4458,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
     /** Restores a paused linear queue snapshot from disk and resumes at the exact frame (#62, #89). */
     fun resumeContinueListening(onReady: () -> Unit = {}) {
-        if (nativePerformance?.isFading == true) return
+        if (isCeremonyLocked || nativePerformance?.isFading == true) return
         viewModelScope.launch {
             val restored = withContext(Dispatchers.IO) {
                 val saved = linearSessionStore.read().getOrNull() ?: return@withContext null
@@ -2774,6 +4504,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                 )
                 Triple(exported, context, saved.positionFrames)
             }
+            if (isCeremonyLocked) return@launch
             if (restored == null) {
                 linearCoordinator.clearSavedSession()
                 _ui.value = _ui.value.copy(continueListening = null)
@@ -2810,6 +4541,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         customRoutes = customRoutes,
         extraCatalog = extraCatalog,
         isStageHidden = ::isSpecialStageLocked,
+        routeMusicCatalog = routeMusicCatalog,
     )
 
     private fun currentPackFingerprints(): List<String> = if (mergedFingerprints.isNotEmpty()) {
@@ -2883,7 +4615,13 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             }
             LinearSessionStore.SourceType.EXTRA -> {
                 val dir = packDir ?: return null
-                val extraId = se.key.removePrefix("extra:")
+                val extraId = com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.extraIdFromEntryKey(se.key)
+                    ?: se.key.removePrefix("extra:")
+                if (!com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.isVisible(
+                        extraId,
+                        com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(_ui.value.unlock),
+                    )
+                ) return null
                 val extraItem = extraCatalog.otherMusic.firstOrNull { it.id == extraId }
                 when (extraItem) {
                     is com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.OtherMusicItem.OverlaidOpening -> {
@@ -2937,24 +4675,63 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             LinearSessionStore.SourceType.PRESET -> {
                 val res = resolver ?: return null
                 val code = se.courseCode ?: return null
-                if (isSpecialStageLocked(code)) return null
-                val presetRef = se.presetId ?: if (se.medleyId != null &&
-                    courseMedleyCatalog.medleys.firstOrNull { it.id == se.medleyId }?.isKnockoutVariant == true
-                ) PresetRefs.SYSTEM_KNOCKOUT else PresetRefs.SYSTEM_DEFAULT
-                if (se.sourceType == LinearSessionStore.SourceType.PRESET &&
-                    PresetRefs.isUser(presetRef) &&
-                    userPresets.none { it.id == presetRef }
-                ) {
-                    // User preset was deleted; verify fallback still compiles or clear if requested.
-                }
-                val resolved = CourseFlowRecipeBuilder.resolvePresetRef(
-                    courseCode = code,
-                    presetRef = presetRef,
-                    userPresets = userPresets,
-                    minf = minfCatalog,
-                    medleyCatalog = courseMedleyCatalog,
-                    resolver = res,
-                ) ?: return null
+                if (isEditorTargetLocked(code)) return null
+                val resolved = if (code.startsWith("extra:")) {
+                    val dir = packDir ?: return null
+                    val targetId = code.removePrefix("extra:")
+                    val extraRes = editorSourceResolver(dir)
+                    val presetRef = se.presetId
+                    val preset = if (PresetRefs.isUser(presetRef)) {
+                        userPresets.firstOrNull { it.id == presetRef && it.courseCode.equals(code, ignoreCase = true) }
+                    } else null
+                    if (preset != null) {
+                        val inv = inspectTargetForEditor(code, dir, extraRes)
+                        inv?.let {
+                            CourseFlowRecipeBuilder.compileUserPreset(
+                                preset = preset,
+                                inventory = it,
+                                minf = minfCatalog,
+                                resolver = extraRes,
+                                segmentSwitchFadeOutMs = playbackBehavior.segmentSwitchFadeOutMs,
+                            )
+                        }
+                    } else {
+                        val item = se.medleyId?.let { extraMedleyCatalog.byMedleyId(it) }
+                            ?: extraMedleyCatalog.forTarget(targetId).firstOrNull()
+                        item?.let { entry ->
+                            val digests = linkedMapOf<String, String>()
+                            var ok = true
+                            for (stem in entry.medley.uniqueStems) {
+                                val sha = resolveAudioSha256(stem)
+                                if (sha == null || !java.io.File(dir, "audio/$sha").isFile) {
+                                    ok = false
+                                    break
+                                }
+                                digests[stem] = sha
+                            }
+                            if (ok) {
+                                com.mylittleblover.mkwplayer.interactive.CourseMedleyCompiler.ResolvedMedley(
+                                    medley = entry.medley,
+                                    sampleRate = extraMedleyCatalog.sampleRate,
+                                    stemDigests = digests,
+                                )
+                            } else null
+                        }
+                    }
+                } else {
+                    val presetRef = se.presetId ?: if (se.medleyId != null &&
+                        courseMedleyCatalog.medleys.firstOrNull { it.id == se.medleyId }?.isKnockoutVariant == true
+                    ) PresetRefs.SYSTEM_KNOCKOUT else PresetRefs.SYSTEM_DEFAULT
+                    CourseFlowRecipeBuilder.resolvePresetRef(
+                        courseCode = code,
+                        presetRef = presetRef,
+                        userPresets = userPresets,
+                        minf = minfCatalog,
+                        medleyCatalog = courseMedleyCatalog,
+                        resolver = packDir?.let(::editorSourceResolver) ?: res,
+                        segmentSwitchFadeOutMs = playbackBehavior.segmentSwitchFadeOutMs,
+                    )
+                } ?: return null
                 LinearQueue.Entry(
                     key = se.key,
                     title = se.title,
@@ -2979,6 +4756,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     internal val selectedEntrySegment: Int? get() = interactivePlan?.entry
 
     fun selectInitialEntry(segment: Int) {
+        if (isCeremonyLocked) return
         val plan = interactivePlan ?: return
         if (_ui.value.canStop || nativePerformance?.isFading == true || segment !in plan.initialSegments) return
         packPlaybackRequest++
@@ -2992,9 +4770,10 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     }
 
     internal val canFadeStop: Boolean
-        get() = interactivePlan != null && session.state.value.loaded && _ui.value.canStop && nativePerformance?.isFading != true
+        get() = !isCeremonyLocked && interactivePlan != null && session.state.value.loaded && _ui.value.canStop && nativePerformance?.isFading != true
 
     fun fadeStopPerformance(seconds: Int) {
+        if (isCeremonyLocked) return
         if(seconds !in listOf(1,3,5,10) || !canFadeStop) return
         startPerformance()
         val driver=nativePerformance ?: return
@@ -3008,6 +4787,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
     /** Stops a performance without ending the stage. */
     fun stopPerformance() {
+        if (isCeremonyLocked) return
         packPlaybackRequest++
         if(nativePerformance!=null) {
             nativePerformance=null
@@ -3077,7 +4857,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
     /** Starts the track with the given key, or reports why it cannot start. */
     fun select(key: String) {
-        if(nativePerformance?.isFading==true) return
+        if (isCeremonyLocked || nativePerformance?.isFading == true) return
         packPlaybackRequest++
         val track = _ui.value.tracks.firstOrNull { it.key == key } ?: return
         if (!track.playable) {
@@ -3154,6 +4934,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         // Start the foreground service so playback survives the activity, and on
         // Android 13+ ask for the notification the service needs.
         // Only starts when the session is actually playing; see PlaybackService.start.
+        syncSessionArtworkMetadata()
         PlaybackService.start(getApplication())
         requestNotificationPermissionIfNeeded()
 
@@ -3182,14 +4963,33 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                 "Notifications are off, so the media controls will not appear."
             },
         )
+        if (granted && pendingUnlockNotification) {
+            postUnlockReadyNotification()
+        } else if (!granted) {
+            pendingUnlockNotification = false
+        }
     }
 
     private fun startPolling() {
-        pollJob?.cancel()
+        if (pollJob?.isActive == true) return
         pollJob = viewModelScope.launch {
             while (true) {
-                publish(session.poll())
+                val st = session.poll()
+                PlaybackTimers.tickFromSession(session)
+                PlaybackTimers.engine.syncInteractiveContext(
+                    isInteractiveActive = st.active && !_ui.value.linearMode,
+                    courseKey = currentStageCode ?: interactivePlan?.name,
+                )
+                if (st.linear && st.active) {
+                    linearCoordinator.onPositionObserved(st.positionFrames, st.playing)
+                }
+                syncVisualizerPolling(st.playing)
+                publish(st)
                 followPerformance()
+                if (!st.active && !linearCoordinator.state.value.active && !isCeremonyLocked) {
+                    pollJob = null
+                    break
+                }
                 delay(POLL_INTERVAL_MS)
             }
         }
@@ -3229,15 +5029,18 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         }
     }
     fun cancelPendingPerformance() {
+        if (isCeremonyLocked) return
         val driver=nativePerformance ?: return
         publishNativePerformance(driver.cancelPending(),true)
     }
     fun selectMusicRegion(number: Int) {
+        if (isCeremonyLocked) return
         startPerformance()
         val driver=nativePerformance ?: return
         publishNativePerformance(driver.selectRegion(number),true)
     }
     fun selectRecordingVersion(number: Int) {
+        if (isCeremonyLocked) return
         startPerformance()
         val driver=nativePerformance ?: return
         publishNativePerformance(driver.selectVersion(number),true)
@@ -3247,17 +5050,39 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val plan=interactivePlan ?: return
         val current=_ui.value.flow ?: return
         val observation=driver.observationState
-        val segment=plan.spec.segments.singleOrNull { it.index==driver.current }
+        ensurePlanIndex(plan)
+        val segment=indexedPlanSegments[driver.current]
         val label=plan.labels[driver.current] ?: "Waiting"
         val pendingId=driver.pending
         val pendingTrans=pendingId?.let { target ->
-            plan.spec.transitions.firstOrNull { driver.current in it.sources && target in it.destinations }
+            indexedPlanTransitions[(driver.current.toLong() shl 32) or (target.toLong() and 0xFFFFFFFFL)]
         }
         val upcomingId=if (pendingId == null && driver.canAdvance) plan.next[driver.current] else null
         val upcomingTrans=upcomingId?.let { target ->
-            plan.spec.transitions.firstOrNull { driver.current in it.sources && target in it.destinations }
+            indexedPlanTransitions[(driver.current.toLong() shl 32) or (target.toLong() and 0xFFFFFFFFL)]
         }
         val pending=pendingId?.let { " → ${plan.labels[it]} (queued)" }.orEmpty()
+        val liveSourceFrame = observation?.sourceFrame
+        val liveFadeRemaining = observation?.fadeEndFrame?.let { end -> observation.transportFrame?.let { (end - it).coerceAtLeast(0) } }
+        val srcLen = segment?.exit
+        val flowProg = if (liveSourceFrame != null && liveSourceFrame >= 0L && srcLen != null && srcLen > 0L) {
+            (liveSourceFrame.toDouble() / srcLen.toDouble()).toFloat().coerceIn(0f, 1f)
+        } else {
+            _progressUi.value.progress
+        }
+        _progressUi.value = _progressUi.value.copy(
+            position = if (liveSourceFrame != null && liveSourceFrame >= 0L) {
+                formatFlowPos(liveSourceFrame, plan.spec.transportSampleRate)
+            } else _progressUi.value.position,
+            total = if (srcLen != null && srcLen > 0L) {
+                formatFlowTotal(srcLen, plan.spec.transportSampleRate)
+            } else _progressUi.value.total,
+            progress = flowProg,
+            sourceFrame = liveSourceFrame,
+            fadeRemainingFrames = liveFadeRemaining,
+        )
+        // Keep exact fadeRemainingFrames during active fade-out for InteractiveFadeStopDeviceTest,
+        // and keep constant presence marker for sourceFrame so non-timeline UI skips 200ms recompositions.
         val updated = _ui.value.copy(detail=if(fromAction) error else driver.diagnostic ?: _ui.value.detail,flow=current.copy(
             activeSegment=driver.current,performing=!driver.finished,
             performanceStage=if(driver.finished) "Finished" else label+pending,
@@ -3270,9 +5095,9 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             canAdvance=driver.canAdvance,canEnd=driver.canEnd,fastPlaying=driver.isFast,canFast=driver.canFast,
             selectedVersion=driver.currentVersion,availableVersions=driver.availableVersions,
             selectedRegion=driver.currentRegion,availableRegions=driver.availableRegions,canCancelPending=driver.canCancelPending,
-            sourceFrame=observation?.sourceFrame,sourceFrames=segment?.exit,loopStart=segment?.loop?.start,loopEnd=segment?.loop?.end,
+            sourceFrame=liveSourceFrame?.let { 0L },sourceFrames=srcLen,loopStart=segment?.loop?.start,loopEnd=segment?.loop?.end,
             voiceCount=observation?.voices ?: 0,transportRate=plan.spec.transportSampleRate,fading=driver.isFading,
-            fadeRemainingFrames=observation?.fadeEndFrame?.let { end -> observation.transportFrame?.let { (end-it).coerceAtLeast(0) } }))
+            fadeRemainingFrames=if (driver.isFading) liveFadeRemaining else null))
         if (updated != _ui.value) _ui.value = updated
     }
     private fun publish(state: PlaybackSession.State) {
@@ -3282,12 +5107,29 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         } else {
             0f
         }
+        val formattedPos = formatLinearPos(state.positionFrames, state.sampleRate)
+        val formattedTotal = formatLinearTotal(state.totalFrames, state.sampleRate)
+        if (_ui.value.flow == null) {
+            _progressUi.value = ProgressUi(
+                position = formattedPos,
+                total = formattedTotal,
+                progress = progress,
+                sourceFrame = null,
+                fadeRemainingFrames = null,
+            )
+        }
 
-        // Timing only exists while this screen holds the output handle; the service does
-        // not expose it, so an absent packet stays NO DATA rather than being invented.
-        val timing = TimingDiagnosis.read(session.timingSnapshot())
+        val elapsed = android.os.SystemClock.elapsedRealtime()
+        val shouldReadTiming = !state.playing || elapsed - lastTimingSnapshotMs >= 2_000L || _ui.value.timingVerdict == TimingDiagnosis.Verdict.NO_DATA
+        val timing = if (shouldReadTiming) {
+            lastTimingSnapshotMs = elapsed
+            TimingDiagnosis.read(session.timingSnapshot())
+        } else {
+            null
+        }
 
-        val updated = _ui.value.copy(
+        val currentUi = _ui.value
+        val updated = currentUi.copy(
             status = when {
                 state.detail != null -> "Failed"
                 state.playing -> "Playing"
@@ -3295,28 +5137,28 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                 state.title.isEmpty() -> "No track loaded"
                 else -> "Stopped"
             },
-            position = EngineSnapshot.formatPosition(state.positionFrames, state.sampleRate),
-            total = EngineSnapshot.formatPosition(state.totalFrames, state.sampleRate),
-            progress = progress,
-            canPause = state.playing,
-            canResume = state.paused,
-            canStop = state.active,
-            timing = timing?.explanation ?: "Timing unavailable",
-            timingVerdict = timing?.verdict ?: TimingDiagnosis.Verdict.NO_DATA,
+            position = if (!state.playing || currentUi.position == "--:--") formattedPos else currentUi.position,
+            total = formattedTotal,
+            progress = if (!state.playing) progress else currentUi.progress,
+            canPause = !isCeremonyLocked && state.playing,
+            canResume = !isCeremonyLocked && state.paused,
+            canStop = !isCeremonyLocked && state.active,
+            timing = timing?.explanation ?: currentUi.timing,
+            timingVerdict = timing?.verdict ?: currentUi.timingVerdict,
             outputActive = session.hasOutput,
-            detail = state.detail ?: _ui.value.detail,
+            detail = state.detail ?: currentUi.detail,
             totalFrames = state.totalFrames.takeIf { it > 0L } ?: totalFrames,
             sampleRate = state.sampleRate.takeIf { it > 0 } ?: rate,
         )
-            val elapsed = android.os.SystemClock.elapsedRealtime()
-            if (_ui.value.linearMode && state.playing && elapsed - lastPersistedLinearProgressMs >= 2_000L) {
-                lastPersistedLinearProgressMs = elapsed
-                linearCoordinator.saveCurrentProgress(state.positionFrames, _ui.value.totalFrames, _ui.value.sampleRate)
-            }
-            if (updated != _ui.value) _ui.value = updated
+        if (currentUi.linearMode && state.playing && !isCeremonyLocked && elapsed - lastPersistedLinearProgressMs >= 2_000L) {
+            lastPersistedLinearProgressMs = elapsed
+            linearCoordinator.saveCurrentProgress(state.positionFrames, updated.totalFrames, updated.sampleRate)
+        }
+        if (updated != currentUi) _ui.value = updated
     }
 
     fun pause() {
+        if (isCeremonyLocked) return
         val st = session.pause()
         publish(st)
         if (_ui.value.linearMode) {
@@ -3325,18 +5167,21 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     }
 
     fun resume() {
+        if (isCeremonyLocked) return
         publish(session.resume())
     }
 
     /** Seeks by fraction of the track. The UI only knows a 0..1 drag value. */
     fun seekTo(fraction: Float) {
+        if (isCeremonyLocked) return
         val frame = SeekTarget.fractionToFrame(fraction, totalFrames)
         if (!SeekTarget.isAddressable(frame, totalFrames)) return
         if (_ui.value.linearMode) {
             linearCoordinator.seekToFrame(frame)
-            publish(session.state.value)
         } else {
-            publish(session.seek(frame))
+            viewModelScope.launch {
+                publish(session.seekAsync(frame))
+            }
         }
     }
 
@@ -3345,7 +5190,10 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             performing = false, performanceStage = "Finished", stageKey = "Finished", pendingStageKey = null))
     }
 
-    fun stop() = stopTransport(cancelPendingOpen = true)
+    fun stop() {
+        if (isCeremonyLocked) return
+        stopTransport(cancelPendingOpen = true)
+    }
 
     /** Natural completion stops only this session; it must not cancel a newer user selection. */
     private fun stopTransport(cancelPendingOpen: Boolean) {
@@ -3353,13 +5201,18 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         nativePerformance=null
         performance?.stop()
         performance=null
+        PlaybackTimers.engine.cancelInteractiveTimer()
+        syncVisualizerPolling(false)
         if (cancelPendingOpen) {
             linearCoordinator.clearSession()
             linearCoordinator.clearSavedSession()
         }
         publish(session.stop())
-        _ui.value = _ui.value.copy(progress = 0f, position = EngineSnapshot.formatPosition(0, rate),
+        val zeroPos = EngineSnapshot.formatPosition(0, rate)
+        _progressUi.value = ProgressUi(position = zeroPos, total = _ui.value.total, progress = 0f)
+        _ui.value = _ui.value.copy(progress = 0f, position = zeroPos,
             linearMode = false, linearTrack = null, canSeek = false,
+            abLoopStartFrame = null, abLoopEndFrame = null,
             continueListening = if (cancelPendingOpen) null else _ui.value.continueListening,
             flow=_ui.value.flow?.copy(performing=false,performanceStage="Stopped",stageKey="Stopped",pendingStageKey=null,canAdvance=false,canEnd=false,fastPlaying=false,
                 canFast=false,canCancelPending=false,fading=false,fadeRemainingFrames=null,voiceCount=0,sourceFrame=null,availableRegions=emptySet(),availableVersions=emptySet(),selectedRegion=null,selectedVersion=null))
@@ -3369,13 +5222,27 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     private fun releaseTransport() {
         pollJob?.cancel()
         pollJob = null
+        visualizerJob?.cancel()
+        visualizerJob = null
+        PlaybackTimers.engine.cancelInteractiveTimer()
+        session.uninterruptible = false
+        testingCeremonyPlaying = false
         linearCoordinator.clearSession()
         flow = null
         flowCompiled = null
         flowBytes = emptyMap()
         nativePerformance = null
         interactivePlan = null
-        _ui.value = _ui.value.copy(flow = null, linearMode = false, linearTrack = null, canSeek = false)
+        _progressUi.value = ProgressUi()
+        _spectrumBars.value = FloatArray(SPECTRUM_BAND_COUNT)
+        _ui.value = _ui.value.copy(
+            flow = null,
+            linearMode = false,
+            linearTrack = null,
+            canSeek = false,
+            abLoopStartFrame = null,
+            abLoopEndFrame = null,
+        )
         session.release()
         PlaybackService.stop(getApplication())
     }
@@ -3385,12 +5252,19 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         // and the notification keeps offering controls. Only the screen stops observing.
         pollJob?.cancel()
         pollJob = null
+        visualizerJob?.cancel()
+        visualizerJob = null
         super.onCleared()
     }
 
     companion object {
+        const val SPECTRUM_BAND_COUNT = 24
+
         /** 200 ms keeps the progress bar smooth without touching the audio thread. */
         const val POLL_INTERVAL_MS = 200L
+
+        /** Entry key reserved for the uninterruptible Special Cup reveal track (#111). */
+        const val CEREMONY_ENTRY_KEY = "extra:special_cup_appears"
 
         /** Bundled compatibility manifest; see tools/gen_catalog.py. */
         const val CATALOG_ASSET = "catalog.json"
@@ -3409,5 +5283,8 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
         /** Where Special Cup progress lives, beside the library rather than inside it. */
         const val SPECIAL_CUP_FILE = "special-cup.json"
+
+        private const val UNLOCK_CHANNEL_ID = "mkw.unlock"
+        private const val UNLOCK_NOTIFICATION_ID = 1002
     }
 }

@@ -20,6 +20,8 @@ internal class WorldMapState(
     var selectedCourseCode by mutableStateOf(courseCode?.removeSuffix("_00"))
         private set
     private var pendingFit: List<Offset>? = null
+    private var pendingFitMaxZoom: Float = MapTransform.MAX_ZOOM
+    private var pendingFitScale: Float = 1f
     private var width = 0f
     private var height = 0f
     private var aspect = 1f
@@ -41,6 +43,7 @@ internal class WorldMapState(
         private set
     var editingRouteName by mutableStateOf("")
     var draftLoopWholeRoute by mutableStateOf(false)
+    var draftRoadRuleMode by mutableStateOf(com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RoadMusicRuleMode.AUTO)
     var draftStopPresets by mutableStateOf<Map<Int, String?>>(emptyMap())
         private set
     var draftEdgeConfigs by mutableStateOf<Map<Int, com.mylittleblover.mkwplayer.routes.CustomRouteEdgeConfig>>(emptyMap())
@@ -60,6 +63,7 @@ internal class WorldMapState(
         editingRouteId = null
         editingRouteName = ""
         draftLoopWholeRoute = false
+        draftRoadRuleMode = com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RoadMusicRuleMode.AUTO
         draftStopPresets = emptyMap()
         draftEdgeConfigs = emptyMap()
         editFrom = null
@@ -73,6 +77,7 @@ internal class WorldMapState(
         editingRouteId = null
         editingRouteName = ""
         draftLoopWholeRoute = false
+        draftRoadRuleMode = com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RoadMusicRuleMode.AUTO
         draftStopPresets = emptyMap()
         draftEdgeConfigs = emptyMap()
         editFrom = null
@@ -89,6 +94,7 @@ internal class WorldMapState(
         editingRouteId = route.id
         editingRouteName = route.name
         draftLoopWholeRoute = route.loopWholeRoute
+        draftRoadRuleMode = route.roadRuleMode
         draft = pairs
         editFrom = route.stops.lastOrNull()?.stageCode?.removeSuffix("_00")
         draftStopPresets = route.stops.mapIndexed { idx, s -> idx to s.presetId }.toMap()
@@ -99,8 +105,13 @@ internal class WorldMapState(
         selectedRouteId = null
         selectedCourseCode = null
         if (points.isNotEmpty()) {
-            if (width > 0f && height > 0f) camera = transform().fitTo(points, padding * 2f)
-            else pendingFit = points
+            if (width > 0f && height > 0f) {
+                camera = transform().fitTo(points, padding * 2.4f, maxZoom = 2.8f, scaleMultiplier = 0.82f)
+            } else {
+                pendingFit = points
+                pendingFitMaxZoom = 2.8f
+                pendingFitScale = 0.82f
+            }
         }
     }
 
@@ -148,6 +159,7 @@ internal class WorldMapState(
     fun editClear() {
         editingRouteId = null
         draft = emptyList()
+        draftRoadRuleMode = com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RoadMusicRuleMode.AUTO
         draftEdgeConfigs = emptyMap()
         draftStopPresets = emptyMap()
         editFrom = null
@@ -192,7 +204,7 @@ internal class WorldMapState(
         this.width = width; this.height = height; this.aspect = imageAspect; this.padding = padding
         if (width > 0f && height > 0f) pendingFit?.let { points ->
             pendingFit = null
-            camera = transform().fitTo(points, padding * 2f)
+            camera = transform().fitTo(points, padding * 3.0f, pendingFitMaxZoom, pendingFitScale)
         }
         return transform()
     }
@@ -202,12 +214,27 @@ internal class WorldMapState(
     fun reset() { camera = MapCamera(1f) }
     fun selectCourse(code: String) { selectedCourseCode = code.removeSuffix("_00") }
     fun clearCourse() { selectedCourseCode = null }
-    fun clearSelection() { selectedCourseCode = null; selectedRouteId = null }
+    fun clearSelection() {
+        val hadRoute = selectedRouteId != null
+        selectedCourseCode = null
+        selectedRouteId = null
+        if (hadRoute && camera.zoom > 1.75f && width > 0f && height > 0f) {
+            val zoomedOut = (camera.zoom * 0.78f).coerceAtLeast(1.25f)
+            camera = MapTransform.create(width, height, aspect, MapCamera(zoomedOut, camera.centerU, camera.centerV), padding).camera
+        }
+    }
     fun selectRoute(id: String, points: List<Offset> = emptyList()) {
         selectedRouteId = id
         selectedCourseCode = null
-        if (width > 0f && height > 0f) camera = transform().fitTo(points, padding * 2f)
-        else pendingFit = points
+        if (points.isNotEmpty()) {
+            if (width > 0f && height > 0f) {
+                camera = transform().fitTo(points, padding * 3.0f, maxZoom = 2.55f, scaleMultiplier = 0.78f)
+            } else {
+                pendingFit = points
+                pendingFitMaxZoom = 2.55f
+                pendingFitScale = 0.78f
+            }
+        }
     }
 
     companion object {

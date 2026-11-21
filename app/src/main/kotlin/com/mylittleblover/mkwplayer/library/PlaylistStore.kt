@@ -5,7 +5,48 @@ import java.util.UUID
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** The ordered list stores occurrences, so the same course may be added more than once. */
+internal sealed interface PlaylistItemRef {
+    val rawId: String
+    val raw: String get() = rawId
+
+    data class Course(val courseCode: String) : PlaylistItemRef {
+        override val rawId: String = courseCode
+        val logicalCode: String get() = courseCode.removeSuffix("_00")
+    }
+
+    data class Jukebox(val trackKey: String) : PlaylistItemRef {
+        override val rawId: String = "$PREFIX_JUKEBOX$trackKey"
+    }
+
+    data class SfcTrack(val trackId: String) : PlaylistItemRef {
+        override val rawId: String = "$PREFIX_SFC$trackId"
+    }
+
+    data class BattleTrack(val trackId: String) : PlaylistItemRef {
+        override val rawId: String = "$PREFIX_BATTLE$trackId"
+    }
+
+    data class ExtraTrack(val extraId: String) : PlaylistItemRef {
+        override val rawId: String = "$PREFIX_EXTRA$extraId"
+    }
+
+    companion object {
+        const val PREFIX_JUKEBOX = "jb:"
+        const val PREFIX_SFC = "sfc:"
+        const val PREFIX_BATTLE = "battle:"
+        const val PREFIX_EXTRA = "extra:"
+
+        fun parse(rawId: String): PlaylistItemRef = when {
+            rawId.startsWith(PREFIX_JUKEBOX) -> Jukebox(rawId.removePrefix(PREFIX_JUKEBOX))
+            rawId.startsWith(PREFIX_SFC) -> SfcTrack(rawId.removePrefix(PREFIX_SFC))
+            rawId.startsWith(PREFIX_BATTLE) -> BattleTrack(rawId.removePrefix(PREFIX_BATTLE))
+            rawId.startsWith(PREFIX_EXTRA) -> ExtraTrack(rawId.removePrefix(PREFIX_EXTRA))
+            else -> Course(rawId)
+        }
+    }
+}
+
+/** The ordered list stores occurrences, so the same track may be added more than once. */
 internal data class PlaylistEntryConfig(
     val presetId: String? = null,
     val nativeTransitionEnabled: Boolean? = null,
@@ -21,6 +62,8 @@ internal data class UserPlaylist(
     val nativeTransitionDefault: Boolean = false,
     val entryConfigs: List<PlaylistEntryConfig> = emptyList(),
 ) {
+    fun itemAt(index: Int): PlaylistItemRef? = courseIds.getOrNull(index)?.let(PlaylistItemRef::parse)
+
     fun configAt(index: Int): PlaylistEntryConfig =
         entryConfigs.getOrNull(index) ?: PlaylistEntryConfig()
 
@@ -100,29 +143,38 @@ internal class PlaylistStore(private val file: File) {
         val title = name.trim().also { require(it.isNotEmpty() && it.length <= 120) }
         current + UserPlaylist(UUID.randomUUID().toString(), title, emptyList())
     }
-    fun addCourse(id: String, courseId: String): Result<List<UserPlaylist>> = update { current ->
-        require(courseId.isNotBlank() && current.any { it.id == id })
+    fun createWithCourses(name: String, courseIds: List<String>): Result<List<UserPlaylist>> = update { current ->
+        val title = name.trim().also { require(it.isNotEmpty() && it.length <= 120) }
+        val clean = courseIds.filter { it.isNotBlank() }
+        current + UserPlaylist(UUID.randomUUID().toString(), title, clean)
+    }
+    fun addCourse(id: String, courseId: String): Result<List<UserPlaylist>> = addCourses(id, listOf(courseId))
+    fun addCourses(id: String, courseIds: List<String>): Result<List<UserPlaylist>> = update { current ->
+        val clean = courseIds.filter { it.isNotBlank() }
+        require(clean.isNotEmpty() && current.any { it.id == id })
         current.map { list ->
             if (list.id != id) list else {
-                val nextCourses = list.courseIds + courseId
+                val nextCourses = list.courseIds + clean
                 val nextConfigs = if (list.entryConfigs.isEmpty()) {
                     emptyList()
                 } else {
-                    normalizeConfigs(nextCourses.size, paddedConfigs(list) + PlaylistEntryConfig())
+                    normalizeConfigs(nextCourses.size, paddedConfigs(list) + List(clean.size) { PlaylistEntryConfig() })
                 }
                 list.copy(courseIds = nextCourses, entryConfigs = nextConfigs)
             }
         }
     }
-    fun removeCourse(id: String, index: Int): Result<List<UserPlaylist>> = update { current ->
-        require(current.any { it.id == id && index in it.courseIds.indices })
+    fun removeCourse(id: String, index: Int): Result<List<UserPlaylist>> = removeCourses(id, setOf(index))
+    fun removeCourses(id: String, indices: Collection<Int>): Result<List<UserPlaylist>> = update { current ->
+        val removeSet = indices.toSet()
+        require(removeSet.isNotEmpty() && current.any { it.id == id && removeSet.all { idx -> idx in it.courseIds.indices } })
         current.map { list ->
             if (list.id != id) list else {
-                val nextCourses = list.courseIds.filterIndexed { i, _ -> i != index }
+                val nextCourses = list.courseIds.filterIndexed { i, _ -> i !in removeSet }
                 val nextConfigs = if (list.entryConfigs.isEmpty()) {
                     emptyList()
                 } else {
-                    normalizeConfigs(nextCourses.size, paddedConfigs(list).filterIndexed { i, _ -> i != index })
+                    normalizeConfigs(nextCourses.size, paddedConfigs(list).filterIndexed { i, _ -> i !in removeSet })
                 }
                 list.copy(courseIds = nextCourses, entryConfigs = nextConfigs)
             }
@@ -191,6 +243,51 @@ internal class PlaylistStore(private val file: File) {
     fun delete(id: String): Result<List<UserPlaylist>> = update { current ->
         require(current.any { it.id == id })
         current.filterNot { it.id == id }
+    }
+    fun replaceAll(playlists: List<UserPlaylist>): Result<List<UserPlaylist>> = update {
+        val clean = ArrayList<UserPlaylist>(playlists.size)
+        val seenIds = hashSetOf<String>()
+        playlists.forEach { raw ->
+            val title = raw.name.trim()
+            if (title.isEmpty()) return@forEach
+            val courses = raw.courseIds.filter { it.isNotBlank() }
+            val uniqueId = if (raw.id.isNotBlank() && seenIds.add(raw.id)) {
+                raw.id
+            } else {
+                UUID.randomUUID().toString().also { seenIds.add(it) }
+            }
+            clean += raw.copy(
+                id = uniqueId,
+                name = title.take(120),
+                courseIds = courses,
+                entryConfigs = normalizeConfigs(courses.size, raw.entryConfigs),
+            )
+        }
+        clean
+    }
+    fun mergeAll(incoming: List<UserPlaylist>): Result<List<UserPlaylist>> = update { current ->
+        val out = current.toMutableList()
+        val byId = current.associateBy { it.id }.toMutableMap()
+        incoming.forEach { raw ->
+            val title = raw.name.trim().take(120)
+            if (title.isEmpty()) return@forEach
+            val courses = raw.courseIds.filter { it.isNotBlank() }
+            val cleanCfg = normalizeConfigs(courses.size, raw.entryConfigs)
+            val existing = byId[raw.id]
+            if (existing == null && raw.id.isNotBlank()) {
+                val added = raw.copy(name = title, courseIds = courses, entryConfigs = cleanCfg)
+                out += added
+                byId[added.id] = added
+            } else if (existing != null && existing.name == title && existing.courseIds == courses) {
+                // Identical playlist already exists: keep existing unchanged.
+            } else {
+                val newId = UUID.randomUUID().toString()
+                val added = raw.copy(id = newId, name = title, courseIds = courses, entryConfigs = cleanCfg)
+                out += added
+                byId[newId] = added
+            }
+        }
+        out
     }
     private fun paddedConfigs(playlist: UserPlaylist): List<PlaylistEntryConfig> =
         (0 until playlist.courseIds.size).map { i -> playlist.configAt(i) }

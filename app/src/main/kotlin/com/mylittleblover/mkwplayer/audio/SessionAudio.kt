@@ -19,6 +19,14 @@ internal interface SessionAudioEngine : PlaybackEngine {
 
     /** Set dynamic gain (dB) for a compiled track layer node (`track.index`), optionally fading over [fadeMs]. */
     fun setLayerGain(trackIndex: Int, gainDb: Double, fadeMs: Int = 0): Int = 1
+
+    fun setPlaybackRate(speed: Double, pitchSemitones: Double): Int = 1
+
+    fun setMasterDsp(eqEnabled: Boolean, bands5: DoubleArray, bassBoostDb: Double, loudnessDb: Double): Int = 1
+
+    fun setVisualizerEnabled(enabled: Boolean) {}
+
+    fun visualizerSpectrum(outBands: FloatArray): Boolean = false
 }
 
 internal interface SessionAudioOutput {

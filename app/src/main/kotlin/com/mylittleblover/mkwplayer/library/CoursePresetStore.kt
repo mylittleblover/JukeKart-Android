@@ -142,6 +142,43 @@ internal class CoursePresetStore(private val file: File) {
         current.filterNot { it.id == id }
     }
 
+    fun replaceAll(presets: List<CoursePreset>): Result<List<CoursePreset>> = update {
+        normalizeImportedPresets(presets)
+    }
+
+    fun mergeAll(incoming: List<CoursePreset>): Result<List<CoursePreset>> = update { current ->
+        val byId = LinkedHashMap<String, CoursePreset>()
+        current.forEach { byId[it.id] = it }
+        normalizeImportedPresets(incoming).forEach { preset ->
+            val existing = byId[preset.id]
+            if (existing == null || preset.updatedAtEpochMs >= existing.updatedAtEpochMs) {
+                byId[preset.id] = preset
+            }
+        }
+        byId.values.toList()
+    }
+
+    private fun normalizeImportedPresets(presets: List<CoursePreset>): List<CoursePreset> {
+        val out = LinkedHashMap<String, CoursePreset>()
+        presets.forEach { raw ->
+            val trimmedName = raw.name.trim().take(120)
+            val course = raw.courseCode.trim().removeSuffix("_00")
+            if (trimmedName.isEmpty() || course.isEmpty() || raw.steps.isEmpty()) return@forEach
+            val normId = if (raw.id.startsWith(PresetRefs.USER_PREFIX)) {
+                raw.id
+            } else {
+                "${PresetRefs.USER_PREFIX}${raw.id.ifBlank { UUID.randomUUID().toString() }}"
+            }
+            out[normId] = raw.copy(
+                id = normId,
+                courseCode = course,
+                name = trimmedName,
+                fadeOutMs = raw.fadeOutMs.coerceIn(0, 10_000),
+            )
+        }
+        return out.values.toList()
+    }
+
     private fun update(transform: (List<CoursePreset>) -> List<CoursePreset>): Result<List<CoursePreset>> =
         synchronized(MetadataFile.lock(file)) {
             runCatching {

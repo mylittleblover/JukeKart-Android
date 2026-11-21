@@ -15,7 +15,7 @@ LoadResult loadCompiledGraph(EngineHandle* engine,const std::uint8_t* bytes,std:
         auto graph=std::make_unique<Graph>(GraphReader(bytes,size).read());
         auto next=std::make_unique<EngineRuntime>(std::move(graph));
         if(engine->cueSearchV9.load()) next->enableCueSearch();
-        engine->runtime.swap(next); engine->graphSchemaDirty=true; engine->device.reset(); engine->publish(); return LoadResult::Ok;
+        engine->runtime.swap(next); engine->graphSchemaDirty=true; engine->device.reset(); engine->masterDspProcessor.reset(); engine->spectrumAnalyzer.reset(); engine->publish(); return LoadResult::Ok;
     } catch(const std::bad_alloc&) { return LoadResult::OutOfMemory; }
       catch(const std::length_error&) { return LoadResult::ResourceLimit; }
       catch(const std::invalid_argument&) { return LoadResult::InvalidGraph; }
@@ -100,7 +100,7 @@ EngineStatus loadLinearSource(EngineHandle* engine,const SourceOpenRequest& sour
             const auto status=next->bindStreamedSource(-1,std::move(handle->source),source.bytes.size,true,loop,&actual,false,&info);
             if(status!=EngineStatus::Ok)return status;
         }
-        engine->runtime.swap(next); engine->graphSchemaDirty=true; engine->device.reset(); engine->publish(); return EngineStatus::Ok;
+        engine->runtime.swap(next); engine->graphSchemaDirty=true; engine->device.reset(); engine->masterDspProcessor.reset(); engine->spectrumAnalyzer.reset(); engine->publish(); return EngineStatus::Ok;
     } catch(const std::bad_alloc&) { return EngineStatus::ResourceLimit; }
       catch(const std::length_error&) { return EngineStatus::ResourceLimit; }
       catch(const std::invalid_argument&) { return EngineStatus::InvalidRequest; }
@@ -150,7 +150,7 @@ EngineStatus loadLinearSourceInput(EngineHandle* engine,const SourceOpenRequest&
             const auto status=next->bindStreamedSource(-1,std::move(handle->source),encodedBytes,true,loop,&handle->encodedRootSha256,false,&info);
             if(status!=EngineStatus::Ok)return status;
         }
-        engine->runtime.swap(next);engine->graphSchemaDirty=true;engine->device.reset();engine->publish();return EngineStatus::Ok;
+        engine->runtime.swap(next);engine->graphSchemaDirty=true;engine->device.reset();engine->masterDspProcessor.reset();engine->spectrumAnalyzer.reset();engine->publish();return EngineStatus::Ok;
     }catch(const std::length_error&){return EngineStatus::ResourceLimit;}
      catch(const std::invalid_argument&){return EngineStatus::InvalidRequest;}
      catch(...){return EngineStatus::ResourceLimit;}
@@ -168,16 +168,51 @@ EngineStatus setEngineOutputGain(EngineHandle* engine,double gainDb,double ceili
         static_cast<int>(std::lround(ceilingDb*10.0)),0.0,{-1}};
     return engine->runtime->submit(command) ? EngineStatus::Ok : EngineStatus::QueueFull;
 }
+EngineStatus setEnginePlaybackRate(EngineHandle* engine,double speed,double pitchSemitones) noexcept {
+    if(!engine || !std::isfinite(speed) || !std::isfinite(pitchSemitones)) return EngineStatus::InvalidRequest;
+    const int sMilli=static_cast<int>(std::lround(std::clamp(speed,0.5,2.0)*1000.0));
+    const int pCenti=static_cast<int>(std::lround(std::clamp(pitchSemitones,-12.0,12.0)*100.0));
+    engine->tempoMilli.store(sMilli,std::memory_order_relaxed);
+    engine->pitchCentisemi.store(pCenti,std::memory_order_relaxed);
+    return EngineStatus::Ok;
+}
+EngineStatus setEngineMasterDsp(EngineHandle* engine,bool eqEnabled,const double* bands5,double bassBoostDb,double loudnessDb) noexcept {
+    if(!engine || !bands5 || !std::isfinite(bassBoostDb) || !std::isfinite(loudnessDb)) return EngineStatus::InvalidRequest;
+    dsp::MasterDspConfig cfg;
+    cfg.eqEnabled=eqEnabled;
+    for(std::size_t i=0;i<5;++i) {
+        if(!std::isfinite(bands5[i])) return EngineStatus::InvalidRequest;
+        cfg.bandDb[i]=std::clamp(bands5[i],-12.0,12.0);
+    }
+    cfg.bassBoostDb=std::clamp(bassBoostDb,0.0,9.0);
+    cfg.loudnessDb=std::clamp(loudnessDb,0.0,9.0);
+    engine->masterDspMailbox.write(cfg);
+    return EngineStatus::Ok;
+}
+void setEngineVisualizerEnabled(EngineHandle* engine,bool enabled) noexcept {
+    if(!engine) return;
+    engine->spectrumAnalyzer.setEnabled(enabled);
+    if(!enabled) engine->spectrumAnalyzer.reset();
+}
+bool engineVisualizerSpectrum(const EngineHandle* engine,float* bands,std::size_t bandCount) noexcept {
+    if(!engine) return false;
+    return engine->spectrumAnalyzer.computeBands(bands,bandCount);
+}
 std::uint64_t engineLimitedSampleCount(const EngineHandle* engine) noexcept {
     return engine && engine->runtime ? engine->runtime->limitedSamples() : 0;
 }
 void renderEngineDevice(EngineHandle* engine,float* output,std::size_t frames,int rate) noexcept {
     if(!output || frames>65536) return;
-    if(engine && engine->runtime) { engine->device.render(*engine->runtime,output,frames,rate);
+    if(engine && engine->runtime) {
+        const double tempo=static_cast<double>(engine->tempoMilli.load(std::memory_order_relaxed))/1000.0;
+        const double pitch=static_cast<double>(engine->pitchCentisemi.load(std::memory_order_relaxed))/100.0;
+        engine->device.render(*engine->runtime,output,frames,rate,tempo,pitch);
+        engine->masterDspProcessor.process(output,frames,rate,engine->masterDspMailbox);
+        engine->spectrumAnalyzer.push(output,frames,rate);
         float left=0,right=0;
         for(std::size_t n=0;n<frames;++n) { left=std::max(left,std::abs(output[n*2])); right=std::max(right,std::abs(output[n*2+1])); }
-        engine->publish(left,right); }
-    else std::fill(output,output+frames*2,0);
+        engine->publish(left,right);
+    } else std::fill(output,output+frames*2,0);
 }
 void renderEngine(EngineHandle* engine,float* output,std::size_t frames) noexcept {
     if(!output || frames>65536) return;
@@ -318,7 +353,7 @@ EngineStatus setLinearRepeat(EngineHandle* engine,bool enabled,std::optional<aud
 EngineStatus seekEngine(EngineHandle* engine,audio::TransportFrame position) noexcept {
     if(!engine || !engine->runtime) return EngineStatus::InvalidRequest;
     if(engine->outputActive.load()) return EngineStatus::OutputActive;
-    const auto result=engine->runtime->seek(position); engine->device.reset(); engine->publish(); return result;
+    const auto result=engine->runtime->seek(position); engine->device.reset(); engine->spectrumAnalyzer.reset(); engine->publish(); return result;
 }
 bool claimEngineOutput(EngineHandle* engine) noexcept {
     if(!engine || !engine->runtime) return false;

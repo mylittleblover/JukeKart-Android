@@ -13,7 +13,7 @@ class Parameters {
     Frame advancedFrame_{-1}; bool advanced_{};
     std::array<std::vector<const Rtpc*>,4096> curvesByTarget_;
     std::array<std::vector<const EffectRtpc*>,4096> curvesByEffect_;
-    std::uint64_t syncRevision_{};
+    std::uint64_t syncRevision_{}; std::uint64_t parameterRevision_{1}; std::uint64_t layerRevision_{1};
     struct LayerRamp {
         bool active{false};
         double startLinear{1.0};
@@ -72,13 +72,13 @@ public:
         reset();
     }
     void reset() noexcept {
-        syncRevision_=0; resetFrame();
+        syncRevision_=0; ++parameterRevision_; ++layerRevision_; resetFrame();
         values_.fill(-1);layerGains_.fill(0);layerRamps_.fill({});activeLayerRampCount_=0;
         for(const auto& group:graph_.groups) values_[group.index]=group.defaultValue;
         for(const auto& p:graph_.parameters) parameters_[p.index].prepare(p.defaultValue,p.attack,p.release);
     }
     const std::array<int,4096>& values() const noexcept { return values_; }
-    std::uint64_t syncRevision() const noexcept { return syncRevision_; }
+    std::uint64_t syncRevision() const noexcept { return syncRevision_; } std::uint64_t parameterRevision() const noexcept { return parameterRevision_; } std::uint64_t layerRevision() const noexcept { return layerRevision_; }
     bool setSync(int group,int value) noexcept {
         const auto* g=find(graph_.groups,group);
         if(!g || std::find(g->values.begin(),g->values.end(),value)==g->values.end()) return false;
@@ -89,7 +89,7 @@ public:
         const auto* node=graph_.node(index);
         if(!node || node->kind!=Kind::Track || !std::isfinite(db) || db< -96 || db>24 || fadeFrames<0)return false;
         if(fadeFrames<=0) {
-            layerGains_[index]=db;
+            layerGains_[index]=db; ++layerRevision_;
             layerRamps_[index]={};
             removeActiveLayerRamp(index);
             return true;
@@ -116,26 +116,21 @@ public:
     bool setParameter(int index,double value) noexcept {
         if(index<0 || index>=4096 || !definitions_[index] || !std::isfinite(value)) return false;
         const auto* p=definitions_[index]; value=std::clamp(value,p->min,p->max);
-        auto& parameter=parameters_[index]; parameter.target=value;
+        auto& parameter=parameters_[index]; if(parameter.target!=value) ++parameterRevision_; parameter.target=value;
         if(advanced_) { parameter.current=frameStart_[index]; parameter.next(); }
         else if((value>parameter.current ? parameter.attackStep : parameter.releaseStep)==1) parameter.current=value;
         return true;
     }
     void advance(Frame frame) noexcept {
         if(advancedFrame_!=frame) {
-            for(const auto& p:graph_.parameters) { frameStart_[p.index]=parameters_[p.index].current; parameters_[p.index].next(); }
+            for(const auto& p:graph_.parameters) { frameStart_[p.index]=parameters_[p.index].current; parameters_[p.index].next(); if(parameters_[p.index].current!=frameStart_[p.index]) ++parameterRevision_; }
             for(std::size_t i=0;i<activeLayerRampCount_;) {
                 const int idx=activeLayerRamps_[i];
                 auto& ramp=layerRamps_[idx];
-                if(!ramp.active || ramp.remainingFrames<=1 || ramp.totalFrames<=0) {
-                    layerGains_[idx]=ramp.targetDb;
-                    ramp={};
-                    activeLayerRamps_[i]=activeLayerRamps_[--activeLayerRampCount_];
-                    continue;
-                }
+                if(!ramp.active || ramp.remainingFrames<=1 || ramp.totalFrames<=0) { layerGains_[idx]=ramp.targetDb; ++layerRevision_; ramp={}; activeLayerRamps_[i]=activeLayerRamps_[--activeLayerRampCount_]; continue; }
                 --ramp.remainingFrames;
                 const double t=static_cast<double>(ramp.totalFrames-ramp.remainingFrames)/static_cast<double>(ramp.totalFrames);
-                layerGains_[idx]=linearToLayerDb(ramp.startLinear+(ramp.targetLinear-ramp.startLinear)*t);
+                layerGains_[idx]=linearToLayerDb(ramp.startLinear+(ramp.targetLinear-ramp.startLinear)*t); ++layerRevision_;
                 ++i;
             }
             advancedFrame_=frame;

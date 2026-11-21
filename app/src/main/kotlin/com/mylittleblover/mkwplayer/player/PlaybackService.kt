@@ -7,14 +7,19 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.IBinder
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
+import android.util.LruCache
 import androidx.core.app.NotificationCompat
 import com.mylittleblover.mkwplayer.MainActivity
 import com.mylittleblover.mkwplayer.R
+import java.io.File
+import java.util.concurrent.Executors
 
 /**
  * Keeps playback alive when the activity goes away, and publishes media controls.
@@ -55,16 +60,73 @@ class PlaybackService : Service() {
     private val pollTicker = object : Runnable {
         override fun run() {
             if (!session.state.value.active) {
+                PlaybackTimers.tickFromSession(session)
                 polling = false
                 return
             }
-            session.poll()
+            val st = session.poll()
+            PlaybackTimers.tickFromSession(session)
+            if (st.linear && st.active) {
+                PlaybackHolder.linear().onPositionObserved(st.positionFrames, st.playing)
+            }
             refresh()
             handler.postDelayed(this, POLL_INTERVAL_MS)
         }
     }
     private var polling = false
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val artExecutor = Executors.newSingleThreadExecutor()
+    private val artCache = object : LruCache<String, Bitmap>(4) {}
+    private var currentArtKey: String? = null
+    private var currentArtBitmap: Bitmap? = null
+    private var pendingArtKey: String? = null
+    private var lastMetadataKey: String? = null
+
+    private fun currentCoverBitmap(state: PlaybackSession.State): Bitmap? {
+        val key = coverKeyFor(state.packDirPath, state.artworkName, state.courseCode) ?: run {
+            currentArtKey = null
+            currentArtBitmap = null
+            pendingArtKey = null
+            return null
+        }
+        if (key == currentArtKey) return currentArtBitmap
+        artCache.get(key)?.let { cached ->
+            currentArtKey = key
+            currentArtBitmap = cached
+            pendingArtKey = null
+            return cached
+        }
+        if (key != pendingArtKey) {
+            pendingArtKey = key
+            val packPath = state.packDirPath
+            val artName = state.artworkName
+            val course = state.courseCode
+            artExecutor.execute {
+                val decoded = runCatching {
+                    loadCoverBitmap(packPath, artName, course, resources)
+                }.getOrNull()
+                handler.post {
+                    if (pendingArtKey == key) pendingArtKey = null
+                    if (decoded != null) {
+                        artCache.put(key, decoded)
+                        if (coverKeyFor(
+                                session.state.value.packDirPath,
+                                session.state.value.artworkName,
+                                session.state.value.courseCode,
+                            ) == key
+                        ) {
+                            currentArtKey = key
+                            currentArtBitmap = decoded
+                            if (session.state.value.active) {
+                                refresh()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return null
+    }
 
     private fun startPolling() {
         if (polling) return
@@ -116,12 +178,14 @@ class PlaybackService : Service() {
         mediaSession = MediaSessionCompat(this, MEDIA_SESSION_TAG).apply {
             setCallback(object : MediaSessionCompat.Callback() {
                 override fun onPlay() {
+                    if (session.uninterruptible) return
                     if (!requestFocusForPlayback()) return
                     session.resume()
                     refresh()
                 }
 
                 override fun onPause() {
+                    if (session.uninterruptible) return
                     session.pause()
                     // A user pause is not a focus pause: focus must not resume it later.
                     pausedByFocus = false
@@ -129,6 +193,7 @@ class PlaybackService : Service() {
                 }
 
                 override fun onStop() {
+                    if (session.uninterruptible) return
                     session.stop()
                     pausedByFocus = false
                     focus.abandon()
@@ -137,23 +202,31 @@ class PlaybackService : Service() {
                 }
 
                 override fun onSeekTo(pos: Long) {
+                    if (session.uninterruptible) return
                     val current = session.state.value
                     val targetFrame = if (current.sampleRate > 0 && current.totalFrames > 0) {
                         (pos * current.sampleRate / 1000L).coerceIn(0L, current.totalFrames)
                     } else {
                         pos.coerceAtLeast(0L)
                     }
-                    session.seek(targetFrame)
+                    val linearSeek = session.onLinearSeek
+                    if (current.linear && linearSeek != null) {
+                        linearSeek(targetFrame)
+                    } else {
+                        session.seek(targetFrame)
+                    }
                     refresh()
                 }
 
                 override fun onSkipToNext() {
+                    if (session.uninterruptible) return
                     if (session.onSkipNext?.invoke() == true) {
                         refresh()
                     }
                 }
 
                 override fun onSkipToPrevious() {
+                    if (session.uninterruptible) return
                     if (session.onSkipPrevious?.invoke() == true) {
                         refresh()
                     }
@@ -169,6 +242,7 @@ class PlaybackService : Service() {
      * The policy lives in [FocusPolicy]; this only performs the result.
      */
     private fun handleFocusEvent(event: FocusPolicy.Event) {
+        if (session.uninterruptible) return
         val action = FocusPolicy.decide(
             event = event,
             playing = session.state.value.playing,
@@ -216,29 +290,45 @@ class PlaybackService : Service() {
 
         when (intent?.action) {
             ACTION_PAUSE -> {
-                session.pause()
-                pausedByFocus = false
+                if (!session.uninterruptible) {
+                    session.pause()
+                    pausedByFocus = false
+                }
             }
             ACTION_RESUME -> {
-                if (requestFocusForPlayback()) session.resume()
+                if (!session.uninterruptible && requestFocusForPlayback()) session.resume()
+            }
+            ACTION_TOGGLE -> {
+                if (!session.uninterruptible) {
+                    if (session.state.value.playing) {
+                        session.pause()
+                        pausedByFocus = false
+                    } else if (session.state.value.paused && requestFocusForPlayback()) {
+                        session.resume()
+                    }
+                }
             }
             ACTION_PREV -> {
-                session.onSkipPrevious?.invoke()
+                if (!session.uninterruptible) session.onSkipPrevious?.invoke()
             }
             ACTION_NEXT -> {
-                session.onSkipNext?.invoke()
+                if (!session.uninterruptible) session.onSkipNext?.invoke()
             }
             ACTION_STOP -> {
-                session.stop()
-                pausedByFocus = false
-                focus.abandon()
-                stopSelf()
-                return START_NOT_STICKY
+                if (!session.uninterruptible) {
+                    session.stop()
+                    pausedByFocus = false
+                    focus.abandon()
+                    com.mylittleblover.mkwplayer.widget.PlayerWidgetUpdater.updateAll(this, session.state.value, null)
+                    com.mylittleblover.mkwplayer.widget.PlayerTileService.requestUpdate(this)
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
             }
             else -> {
                 // Started because a track began. If focus is refused the transport must not
                 // keep playing into another app's audio.
-                if (session.state.value.playing && !requestFocusForPlayback()) {
+                if (session.state.value.playing && !session.uninterruptible && !requestFocusForPlayback()) {
                     session.pause()
                 }
             }
@@ -260,11 +350,20 @@ class PlaybackService : Service() {
         focus.abandon()
         pausedByFocus = false
         stopPolling()
+        pendingArtKey = null
+        currentArtBitmap = null
+        lastMetadataKey = null
+        artCache.evictAll()
+        artExecutor.shutdownNow()
         mediaSession?.isActive = false
         mediaSession?.release()
         mediaSession = null
         // A destroyed service must not leave its media notification in the shade.
         manager.cancel(NOTIFICATION_ID)
+        if (!session.state.value.active) {
+            com.mylittleblover.mkwplayer.widget.PlayerWidgetUpdater.updateAll(this, session.state.value, null)
+            com.mylittleblover.mkwplayer.widget.PlayerTileService.requestUpdate(this)
+        }
         super.onDestroy()
     }
 
@@ -273,6 +372,12 @@ class PlaybackService : Service() {
         val state = session.state.value
         updatePlaybackState(state)
         manager.notify(NOTIFICATION_ID, buildNotification())
+        com.mylittleblover.mkwplayer.widget.PlayerWidgetUpdater.updateAll(
+            this,
+            state,
+            if (state.active) currentCoverBitmap(state) else null,
+        )
+        com.mylittleblover.mkwplayer.widget.PlayerTileService.requestUpdate(this)
 
         if (state.active) startPolling() else stopPolling()
 
@@ -299,20 +404,40 @@ class PlaybackService : Service() {
         } else {
             0L
         }
-        session.setMetadata(
-            MediaMetadataCompat.Builder()
-                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, state.title)
-                .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, durationMillis(state))
-                .build(),
-        )
-        val baseActions = PlaybackStateCompat.ACTION_PLAY or
-            PlaybackStateCompat.ACTION_PAUSE or
-            PlaybackStateCompat.ACTION_STOP or
-            PlaybackStateCompat.ACTION_SEEK_TO
-        val actions = if (state.linear && this.session.canSkipQueue?.invoke() == true) {
-            baseActions or PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or PlaybackStateCompat.ACTION_SKIP_TO_NEXT
+        val cover = currentCoverBitmap(state)
+        val titleText = state.title.ifEmpty { getString(R.string.app_name) }
+        val artistText = state.subtitle?.takeIf { it.isNotBlank() }
+            ?: state.detail?.takeIf { it.isNotBlank() }
+            ?: getString(R.string.app_name)
+        val albumText = state.courseCode?.takeIf { it.isNotBlank() }?.removeSuffix("_00")
+            ?: getString(R.string.app_name)
+        val duration = durationMillis(state)
+        val coverKey = coverKeyFor(state.packDirPath, state.artworkName, state.courseCode).orEmpty()
+        val metadataKey = "$titleText|$artistText|$albumText|$duration|$coverKey|${cover != null}"
+        if (metadataKey != lastMetadataKey) {
+            val metadataBuilder = MediaMetadataCompat.Builder()
+                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, titleText)
+                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artistText)
+                .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, albumText)
+                .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration)
+            if (cover != null) {
+                metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, cover)
+            }
+            session.setMetadata(metadataBuilder.build())
+            lastMetadataKey = metadataKey
+        }
+        val actions = if (this.session.uninterruptible) {
+            0L
         } else {
-            baseActions
+            val baseActions = PlaybackStateCompat.ACTION_PLAY or
+                PlaybackStateCompat.ACTION_PAUSE or
+                PlaybackStateCompat.ACTION_STOP or
+                PlaybackStateCompat.ACTION_SEEK_TO
+            if (state.linear && this.session.canSkipQueue?.invoke() == true) {
+                baseActions or PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or PlaybackStateCompat.ACTION_SKIP_TO_NEXT
+            } else {
+                baseActions
+            }
         }
         session.setPlaybackState(
             PlaybackStateCompat.Builder()
@@ -327,6 +452,7 @@ class PlaybackService : Service() {
 
     private fun buildNotification(): Notification {
         val state = session.state.value
+        val cover = currentCoverBitmap(state)
         val openApp = PendingIntent.getActivity(
             this,
             0,
@@ -334,55 +460,90 @@ class PlaybackService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
 
+        val subtitleText = state.subtitle?.takeIf { it.isNotBlank() } ?: when {
+            state.detail != null -> state.detail
+            state.paused -> "Paused"
+            state.playing -> "Playing"
+            else -> "Stopped"
+        }
+
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle(state.title.ifEmpty { "MKW Player" })
-            .setContentText(
-                when {
-                    state.detail != null -> state.detail
-                    state.paused -> "Paused"
-                    state.playing -> "Playing"
-                    else -> "Stopped"
-                },
-            )
+            .setContentText(subtitleText)
+            .setSubText(state.courseCode?.takeIf { it.isNotBlank() }?.removeSuffix("_00"))
+            .setLargeIcon(cover)
+            .setColorized(cover != null)
+            .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
+            .setShowWhen(false)
             .setContentIntent(openApp)
-            .setOngoing(state.playing)
+            .setOngoing(state.playing || session.uninterruptible)
             .setOnlyAlertOnce(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
 
-        if (state.linear && session.canSkipQueue?.invoke() == true) {
-            builder.addAction(
-                android.R.drawable.ic_media_previous, "Previous",
-                command(ACTION_PREV),
-            )
-        }
-        if (!state.playing) {
-            builder.addAction(
-                android.R.drawable.ic_media_play, "Resume",
-                command(ACTION_RESUME),
-            )
-        }
-        if (state.playing) {
-            builder.addAction(
-                android.R.drawable.ic_media_pause, "Pause",
-                command(ACTION_PAUSE),
-            )
-        }
-        if (state.linear && session.canSkipQueue?.invoke() == true) {
-            builder.addAction(
-                android.R.drawable.ic_media_next, "Next",
-                command(ACTION_NEXT),
-            )
-        }
-        builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", command(ACTION_STOP))
+        val canSkip = state.linear && session.canSkipQueue?.invoke() == true
+        var actionCount = 0
+        var prevIdx = -1
+        var playPauseIdx = -1
+        var nextIdx = -1
+        var stopIdx = -1
 
-        mediaSession?.let { builder.setStyle(androidx.media.app.NotificationCompat.MediaStyle().setMediaSession(it.sessionToken)) }
+        if (!session.uninterruptible) {
+            if (canSkip) {
+                prevIdx = actionCount++
+                builder.addAction(
+                    android.R.drawable.ic_media_previous, "Previous",
+                    command(ACTION_PREV),
+                )
+            }
+            if (!state.playing) {
+                playPauseIdx = actionCount++
+                builder.addAction(
+                    android.R.drawable.ic_media_play, "Resume",
+                    command(ACTION_RESUME),
+                )
+            }
+            if (state.playing) {
+                playPauseIdx = actionCount++
+                builder.addAction(
+                    android.R.drawable.ic_media_pause, "Pause",
+                    command(ACTION_PAUSE),
+                )
+            }
+            if (canSkip) {
+                nextIdx = actionCount++
+                builder.addAction(
+                    android.R.drawable.ic_media_next, "Next",
+                    command(ACTION_NEXT),
+                )
+            }
+            stopIdx = actionCount++
+            builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", command(ACTION_STOP))
+        }
+
+        mediaSession?.let { media ->
+            val style = androidx.media.app.NotificationCompat.MediaStyle()
+                .setMediaSession(media.sessionToken)
+                .setShowCancelButton(true)
+                .setCancelButtonIntent(command(ACTION_STOP))
+            val compactIndices = when {
+                session.uninterruptible || actionCount == 0 -> intArrayOf()
+                prevIdx >= 0 && playPauseIdx >= 0 && nextIdx >= 0 -> intArrayOf(prevIdx, playPauseIdx, nextIdx)
+                playPauseIdx >= 0 && stopIdx >= 0 -> intArrayOf(playPauseIdx, stopIdx)
+                playPauseIdx >= 0 -> intArrayOf(playPauseIdx)
+                else -> intArrayOf(0)
+            }
+            if (compactIndices.isNotEmpty()) {
+                style.setShowActionsInCompactView(*compactIndices)
+            }
+            builder.setStyle(style)
+        }
         return builder.build()
     }
 
     private fun command(action: String): PendingIntent = PendingIntent.getService(
         this,
-        0,
+        action.hashCode(),
         Intent(this, PlaybackService::class.java).setAction(action),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
@@ -412,6 +573,7 @@ class PlaybackService : Service() {
         /** 500 ms: smooth enough for a progress bar, cheap enough to run indefinitely. */
         const val POLL_INTERVAL_MS = 500L
 
+        const val ACTION_TOGGLE = "com.mylittleblover.mkwplayer.TOGGLE"
         const val ACTION_PAUSE = "com.mylittleblover.mkwplayer.PAUSE"
         const val ACTION_RESUME = "com.mylittleblover.mkwplayer.RESUME"
         const val ACTION_PREV = "com.mylittleblover.mkwplayer.PREV"
@@ -470,7 +632,55 @@ class PlaybackService : Service() {
         /** Delay long enough for one foreground handshake, short enough to feel immediate. */
         private const val STOP_GRACE_MS = 400L
 
-        private val stopHandler = android.os.Handler(android.os.Looper.getMainLooper())
+        private val stopHandler by lazy { android.os.Handler(android.os.Looper.getMainLooper()) }
         private var pendingStop: Runnable? = null
+
+        internal fun coverKeyFor(packDirPath: String?, artworkName: String?, courseCode: String?): String? {
+            val cleanArt = artworkName?.trim()?.takeIf { it.isNotEmpty() }
+            val cleanCourse = courseCode?.trim()?.takeIf { it.isNotEmpty() }
+            return when {
+                !packDirPath.isNullOrBlank() && cleanArt != null -> "pack:$packDirPath|$cleanArt"
+                cleanCourse != null -> "course:$cleanCourse"
+                else -> null
+            }
+        }
+
+        internal fun loadCoverBitmap(
+            packDirPath: String?,
+            artworkName: String?,
+            courseCode: String?,
+            resources: android.content.res.Resources,
+        ): Bitmap? {
+            if (!packDirPath.isNullOrBlank() && !artworkName.isNullOrBlank()) {
+                val file = File(File(packDirPath, "artwork"), artworkName)
+                if (file.isFile) {
+                    decodeSampled { BitmapFactory.decodeFile(file.path, it) }?.let { return it }
+                }
+            }
+            val cleanCourse = courseCode?.trim()?.takeIf { it.isNotEmpty() }
+            if (cleanCourse != null) {
+                val resId = com.mylittleblover.mkwplayer.ui.art.CourseCoverArt.resolve(cleanCourse)
+                if (resId != null) {
+                    decodeSampled { BitmapFactory.decodeResource(resources, resId, it) }?.let { return it }
+                }
+            }
+            return null
+        }
+
+        private fun decodeSampled(decode: (BitmapFactory.Options) -> Bitmap?): Bitmap? {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            decode(bounds)
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+            var sample = 1
+            val maxDim = maxOf(bounds.outWidth, bounds.outHeight)
+            while (maxDim / sample > 384) {
+                sample *= 2
+            }
+            val opts = BitmapFactory.Options().apply {
+                inSampleSize = sample
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+            return decode(opts)
+        }
     }
 }

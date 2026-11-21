@@ -72,6 +72,7 @@ internal class NavState(
         data class CustomRoute(val id: String) : Detail
 
         data object Settings : Detail
+        data object Equalizer : Detail
     }
 
     /** True when back would leave the detail rather than the tab. */
@@ -103,6 +104,7 @@ internal class NavState(
             is Detail.FlowEditor -> listOf("flow-editor", "${page.courseCode}|${page.presetId.orEmpty()}")
             is Detail.CustomRoute -> listOf("custom-route", page.id)
             Detail.Settings -> listOf("settings", "")
+            Detail.Equalizer -> listOf("equalizer", "")
         }
     }
 
@@ -146,6 +148,7 @@ internal class NavState(
                 }
                 "custom-route" -> value?.takeIf { it.isNotBlank() }?.let(Detail::CustomRoute)
                 "settings" -> Detail.Settings
+                "equalizer" -> Detail.Equalizer
                 else -> null
             }
             val stack = if (state.getOrNull(1) == "stack-v2") {

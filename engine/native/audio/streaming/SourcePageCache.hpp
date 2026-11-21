@@ -15,10 +15,11 @@ struct StreamCacheSnapshot {
 // Binding/pause/destruction require stopped audio and all cursors released.
 class SourcePageCache {
 public:
-    static constexpr std::size_t FramesPerPage=2048,MaximumPages=128,MaximumSources=64;
+    static constexpr std::size_t FramesPerPage=4096,MaximumPages=256,MaximumSources=64;
     static constexpr std::size_t PagePcmBytes=FramesPerPage*2*sizeof(float);
 private:
     static constexpr std::uint32_t Writing=std::uint32_t{1}<<31;
+    static constexpr std::size_t HintBuckets=512;
     struct Key { int asset{-1};std::int64_t page{-1};bool operator==(const Key& other) const noexcept {return asset==other.asset && page==other.page;} };
     struct Page {
         std::atomic<std::uint32_t> users{0};Key key;int channels{};
@@ -27,14 +28,25 @@ private:
     struct Source {std::unique_ptr<AudioFrameSource> frames;std::size_t encodedBytes{};};
     std::array<Source,4096> sources_;
     std::unique_ptr<Page[]> pages_;std::size_t pageCount_,cursor_{},encodedBytes_{},sourceCount_{};
+    std::array<std::atomic<std::uint64_t>,MaximumPages> pageTags_{};
+    std::array<std::atomic<std::int16_t>,HintBuckets> slotHints_{};
     std::size_t maximumEncodedBytes_;bool controlRendering_{};
     int repeatAsset_{-1};std::int64_t repeatFirst_{-1},repeatLast_{-1},repeatEndPage_{-1};
-    SpscQueue<Key,129> requests_,completed_;
-    std::array<Key,128> pending_{};std::size_t pendingCount_{};
+    SpscQueue<Key,257> requests_,completed_;
+    std::array<Key,256> pending_{};std::size_t pendingCount_{};
     std::uint64_t underruns_{},requestCount_{},dropped_{};
     std::atomic<bool> paused_{true},idle_{true},stopping_{false};
     std::atomic<std::uint32_t> decoded_{0},failures_{0},cached_{0};
     std::atomic<int> lastFailure_{0};std::thread worker_;
+    static constexpr std::uint64_t packTag(int asset,std::int64_t page) noexcept {
+        return (asset<0 || page<0) ? 0ULL : ((static_cast<std::uint64_t>(asset+1)<<36) | (static_cast<std::uint64_t>(page) & 0xFFFFFFFFFULL));
+    }
+    static constexpr std::size_t hintBucket(int asset,std::int64_t page) noexcept {
+        const auto h=static_cast<std::uint64_t>(asset+1)*0x9E3779B185EBCA87ULL ^ static_cast<std::uint64_t>(page)*0xC2B2AE3D27D4EB4FULL;
+        return static_cast<std::size_t>((h ^ (h>>32)) & (HintBuckets-1));
+    }
+    void publishSlotTag(std::size_t slot,int asset,std::int64_t page) noexcept;
+    void clearSlotTag(std::size_t slot) noexcept;
     SourceStatus load(Key key) noexcept;
     SourceStatus setSourceControls(int asset,std::uint64_t mute,std::uint64_t solo,bool groups)noexcept;
     void work() noexcept;
@@ -50,6 +62,7 @@ public:
     void beginControlRender() noexcept {pauseWorker();controlRendering_=true;}
     void endControlRender() noexcept {controlRendering_=false;resumeWorker();}
     bool controlRendering() const noexcept {return controlRendering_;}
+    std::uint32_t decodedCount() const noexcept {return decoded_.load(std::memory_order_relaxed);}
     unsigned moduleChannelCount(int asset)const noexcept;
     unsigned streamGroupCount(int asset)const noexcept;
     SourceStatus setStreamGroups(int asset,std::uint32_t mute,std::uint32_t solo)noexcept;

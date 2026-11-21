@@ -44,13 +44,19 @@ import com.mylittleblover.mkwplayer.R
 import com.mylittleblover.mkwplayer.audio.EngineSnapshot
 import com.mylittleblover.mkwplayer.player.PlayerViewModel
 import java.util.Locale
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /** A read-only view of Native source/transport clocks; no seek gesture or UI timer. */
 @Composable
-internal fun InteractivePlaybackTimeline(position: String, flow: PlayerViewModel.FlowUi) {
+internal fun InteractivePlaybackTimeline(
+    position: String,
+    flow: PlayerViewModel.FlowUi,
+    progressFlow: StateFlow<PlayerViewModel.ProgressUi>? = null,
+) {
+    val progressUi = progressFlow?.collectAsState()?.value
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        val frame = flow.sourceFrame
+        val frame = progressUi?.sourceFrame ?: flow.sourceFrame
         val length = flow.sourceFrames
         if (frame != null && frame >= 0 && length != null && length > 0) {
             com.mylittleblover.mkwplayer.ui.SmoothProgressIndicator(
@@ -62,7 +68,8 @@ internal fun InteractivePlaybackTimeline(position: String, flow: PlayerViewModel
         val numStyle = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(
-                if (frame != null && frame >= 0) EngineSnapshot.formatPosition(frame, flow.transportRate) else position,
+                if (frame != null && frame >= 0) EngineSnapshot.formatPosition(frame, flow.transportRate)
+                else (progressUi?.position ?: position),
                 style = numStyle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -74,19 +81,8 @@ internal fun InteractivePlaybackTimeline(position: String, flow: PlayerViewModel
                 )
             }
         }
-        if (flow.voiceCount > 0 && flow.loopStart != null && flow.loopEnd != null && !flow.fading) {
-            Text(
-                stringResource(
-                    R.string.interactive_loop_range,
-                    EngineSnapshot.formatPosition(flow.loopStart, flow.transportRate),
-                    EngineSnapshot.formatPosition(flow.loopEnd, flow.transportRate),
-                ),
-                style = numStyle,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
         if (flow.fading) {
-            val remaining = flow.fadeRemainingFrames
+            val remaining = progressUi?.fadeRemainingFrames ?: flow.fadeRemainingFrames
             Text(
                 if (remaining == null) stringResource(R.string.interactive_fading)
                 else stringResource(
@@ -208,6 +204,7 @@ internal fun InteractiveStopBar(
     paused: Boolean = false,
     fadeRemainingFrames: Long? = null,
     transportRate: Int = 48000,
+    progressFlow: StateFlow<PlayerViewModel.ProgressUi>? = null,
 ) {
     var showFade by rememberSaveable { mutableStateOf(false) }
     val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
@@ -247,7 +244,12 @@ internal fun InteractiveStopBar(
         }
     }
 
-    val remainText = fadeRemainingFrames?.let { frames ->
+    val liveFadeRemaining = if (fading) {
+        progressFlow?.collectAsState()?.value?.fadeRemainingFrames ?: fadeRemainingFrames
+    } else {
+        fadeRemainingFrames
+    }
+    val remainText = liveFadeRemaining?.let { frames ->
         val rate = transportRate.coerceAtLeast(1)
         String.format(java.util.Locale.ROOT, "%.1f", frames.toDouble() / rate.toDouble())
     }
@@ -305,7 +307,6 @@ internal fun InteractiveStopBar(
                         fading && paused && remainText != null -> stringResource(R.string.interactive_fade_paused, remainText)
                         fading && remainText != null -> stringResource(R.string.interactive_fade_remaining, remainText)
                         fading -> stringResource(R.string.interactive_fading)
-                        canFade -> "${stringResource(R.string.interactive_stop)} · ${stringResource(R.string.interactive_stop_hold_hint)}"
                         else -> stringResource(R.string.interactive_stop)
                     }
                     Text(
@@ -653,64 +654,28 @@ internal fun InteractivePhaseControlZone(
     onFast: () -> Unit,
     onCancel: () -> Unit,
     onEnd: () -> Unit,
+    progressFlow: StateFlow<PlayerViewModel.ProgressUi>? = null,
 ) {
-    val active = flow.performing && flow.voiceCount > 0 && flow.sourceFrame != null
     val currentTitle = when {
         flow.performing && flow.voiceCount > 0 && flow.sourceFrame == null -> stringResource(R.string.stage_transitioning)
         else -> stageText(flow.stageKey ?: flow.performanceStage)
     }
-    val nextHintLabel = if (flow.pendingStageKey == null && flow.canAdvance && flow.nextAdvanceTargetKey != null) {
-        val syncLabel = syncPointText(flow.nextAdvanceSyncPoint)
-        if (syncLabel != null) {
-            stringResource(R.string.interactive_next_trigger_hint, stageText(flow.nextAdvanceTargetKey), syncLabel)
-        } else {
-            stageText(flow.nextAdvanceTargetKey)
-        }
-    } else null
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    stringResource(R.string.interactive_current_stage_label),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    currentTitle,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (nextHintLabel != null) {
-                    Text(
-                        nextHintLabel,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-            if (active && flow.voiceCount > 0) {
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                ) {
-                    Text(
-                        stringResource(R.string.interactive_voice_count, flow.voiceCount),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                stringResource(R.string.interactive_current_stage_label),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                currentTitle,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
 
         if (flow.pendingStageKey != null) {
@@ -766,7 +731,8 @@ internal fun InteractivePhaseControlZone(
         }
 
         if (flow.fading) {
-            val remainText = flow.fadeRemainingFrames?.let { frames ->
+            val liveFade = progressFlow?.collectAsState()?.value?.fadeRemainingFrames ?: flow.fadeRemainingFrames
+            val remainText = liveFade?.let { frames ->
                 val rate = flow.transportRate.coerceAtLeast(1)
                 String.format(java.util.Locale.ROOT, "%.1f", frames.toDouble() / rate.toDouble())
             }

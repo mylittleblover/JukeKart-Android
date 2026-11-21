@@ -8,10 +8,10 @@ import java.security.MessageDigest
  * Compiles a consecutive run of native-handover [CourseMedleyCompiler.ResolvedMedley]
  * entries into a single multi-segment graph packet (#51-#53).
  *
- * Each boundary `i -> i+1` transitions strictly on `Outro_ToNextPre` (`SyncPoint.ExitCue`,
- * `postExit = true`) into the next entry's verified `Pre` / `Pre_Short` / `Bridge` start
- * offset via `TransitionTimeline(0, -dest.incomingPrePhase, 0, 0)`, letting the outgoing
- * outro decay naturally without fabricated crossfades.
+ * Each boundary `i -> i+1` transitions strictly at `Outro_ToNextPre` (`SyncPoint.ExitCue`,
+ * `postExit = true`) directly into the next entry's frame `0` via
+ * `TransitionTimeline(0, 0, 0, 0)` without subtracting MINF phase, letting the outgoing
+ * outro decay naturally without starting the next track early.
  */
 internal object CourseMedleyChainCompiler {
 
@@ -132,9 +132,7 @@ internal object CourseMedleyChainCompiler {
             )
 
             if (!isLast) {
-                val nextResolved = entries[idx + 1].second
                 val nextSegId = segId + 1
-                val destPhase = nextResolved.incomingPrePhase.coerceAtLeast(0L)
                 transitions += G.Transition(
                     index = nextTransitionId++,
                     sources = listOf(segId),
@@ -145,13 +143,13 @@ internal object CourseMedleyChainCompiler {
                     postExit = true,
                     timeline = G.TransitionTimeline(
                         bridgeStart = 0L,
-                        destinationStart = -destPhase,
+                        destinationStart = 0L,
                         destinationCommit = 0L,
                         destinationSource = 0L,
                     ),
                 )
                 autoAdvance[segId] = nextSegId
-                transportCursor = (transportCursor + exitFrame - destPhase).coerceAtLeast(transportCursor)
+                transportCursor = (transportCursor + exitFrame).coerceAtLeast(transportCursor)
             }
         }
 

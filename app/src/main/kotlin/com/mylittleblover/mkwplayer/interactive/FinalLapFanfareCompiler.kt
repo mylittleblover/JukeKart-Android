@@ -9,13 +9,17 @@ internal object FinalLapFanfareCompiler {
     const val ASSET = "BGM_Seq_FinalLapFF.bwav"
     // Median measured from three gameplay recordings, not a MINF event. See research note.
     private const val FAST_START = 188_880L
-    private const val SHA256 = "60790cdf84a2e04c9fffca7ccee8bafa5be2bfb6ceb6dfd4f98ecfc8bdd8ce94"
+    internal const val SHA256 = "60790cdf84a2e04c9fffca7ccee8bafa5be2bfb6ceb6dfd4f98ecfc8bdd8ce94"
     @Volatile
     private var verifiedAssetBytes: ByteArray? = null
     @Volatile
     private var verifiedDigest: ByteArray? = null
 
-    fun extend(base: InteractivePlaybackPlan, bytes: Map<String,ByteArray>): InteractivePlaybackPlan {
+    fun extend(
+        base: InteractivePlaybackPlan,
+        bytes: Map<String,ByteArray>,
+        perfectBeatEnabled: Boolean = false,
+    ): InteractivePlaybackPlan {
         val fastTargets=(listOfNotNull(base.fast)+base.versions.mapNotNull { it.fast }).toSet()
         val rules=base.spec.transitions.filter { rule ->
             rule.entry!=G.EntryMode.SameTime && rule.sources.none { it in fastTargets } &&
@@ -41,14 +45,31 @@ internal object FinalLapFanfareCompiler {
             base.spec.transitions.map { it.index }+base.spec.segments.flatMap { it.cues.map { c -> c.index } }+
             base.spec.tracks.flatMap { it.clips.map { c -> c.index } }).max()+1
         val ff=id++
+        val segmentByIndex = base.spec.segments.associateBy { it.index }
+        fun downbeatSyncFor(sourceId: Int?): Pair<G.SyncPoint, String?> {
+            if (!perfectBeatEnabled) return G.SyncPoint.Immediate to null
+            val seg = sourceId?.let { segmentByIndex[it] }
+            val cueName = seg?.let { s ->
+                listOf("beat1.exit", "fast.exit", "pre.exit", "region.exit", "bar.exit")
+                    .firstOrNull { name -> s.cues.any { it.name == name } }
+            }
+            return if (cueName != null) {
+                G.SyncPoint.NextCustomCue to cueName
+            } else {
+                G.SyncPoint.NextBar to null
+            }
+        }
         val spec=base.spec.copy(
             assets=base.spec.assets+G.Asset(ASSET,48000,2,268759,digest),
             segments=base.spec.segments+G.Segment(ff,exit=FAST_START),
             tracks=base.spec.tracks+G.Track(id++,ff,listOf(G.Clip(id++,base.spec.assets.size,sourceLength=268759))),
             transitions=base.spec.transitions.map { rule ->
-                if(rule !in rules) rule else rule.copy(sync=G.SyncPoint.Immediate,sourceCue=null,
-                    bridge=ff,fadeOut=G.Fade(),fadeIn=G.Fade(),postExit=true,preEntry=false,
-                    timeline=G.TransitionTimeline(0,FAST_START,FAST_START,0))
+                if(rule !in rules) rule else {
+                    val (syncPoint, cueName) = downbeatSyncFor(rule.sources.firstOrNull())
+                    rule.copy(sync=syncPoint,sourceCue=cueName,
+                        bridge=ff,fadeOut=G.Fade(),fadeIn=G.Fade(),postExit=true,preEntry=false,
+                        timeline=G.TransitionTimeline(0,FAST_START,FAST_START,0))
+                }
             },
         )
         // With an Immediate rule and zero outgoing fade, Native cuts the Full voice at sourceSync.

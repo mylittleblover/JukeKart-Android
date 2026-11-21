@@ -48,6 +48,19 @@ internal class AudioEngine private constructor(private val handle: Long) : Sessi
     override fun setOutputGain(gainDb: Double, ceilingDb: Double): Int =
         if (closed) CLOSED else NativeAudioLibrary.setOutputGain(handle, gainDb, ceilingDb)
 
+    override fun setPlaybackRate(speed: Double, pitchSemitones: Double): Int =
+        if (closed) CLOSED else NativeAudioLibrary.setPlaybackRate(handle, speed, pitchSemitones)
+
+    override fun setMasterDsp(eqEnabled: Boolean, bands5: DoubleArray, bassBoostDb: Double, loudnessDb: Double): Int =
+        if (closed) CLOSED else NativeAudioLibrary.setMasterDsp(handle, eqEnabled, bands5, bassBoostDb, loudnessDb)
+
+    override fun setVisualizerEnabled(enabled: Boolean) {
+        if (!closed) NativeAudioLibrary.setVisualizerEnabled(handle, enabled)
+    }
+
+    override fun visualizerSpectrum(outBands: FloatArray): Boolean =
+        !closed && NativeAudioLibrary.visualizerSpectrum(handle, outBands)
+
     override fun setLayerGain(trackIndex: Int, gainDb: Double, fadeMs: Int): Int =
         if (closed) CLOSED else NativeAudioLibrary.command(handle, COMMAND_LAYER_GAIN, trackIndex, fadeMs.coerceIn(0, 60_000), gainDb, -1L)
 
@@ -73,6 +86,24 @@ internal class AudioEngine private constructor(private val handle: Long) : Sessi
                 null,
             )
         }
+
+    override fun loadLinearFile(file: java.io.File, assetId: String, loop: Boolean, streamed: Boolean): Int {
+        if (closed) return CLOSED
+        return android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
+            NativeAudioLibrary.loadLinearInput(
+                handle,
+                PROVIDER_BWAV,
+                pfd.fileDescriptor,
+                loop,
+                if (streamed) PREPARATION_STREAMED else PREPARATION_PREPARED,
+                assetId,
+                null,
+                null,
+                null,
+                null,
+            )
+        }
+    }
 
     override fun setLinearRepeat(enabled: Boolean, begin: Long, end: Long): Int =
         if (closed) CLOSED else NativeAudioLibrary.setLinearRepeat(handle, enabled, begin, end)
@@ -159,6 +190,9 @@ internal class AudioEngine private constructor(private val handle: Long) : Sessi
 
         /** EngineStatus.Ok */
         const val STATUS_OK = 0
+
+        /** EngineStatus.DeadlineMiss */
+        const val STATUS_DEADLINE_MISS = 10
 
         /** Returned by this wrapper once the handle is gone; never a native code. */
         const val CLOSED = -1

@@ -9,4 +9,18 @@
     <string name="settings_unlock_test_unlock">Unlock for testing</string>
     <string name="settings_unlock_test_lock">Cancel unlock for testing</string>
     <string name="settings_unlock_test_restore">Restore normal progress</string>
+    <string name="settings_dev_taps_remaining">%1$d more taps to unlock developer options</string>
+    <string name="settings_dev_unlocked">Developer options unlocked</string>
+    <string name="settings_dev_already_unlocked">Developer options are already unlocked</string>
+    <string name="settings_unlock_test_ceremony_btn">Play Special Cup unlock ceremony</string>
+    <string name="settings_unlock_test_vfx_btn">Play unlock effect preview</string>
+    <string name="settings_unlock_test_notif_btn">Pop up Special Cup unlock notification</string>
+    <string name="unlock_ceremony_badge">SPECIAL CUP UNLOCKED</string>
+    <string name="unlock_ceremony_title">The Special Cup Appears!</string>
+    <string name="unlock_ceremony_subtitle">Enjoy the reveal fanfare — controls unlock when the music ends.</string>
+    <string name="unlock_ceremony_locked_hint">Ceremony in progress · Playback cannot be interrupted</string>
+    <string name="unlock_congrats_title">Special Cup Unlocked!</string>
+    <string name="unlock_congrats_body">You have listened to all eligible courses. Special Cup, Rainbow Road, and their commemorative tracks are now available across the player.</string>
+    <string name="unlock_congrats_enter">Enter Special Cup</string>
+    <string name="unlock_congrats_close">Close</string>
 </resources>

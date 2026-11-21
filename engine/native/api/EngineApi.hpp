@@ -39,6 +39,10 @@ EngineStatus submitEngineCommand(EngineHandle* engine,const EngineCommand& comma
 // Master output trim for quiet sources: lift by `gainDb`, then hold the result under `ceilingDb`.
 // Applied after the mixer, so it affects every path equally and never feeds back into the stream clock.
 EngineStatus setEngineOutputGain(EngineHandle* engine,double gainDb,double ceilingDb) noexcept;
+EngineStatus setEnginePlaybackRate(EngineHandle* engine,double speed,double pitchSemitones) noexcept;
+EngineStatus setEngineMasterDsp(EngineHandle* engine,bool eqEnabled,const double* bands5,double bassBoostDb,double loudnessDb) noexcept;
+void setEngineVisualizerEnabled(EngineHandle* engine,bool enabled) noexcept;
+bool engineVisualizerSpectrum(const EngineHandle* engine,float* bands,std::size_t bandCount) noexcept;
 // How many samples the ceiling has caught on this engine. A diagnostic, not a control.
 std::uint64_t engineLimitedSampleCount(const EngineHandle* engine) noexcept;
 // Device-rate rendering is the same runtime; no second clock or scheduling implementation.

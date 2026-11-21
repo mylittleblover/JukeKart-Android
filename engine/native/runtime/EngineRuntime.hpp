@@ -43,7 +43,7 @@ class EngineRuntime {
         int target{-1},segment{-1},sourceSegment{-1},sourceSwitchTarget{-1},candidates{},specificity{},priority{};
         CueForecast forecastPlan;
         Frame requested{},sourceSync{},destinationEntry{},preStart{},bridgeStart{},position{},destinationLead{};
-        std::uint64_t revision{},preparationGeneration{};bool preparationDecided{};
+        std::uint64_t revision{},preparationGeneration{},bridgePreparationGeneration{};bool preparationDecided{},bridgePreparationDecided{};std::size_t bridgePreparationInputCount{};bool preparedPagesValid{},preparedBridgeStarted{},preparedDestStarted{};const Transition* preparedRule{};int preparedSegment{-1};Frame preparedPosition{};std::uint64_t preparedRevision{},preparedSyncRev{},preparedParamRev{};
         long double sourceBoundary{}; double sourceSpeed{1},destinationSpeed{1},bridgeSpeed{1};
         int sourceInstance{}; bool sourceLoopDisabled{};
         PlaylistSession playlist;
@@ -92,7 +92,7 @@ class EngineRuntime {
     std::size_t futureClipCount_{};bool futureClipOverflow_{},futureClipReady_{true};
     std::uint64_t futureClipResourceLimits_{};bool futureClipLimited_{};
     std::uint64_t preparationGeneration_{};
-    VoiceManager voices_;
+    VoiceManager voices_; const Graph* lastMixerGraph_{}; std::uint64_t lastMixerParamRev_{};
     SampleClock clock_;
     SpscQueue<api::EngineCommand> queue_;
     std::unique_ptr<CommandJournal> journal_;
@@ -164,7 +164,7 @@ class EngineRuntime {
     bool stingerPagesReady() noexcept;
     bool retimeWaitingStinger() noexcept;
     api::EngineStatus recordPreparationDecision(std::uint64_t generation,api::EngineStatus result,bool needsHistory,bool& historical) noexcept;
-    api::EngineStatus prepareTransitionPages(const TransitionRun& run) noexcept;
+    api::EngineStatus prepareTransitionPages(TransitionRun& run) noexcept;
     bool transitionPagesReady() noexcept;
     bool retimeWaitingTransition() noexcept;
     Frame projectSameTime(const TransitionRun& run,Frame now,double speed,Frame sync) const noexcept;
@@ -213,7 +213,7 @@ public:
     int sampleRate() const noexcept { return rate_; }
     /** Samples the output ceiling has caught since this engine was created. */
     std::uint64_t limitedSamples() const noexcept { return limitedSamples_; }
-    const Graph* graph() const noexcept { return graph_.get(); }
+    const Graph* graph() const noexcept { return graph_.get(); } const Parameters* parameters() const noexcept { return parameters_.get(); } std::size_t activeVoiceLimit() const noexcept { return voices_.activeLimit(); }
     // Control-only rebinding requires every execution owner and page reservation
     // to be idle, including silent timelines and not-yet-started plans.
     bool canBindSource() const noexcept;

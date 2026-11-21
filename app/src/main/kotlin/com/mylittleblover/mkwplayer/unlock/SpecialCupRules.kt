@@ -34,11 +34,18 @@ internal object SpecialCupRules {
      * Takes names rather than tracks so it accepts both the database and a folder scan; both end up
      * as `BGM_Stage_*` prefixes via the shared discovery rule.
      */
+    val EXCLUDED_STAGES: Set<String> = setOf("Rainbow", "BigTree", "SFCMarioCircuit")
+
+    fun isExcludedFromUnlock(stageCode: String): Boolean {
+        val clean = stageCode.removePrefix("BGM_Stage_").removeSuffix("_00")
+        return EXCLUDED_STAGES.any { it.equals(clean, ignoreCase = true) }
+    }
+
     fun eligibleStages(fileNames: Collection<String>): Set<String> =
         fileNames
             .filterNot { it.isBlank() }
             .map { StageFlowDiscovery.prefixOf(it) }
-            .filter { it.isNotEmpty() }
+            .filter { it.isNotEmpty() && !isExcludedFromUnlock(it) }
             .toSet()
 
     /** One line for the screen, so the rule is visible where the progress is shown. */

@@ -13,7 +13,12 @@ internal object RainbowInteractiveCompiler {
     data class Source(val fileName: String,val sampleRate: Int,val channels: Int,val frames: Long,
                       val loopStart: Long?,val loopEnd: Long?,val sha256: ByteArray)
     data class Prepared(val spec: G.Spec,val packet: ByteArray,val segments: Map<String,Int>,val assets: List<Source>)
-    fun prepare(sources: List<Source>,catalog: MinfCatalog): Prepared {
+    fun prepare(
+        sources: List<Source>,
+        catalog: MinfCatalog,
+        allowPreludeToFast: Boolean = false,
+        perfectBeatEnabled: Boolean = false,
+    ): Prepared {
         require(sources.size==roles.size && sources.map { it.fileName }.distinct().size==roles.size)
         val assets=roles.map { role -> sources.single { it.fileName=="BGM_Rainbow_$role.bwav" } }
         val byRole=roles.zip(assets).toMap()
@@ -35,13 +40,19 @@ internal object RainbowInteractiveCompiler {
         val segments=names.map { name ->
             val s=source(name);val r=record(name)
             val cues=buildList {
-                if(name.endsWith("_Pre")) r.loopCandidates.forEach { add(G.Cue(cueId++,"pre.exit",it)) }
+                if(name.endsWith("_Pre")) {
+                    r.loopCandidates.forEach { add(G.Cue(cueId++,"pre.exit",it)) }
+                    if (allowPreludeToFast && perfectBeatEnabled) {
+                        r.beats.filter { it.label == 1 && it.frame in 0L..s.frames }
+                            .forEach { add(G.Cue(cueId++, "beat1.exit", it.frame)) }
+                    }
+                }
                 if(name in listOf("Area1","Area3")) r.beats.filter { it.label==1 }.forEach { add(G.Cue(cueId++,"bar.exit",it.frame)) }
                 if(name=="Area2") (0..4).forEach { n ->
                     val label="Full_ToOutro%02d".format(n)
                     add(G.Cue(cueId++,label,r.event(label)!!.single()))
                 }
-            }
+            }.sortedBy { it.frame }
             val exit=when {
                 name.startsWith("Area2_Outro") -> r.event("Outro_ToNextPre")!!.single()
                 name=="FinalLapFanfare" -> FINAL_FROM_FANFARE_FRAMES
@@ -82,6 +93,19 @@ internal object RainbowInteractiveCompiler {
         link("Final_Pre","Final","pre.exit","FinalLapFanfare",tail=true,
             timeline=G.TransitionTimeline(0,FINAL_FROM_FANFARE_FRAMES,FINAL_FROM_FANFARE_FRAMES,0))
         link("FinalLapFanfare","Final",null,sync=G.SyncPoint.ExitCue,tail=true)
+        if (allowPreludeToFast) {
+            for (preName in listOf("Area1_Pre", "Area3_Pre")) {
+                link(
+                    from = preName,
+                    to = "Final",
+                    cue = if (perfectBeatEnabled) "beat1.exit" else null,
+                    bridge = "FinalLapFanfare",
+                    sync = if (perfectBeatEnabled) G.SyncPoint.NextCustomCue else G.SyncPoint.Immediate,
+                    tail = true,
+                    timeline = G.TransitionTimeline(0, FINAL_FROM_FANFARE_FRAMES, FINAL_FROM_FANFARE_FRAMES, 0),
+                )
+            }
+        }
         for(n in 0..4) {
             val outro="Area2_Outro%02d".format(n)
             link("Area2",outro,"Full_ToOutro%02d".format(n),timeline=G.TransitionTimeline(0,0,0,0))
