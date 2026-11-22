@@ -10,7 +10,9 @@ JukeKart 是面向《马力欧卡丁车 世界》配乐的独立 Android 播放�
 
 ## 安装与导入
 
-安装 JukeKart 的 Release APK，然后在应用内打开 **设置 → 导入 .mkwpack**。音乐、演出视频以及游戏的赛道截图和地图贴图均由用户自行提供。缺少可选的封面、地图或演出视频时，应用会使用自带图形和动画。应用图标及通知图标沿用现有样式。
+安装 JukeKart 的 Release APK，然后在首次启动欢迎页或应用内打开 **设置 → 导入 .mkwpack** 导入资源包。缺少可选的封面、地图或演出视频时，应用会使用自带图形和动画。应用图标及通知图标沿用现有样式。
+
+- **完整 `.mkwpack` 资源包下载（MEGA）**：https://mega.nz/file/j1BxBRyI#cJxJEof3uY3JxDSPiIep7WOI1mNyI2h3Vz7yZ3YRdOc
 
 详见 [Beta 使用说明](docs/USAGE.md)、[曲包格式](docs/PACK-FORMAT.md)和[版本变更](CHANGELOG.md)。
 
