@@ -1,5 +1,7 @@
 # 架构
 
+**简体中文** | [繁體中文](ARCHITECTURE.zh-Hant.md) | [English](ARCHITECTURE.en.md) | [日本語](ARCHITECTURE.ja.md)
+
 这份文档解释**为什么这样分层**，以及每一层各自拒绝了什么。
 
 代码能看出「是什么」，看不出「为什么不是另一种」。而这个项目里大多数决定，都是在排除了一条

@@ -1,5 +1,7 @@
 # 变更记录
 
+**简体中文** | [繁體中文](CHANGELOG.zh-Hant.md) | [English](CHANGELOG.en.md) | [日本語](CHANGELOG.ja.md)
+
 以下记录按可从 Git 历史核实的版本和开发里程碑整理。
 
 ## 0.1.0-beta03 · 2026-11-22
@@ -27,7 +29,7 @@
 - 移除随应用分发的游戏音视频和游戏贴图，加入原创赛道徽章、封面和地图。应用及通知图标沿用现有样式。
 - 更新通知、快捷设置磁贴和后台服务的 Android 版本兼容处理。Release 启用 R8、资源缩减和独立签名，更新原生库的链接对齐。
 - 在设置中展示第三方许可与反馈入口。
-- 原创源代码与内置原创矢量图形采用 Apache-2.0 开源许可（第三方组件保留各自许可，见 `NOTICE-THIRD-PARTY.md`）。
+- 原创源代码与内置原创矢量图形采用 Apache-2.0 开源许可（第三方组件保留各自许可，见 [NOTICE-THIRD-PARTY.zh-Hans.md](NOTICE-THIRD-PARTY.zh-Hans.md)）。
 
 ## 0.1.0-alpha25 · 2026-11-21
 

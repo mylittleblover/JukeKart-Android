@@ -1,5 +1,7 @@
 # Third-Party Notices
 
+[简体中文](NOTICE-THIRD-PARTY.zh-Hans.md) | [繁體中文](NOTICE-THIRD-PARTY.zh-Hant.md) | **English** | [日本語](NOTICE-THIRD-PARTY.ja.md)
+
 JukeKart's original source code and built-in original vector artwork are licensed under the **Apache License, Version 2.0** (see [`LICENSE`](LICENSE)). The native components below retain their own licenses and notices. Their texts are included in the APK and shown under **Settings → Third-party licenses**. The source copies are in [`app/src/main/assets/licenses/`](app/src/main/assets/licenses/).
 
 | Component | Version or source | License | Bundled text |

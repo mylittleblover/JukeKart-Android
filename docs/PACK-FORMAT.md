@@ -1,5 +1,7 @@
 # MKW Soundtrack Pack (`.mkwpack`), format version 1
 
+[简体中文](PACK-FORMAT.zh-Hans.md) | [繁體中文](PACK-FORMAT.zh-Hant.md) | **English** | [日本語](PACK-FORMAT.ja.md)
+
 This document is the protocol. It is written so a second implementer can build a pack
 writer or a pack reader without reading this repository's Kotlin, and so a later
 maintainer cannot "simplify" a rule without seeing what it was protecting against.
