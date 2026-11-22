@@ -2,6 +2,11 @@
 
 以下记录按可从 Git 历史核实的版本和开发里程碑整理。
 
+## 0.1.0-beta03 · 2026-11-22
+
+- 仓库 URL 迁移至 `mylittleblover/JukeKart-Android`，同步更新 `README.md`、`docs/USAGE.md` 与多语言设置页反馈入口。
+- 规范化自适应启动图标分层目录：将 `ic_launcher_background.png` 与 `ic_launcher_foreground.png` 从 `mipmap-*` 迁至 `drawable-*` 并更新 `mipmap-anydpi-v26` 与 `raw/keep.xml` 引用；同时为 `PlaybackService`、`PackImportService` 和 `PlayerWidgetProvider` 补充显式 `android:icon="@mipmap/ic_launcher"`，提升小米 HyperOS / MIUI `CustomizeIcon` 兼容性。
+
 ## 0.1.0-beta02 · 2026-11-22
 
 - 补全 114 首自由漫游/点唱机曲目的简体与繁体中文名称本地化（对照 Super Mario Wiki 与目录命名规范）。

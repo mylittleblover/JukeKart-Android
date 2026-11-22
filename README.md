@@ -1,6 +1,6 @@
 # JukeKart
 
-**0.1.0-beta02** · Android 8.0（API 26）及以上
+**0.1.0-beta03** · Android 8.0（API 26）及以上
 
 JukeKart 是面向《马力欧卡丁车 世界》配乐的独立 Android 播放器。导入自己的 `.mkwpack` 后，可以切换赛道音乐的阶段和版本，播放赛道组曲，沿世界地图路线听音乐，或用点唱机管理收藏和播放列表。
 
@@ -28,6 +28,6 @@ Windows 上将 `./gradlew` 换成 `.\gradlew.bat`。Debug APK 位于 `app/build/
 
 ## 反馈与许可
 
-在 [GitHub Issues](https://github.com/mylittleblover/MarioKartWorldPlayer-Android/issues) 提交问题，请附上应用版本、手机型号、Android 版本和复现步骤。JukeKart 的原创源代码与内置原创矢量图形采用 [Apache-2.0](LICENSE) 许可，第三方组件及其各自许可详见 [Third-Party Notices](NOTICE-THIRD-PARTY.md)。
+在 [GitHub Issues](https://github.com/mylittleblover/JukeKart-Android/issues) 提交问题，请附上应用版本、手机型号、Android 版本和复现步骤。JukeKart 的原创源代码与内置原创矢量图形采用 [Apache-2.0](LICENSE) 许可，第三方组件及其各自许可详见 [Third-Party Notices](NOTICE-THIRD-PARTY.md)。
 
 JukeKart 是独立的爱好者项目，与 Nintendo 无关联，亦未经 Nintendo 认可或赞助。相关名称、商标和游戏素材归各自权利人所有。

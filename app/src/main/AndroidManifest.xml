@@ -37,15 +37,18 @@
 
         <service
             android:name=".player.PlaybackService"
+            android:icon="@mipmap/ic_launcher"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
         <service
             android:name=".pack.PackImportService"
+            android:icon="@mipmap/ic_launcher"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
         <receiver
             android:name=".widget.PlayerWidgetProvider"
+            android:icon="@mipmap/ic_launcher"
             android:exported="true"
             android:label="@string/widget_label">
             <intent-filter>

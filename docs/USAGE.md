@@ -2,7 +2,7 @@
 
 ## 安装和导入音乐
 
-1. 在 Android 8.0 或更高版本上安装 JukeKart `0.1.0-beta02` Release APK。手机可能会要求授权安装来源。
+1. 在 Android 8.0 或更高版本上安装 JukeKart `0.1.0-beta03` Release APK。手机可能会要求授权安装来源。
 2. 自备兼容的 `.mkwpack`，保存在系统文件选择器可访问的位置。应用会将曲包内容导入内部存储，请预留足够空间。曲包结构见[格式说明](PACK-FORMAT.md)。
 3. 首次启动可在欢迎页授权通知并直接选择导入 `.mkwpack`，也可随时打开 **设置 → 导入 .mkwpack** 选择文件并等待校验。完成后在导入详情查看可播放曲目。可以陆续导入多个曲包，内容会合并到曲库。
 4. 导入中断后，可在设置里选择 **继续导入**。若系统文件访问授权过期，按提示重新选择同一个曲包。
@@ -28,4 +28,4 @@
 
 ## 报告问题
 
-反馈播放、导入或显示问题时，请写明 JukeKart 版本、设备型号、Android 版本、曲名或曲包版本及复现步骤。若问题出现在后台播放，也请注明当时使用的是通知、磁贴还是小组件。[提交 GitHub Issue](https://github.com/mylittleblover/MarioKartWorldPlayer-Android/issues)
+反馈播放、导入或显示问题时，请写明 JukeKart 版本、设备型号、Android 版本、曲名或曲包版本及复现步骤。若问题出现在后台播放，也请注明当时使用的是通知、磁贴还是小组件。[提交 GitHub Issue](https://github.com/mylittleblover/JukeKart-Android/issues)

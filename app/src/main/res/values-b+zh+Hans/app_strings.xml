@@ -189,7 +189,7 @@
     <string name="settings_open_source_licenses">第三方开源许可</string>
     <string name="settings_open_source_licenses_summary">包含 Game_Music_Emu (LGPL-2.1 动态库)、libopenmpt (BSD-3)、Opus (BSD-3)、clHCA (ISC)、Oboe 与 Jetpack Compose (Apache-2.0)。</string>
     <string name="settings_non_affiliation">独立开发的爱好者工具，与 Nintendo 无关，亦未获得任天堂官方授权或背书。</string>
-    <string name="settings_feedback_repo">问题反馈与仓库：github.com/mylittleblover/MarioKartWorldPlayer-Android</string>
+    <string name="settings_feedback_repo">问题反馈与仓库：github.com/mylittleblover/JukeKart-Android</string>
     <string name="settings_licenses_close">关闭</string>
 
     <string name="onboarding_welcome_title">欢迎来到 JukeKart</string>

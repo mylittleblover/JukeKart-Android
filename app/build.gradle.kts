@@ -34,9 +34,9 @@ android {
         applicationId = "com.mylittleblover.mkwplayer"
         minSdk = 26
         targetSdk = 35
-        // Beta 02: MarioWiki Jukebox zh i18n, runtime pack icons & sharp map, all-type recent plays, spacious map UI, onboarding, unlock & background handover fixes.
-        versionCode = 27
-        versionName = "0.1.0-beta02"
+        // Beta 03: JukeKart-Android repository URL migration, adaptive icon drawable layers & service manifest icons for MIUI/HyperOS.
+        versionCode = 28
+        versionName = "0.1.0-beta03"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
