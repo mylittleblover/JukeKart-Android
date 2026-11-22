@@ -642,20 +642,20 @@
                        "names":  {
                                      "en":  "Ground BGM (Latin)",
                                      "ja":  "地上BGM ラテンVer.",
-                                     "zh-Hans":  "Ground BGM (Latin Ver.)",
-                                     "zh-Hant":  "Ground BGM (Latin Ver.)"
+                                     "zh-Hans":  "地上BGM 拉丁Ver.",
+                                     "zh-Hant":  "地上BGM 拉丁Ver."
                                  },
                        "titles":  {
                                       "en":  "Ground BGM",
                                       "ja":  "地上BGM",
-                                      "zh-Hans":  "Ground BGM",
-                                      "zh-Hant":  "Ground BGM"
+                                      "zh-Hans":  "地上BGM",
+                                      "zh-Hant":  "地上BGM"
                                   },
                        "arrangements":  {
                                             "en":  "Latin",
                                             "ja":  "ラテンVer.",
-                                            "zh-Hans":  "Latin Ver.",
-                                            "zh-Hant":  "Latin Ver."
+                                            "zh-Hans":  "拉丁Ver.",
+                                            "zh-Hant":  "拉丁Ver."
                                         }
                    },
                    {
@@ -677,20 +677,20 @@
                        "names":  {
                                      "en":  "Ground BGM (Acoustic)",
                                      "ja":  "地上BGM アコースティックVer.",
-                                     "zh-Hans":  "Ground BGM (Acoustic Ver.)",
-                                     "zh-Hant":  "Ground BGM (Acoustic Ver.)"
+                                     "zh-Hans":  "地上BGM 原声音乐Ver.",
+                                     "zh-Hant":  "地上BGM 不插電Ver."
                                  },
                        "titles":  {
                                       "en":  "Ground BGM",
                                       "ja":  "地上BGM",
-                                      "zh-Hans":  "Ground BGM",
-                                      "zh-Hant":  "Ground BGM"
+                                      "zh-Hans":  "地上BGM",
+                                      "zh-Hant":  "地上BGM"
                                   },
                        "arrangements":  {
                                             "en":  "Acoustic",
                                             "ja":  "アコースティックVer.",
-                                            "zh-Hans":  "Acoustic Ver.",
-                                            "zh-Hant":  "Acoustic Ver."
+                                            "zh-Hans":  "原声音乐Ver.",
+                                            "zh-Hant":  "不插電Ver."
                                         }
                    },
                    {
@@ -712,20 +712,20 @@
                        "names":  {
                                      "en":  "Underground BGM (Jazz Fusion)",
                                      "ja":  "地下BGM フュージョンVer.",
-                                     "zh-Hans":  "Underground BGM (Jazz Fusion Ver.)",
-                                     "zh-Hant":  "Underground BGM (Jazz Fusion Ver.)"
+                                     "zh-Hans":  "地下BGM 融合爵士乐Ver.",
+                                     "zh-Hant":  "地下BGM 融合爵士樂Ver."
                                  },
                        "titles":  {
                                       "en":  "Underground BGM",
                                       "ja":  "地下BGM",
-                                      "zh-Hans":  "Underground BGM",
-                                      "zh-Hant":  "Underground BGM"
+                                      "zh-Hans":  "地下BGM",
+                                      "zh-Hant":  "地下BGM"
                                   },
                        "arrangements":  {
                                             "en":  "Jazz Fusion",
                                             "ja":  "フュージョンVer.",
-                                            "zh-Hans":  "Jazz Fusion Ver.",
-                                            "zh-Hant":  "Jazz Fusion Ver."
+                                            "zh-Hans":  "融合爵士乐Ver.",
+                                            "zh-Hant":  "融合爵士樂Ver."
                                         }
                    },
                    {
@@ -747,20 +747,20 @@
                        "names":  {
                                      "en":  "Underground BGM (Acoustic)",
                                      "ja":  "地下BGM アコースティックVer.",
-                                     "zh-Hans":  "Underground BGM (Acoustic Ver.)",
-                                     "zh-Hant":  "Underground BGM (Acoustic Ver.)"
+                                     "zh-Hans":  "地下BGM 原声音乐Ver.",
+                                     "zh-Hant":  "地下BGM 不插電Ver."
                                  },
                        "titles":  {
                                       "en":  "Underground BGM",
                                       "ja":  "地下BGM",
-                                      "zh-Hans":  "Underground BGM",
-                                      "zh-Hant":  "Underground BGM"
+                                      "zh-Hans":  "地下BGM",
+                                      "zh-Hant":  "地下BGM"
                                   },
                        "arrangements":  {
                                             "en":  "Acoustic",
                                             "ja":  "アコースティックVer.",
-                                            "zh-Hans":  "Acoustic Ver.",
-                                            "zh-Hant":  "Acoustic Ver."
+                                            "zh-Hans":  "原声音乐Ver.",
+                                            "zh-Hant":  "不插電Ver."
                                         }
                    },
                    {
@@ -782,14 +782,14 @@
                        "names":  {
                                      "en":  "Underwater BGM",
                                      "ja":  "水中BGM",
-                                     "zh-Hans":  "Underwater BGM",
-                                     "zh-Hant":  "Underwater BGM"
+                                     "zh-Hans":  "水中BGM",
+                                     "zh-Hant":  "水中BGM"
                                  },
                        "titles":  {
                                       "en":  "Underwater BGM",
                                       "ja":  "水中BGM",
-                                      "zh-Hans":  "Underwater BGM",
-                                      "zh-Hant":  "Underwater BGM"
+                                      "zh-Hans":  "水中BGM",
+                                      "zh-Hant":  "水中BGM"
                                   }
                    },
                    {
@@ -811,14 +811,14 @@
                        "names":  {
                                      "en":  "Please Select Player",
                                      "ja":  "プレイヤーセレクト",
-                                     "zh-Hans":  "Please Select Player",
-                                     "zh-Hant":  "Please Select Player"
+                                     "zh-Hans":  "选择角色",
+                                     "zh-Hant":  "選擇角色"
                                  },
                        "titles":  {
                                       "en":  "Please Select Player",
                                       "ja":  "プレイヤーセレクト",
-                                      "zh-Hans":  "Please Select Player",
-                                      "zh-Hant":  "Please Select Player"
+                                      "zh-Hans":  "选择角色",
+                                      "zh-Hant":  "選擇角色"
                                   }
                    },
                    {
@@ -840,14 +840,14 @@
                        "names":  {
                                      "en":  "Ground BGM",
                                      "ja":  "地上BGM",
-                                     "zh-Hans":  "Ground BGM",
-                                     "zh-Hant":  "Ground BGM"
+                                     "zh-Hans":  "地上BGM",
+                                     "zh-Hant":  "地上BGM"
                                  },
                        "titles":  {
                                       "en":  "Ground BGM",
                                       "ja":  "地上BGM",
-                                      "zh-Hans":  "Ground BGM",
-                                      "zh-Hant":  "Ground BGM"
+                                      "zh-Hans":  "地上BGM",
+                                      "zh-Hant":  "地上BGM"
                                   }
                    },
                    {
@@ -869,14 +869,14 @@
                        "names":  {
                                      "en":  "Underground BGM",
                                      "ja":  "地下BGM",
-                                     "zh-Hans":  "Underground BGM",
-                                     "zh-Hant":  "Underground BGM"
+                                     "zh-Hans":  "地下BGM",
+                                     "zh-Hant":  "地下BGM"
                                  },
                        "titles":  {
                                       "en":  "Underground BGM",
                                       "ja":  "地下BGM",
-                                      "zh-Hans":  "Underground BGM",
-                                      "zh-Hant":  "Underground BGM"
+                                      "zh-Hans":  "地下BGM",
+                                      "zh-Hant":  "地下BGM"
                                   }
                    },
                    {
@@ -898,14 +898,14 @@
                        "names":  {
                                      "en":  "Overworld Medley",
                                      "ja":  "マップメドレー",
-                                     "zh-Hans":  "Overworld Medley",
-                                     "zh-Hant":  "Overworld Medley"
+                                     "zh-Hans":  "地图组曲",
+                                     "zh-Hant":  "地圖組曲"
                                  },
                        "titles":  {
                                       "en":  "Overworld Medley",
                                       "ja":  "マップメドレー",
-                                      "zh-Hans":  "Overworld Medley",
-                                      "zh-Hant":  "Overworld Medley"
+                                      "zh-Hans":  "地图组曲",
+                                      "zh-Hant":  "地圖組曲"
                                   }
                    },
                    {
@@ -927,14 +927,14 @@
                        "names":  {
                                      "en":  "Ground BGM",
                                      "ja":  "地上BGM",
-                                     "zh-Hans":  "Ground BGM",
-                                     "zh-Hant":  "Ground BGM"
+                                     "zh-Hans":  "地上BGM",
+                                     "zh-Hant":  "地上BGM"
                                  },
                        "titles":  {
                                       "en":  "Ground BGM",
                                       "ja":  "地上BGM",
-                                      "zh-Hans":  "Ground BGM",
-                                      "zh-Hant":  "Ground BGM"
+                                      "zh-Hans":  "地上BGM",
+                                      "zh-Hant":  "地上BGM"
                                   }
                    },
                    {
@@ -956,14 +956,14 @@
                        "names":  {
                                      "en":  "Athletic BGM",
                                      "ja":  "アスレチックBGM",
-                                     "zh-Hans":  "Athletic BGM",
-                                     "zh-Hant":  "Athletic BGM"
+                                     "zh-Hans":  "运动关卡BGM",
+                                     "zh-Hant":  "運動關卡BGM"
                                  },
                        "titles":  {
                                       "en":  "Athletic BGM",
                                       "ja":  "アスレチックBGM",
-                                      "zh-Hans":  "Athletic BGM",
-                                      "zh-Hant":  "Athletic BGM"
+                                      "zh-Hans":  "运动关卡BGM",
+                                      "zh-Hant":  "運動關卡BGM"
                                   }
                    },
                    {
@@ -985,14 +985,14 @@
                        "names":  {
                                      "en":  "Underwater BGM",
                                      "ja":  "水中BGM",
-                                     "zh-Hans":  "Underwater BGM",
-                                     "zh-Hant":  "Underwater BGM"
+                                     "zh-Hans":  "水中BGM",
+                                     "zh-Hant":  "水中BGM"
                                  },
                        "titles":  {
                                       "en":  "Underwater BGM",
                                       "ja":  "水中BGM",
-                                      "zh-Hans":  "Underwater BGM",
-                                      "zh-Hant":  "Underwater BGM"
+                                      "zh-Hans":  "水中BGM",
+                                      "zh-Hant":  "水中BGM"
                                   }
                    },
                    {
@@ -1014,14 +1014,14 @@
                        "names":  {
                                      "en":  "Fortress Boss BGM",
                                      "ja":  "砦のボス",
-                                     "zh-Hans":  "Fortress Boss BGM",
-                                     "zh-Hant":  "Fortress Boss BGM"
+                                     "zh-Hans":  "要塞Boss战",
+                                     "zh-Hant":  "要塞Boss戰"
                                  },
                        "titles":  {
                                       "en":  "Fortress Boss BGM",
                                       "ja":  "砦のボス",
-                                      "zh-Hans":  "Fortress Boss BGM",
-                                      "zh-Hant":  "Fortress Boss BGM"
+                                      "zh-Hans":  "要塞Boss战",
+                                      "zh-Hant":  "要塞Boss戰"
                                   }
                    },
                    {
@@ -1043,14 +1043,14 @@
                        "names":  {
                                      "en":  "Airship BGM",
                                      "ja":  "飛行船BGM",
-                                     "zh-Hans":  "Airship BGM",
-                                     "zh-Hant":  "Airship BGM"
+                                     "zh-Hans":  "飞行船BGM",
+                                     "zh-Hant":  "飛行船BGM"
                                  },
                        "titles":  {
                                       "en":  "Airship BGM",
                                       "ja":  "飛行船BGM",
-                                      "zh-Hans":  "Airship BGM",
-                                      "zh-Hant":  "Airship BGM"
+                                      "zh-Hans":  "飞行船BGM",
+                                      "zh-Hant":  "飛行船BGM"
                                   }
                    },
                    {
@@ -1072,14 +1072,14 @@
                        "names":  {
                                      "en":  "Ending",
                                      "ja":  "エンディング",
-                                     "zh-Hans":  "Ending",
-                                     "zh-Hant":  "Ending"
+                                     "zh-Hans":  "片尾曲",
+                                     "zh-Hant":  "片尾曲"
                                  },
                        "titles":  {
                                       "en":  "Ending",
                                       "ja":  "エンディング",
-                                      "zh-Hans":  "Ending",
-                                      "zh-Hant":  "Ending"
+                                      "zh-Hans":  "片尾曲",
+                                      "zh-Hant":  "片尾曲"
                                   }
                    },
                    {
@@ -1101,14 +1101,14 @@
                        "names":  {
                                      "en":  "Ground BGM",
                                      "ja":  "地上BGM",
-                                     "zh-Hans":  "Ground BGM",
-                                     "zh-Hant":  "Ground BGM"
+                                     "zh-Hans":  "地上BGM",
+                                     "zh-Hant":  "地上BGM"
                                  },
                        "titles":  {
                                       "en":  "Ground BGM",
                                       "ja":  "地上BGM",
-                                      "zh-Hans":  "Ground BGM",
-                                      "zh-Hant":  "Ground BGM"
+                                      "zh-Hans":  "地上BGM",
+                                      "zh-Hant":  "地上BGM"
                                   }
                    },
                    {
@@ -1130,14 +1130,14 @@
                        "names":  {
                                      "en":  "Underground BGM",
                                      "ja":  "地下BGM",
-                                     "zh-Hans":  "Underground BGM",
-                                     "zh-Hant":  "Underground BGM"
+                                     "zh-Hans":  "地下BGM",
+                                     "zh-Hant":  "地下BGM"
                                  },
                        "titles":  {
                                       "en":  "Underground BGM",
                                       "ja":  "地下BGM",
-                                      "zh-Hans":  "Underground BGM",
-                                      "zh-Hant":  "Underground BGM"
+                                      "zh-Hans":  "地下BGM",
+                                      "zh-Hant":  "地下BGM"
                                   }
                    },
                    {
@@ -1159,14 +1159,14 @@
                        "names":  {
                                      "en":  "Title BGM",
                                      "ja":  "タイトルBGM",
-                                     "zh-Hans":  "Title BGM",
-                                     "zh-Hant":  "Title BGM"
+                                     "zh-Hans":  "标题BGM",
+                                     "zh-Hant":  "標題BGM"
                                  },
                        "titles":  {
                                       "en":  "Title BGM",
                                       "ja":  "タイトルBGM",
-                                      "zh-Hans":  "Title BGM",
-                                      "zh-Hant":  "Title BGM"
+                                      "zh-Hans":  "标题BGM",
+                                      "zh-Hant":  "標題BGM"
                                   }
                    },
                    {
@@ -1188,14 +1188,14 @@
                        "names":  {
                                      "en":  "Overworld Medley",
                                      "ja":  "マップメドレー",
-                                     "zh-Hans":  "Overworld Medley",
-                                     "zh-Hant":  "Overworld Medley"
+                                     "zh-Hans":  "地图组曲",
+                                     "zh-Hant":  "地圖組曲"
                                  },
                        "titles":  {
                                       "en":  "Overworld Medley",
                                       "ja":  "マップメドレー",
-                                      "zh-Hans":  "Overworld Medley",
-                                      "zh-Hant":  "Overworld Medley"
+                                      "zh-Hans":  "地图组曲",
+                                      "zh-Hant":  "地圖組曲"
                                   }
                    },
                    {
@@ -1217,20 +1217,20 @@
                        "names":  {
                                      "en":  "Ground BGM (Rock \u0027n\u0027 Roll 1)",
                                      "ja":  "地上BGM ロックンロールVer.1",
-                                     "zh-Hans":  "Ground BGM (Rock \u0027n\u0027 Roll Ver. 1)",
-                                     "zh-Hant":  "Ground BGM (Rock \u0027n\u0027 Roll Ver. 1)"
+                                     "zh-Hans":  "地上BGM 摇滚乐Ver.1",
+                                     "zh-Hant":  "地上BGM 搖滾樂Ver.1"
                                  },
                        "titles":  {
                                       "en":  "Ground BGM",
                                       "ja":  "地上BGM",
-                                      "zh-Hans":  "Ground BGM",
-                                      "zh-Hant":  "Ground BGM"
+                                      "zh-Hans":  "地上BGM",
+                                      "zh-Hant":  "地上BGM"
                                   },
                        "arrangements":  {
                                             "en":  "Rock \u0027n\u0027 Roll 1",
                                             "ja":  "ロックンロールVer.1",
-                                            "zh-Hans":  "Rock \u0027n\u0027 Roll Ver. 1",
-                                            "zh-Hant":  "Rock \u0027n\u0027 Roll Ver. 1"
+                                            "zh-Hans":  "摇滚乐Ver.1",
+                                            "zh-Hant":  "搖滾樂Ver.1"
                                         }
                    },
                    {
@@ -1252,20 +1252,20 @@
                        "names":  {
                                      "en":  "Ground BGM (Rock \u0027n\u0027 Roll 2)",
                                      "ja":  "地上BGM ロックンロールVer.2",
-                                     "zh-Hans":  "Ground BGM (Rock \u0027n\u0027 Roll Ver. 2)",
-                                     "zh-Hant":  "Ground BGM (Rock \u0027n\u0027 Roll Ver. 2)"
+                                     "zh-Hans":  "地上BGM 摇滚乐Ver.2",
+                                     "zh-Hant":  "地上BGM 搖滾樂Ver.2"
                                  },
                        "titles":  {
                                       "en":  "Ground BGM",
                                       "ja":  "地上BGM",
-                                      "zh-Hans":  "Ground BGM",
-                                      "zh-Hant":  "Ground BGM"
+                                      "zh-Hans":  "地上BGM",
+                                      "zh-Hant":  "地上BGM"
                                   },
                        "arrangements":  {
                                             "en":  "Rock \u0027n\u0027 Roll 2",
                                             "ja":  "ロックンロールVer.2",
-                                            "zh-Hans":  "Rock \u0027n\u0027 Roll Ver. 2",
-                                            "zh-Hant":  "Rock \u0027n\u0027 Roll Ver. 2"
+                                            "zh-Hans":  "摇滚乐Ver.2",
+                                            "zh-Hant":  "搖滾樂Ver.2"
                                         }
                    },
                    {
@@ -1287,20 +1287,20 @@
                        "names":  {
                                      "en":  "Ground BGM (Ska)",
                                      "ja":  "地上BGM スカVer.",
-                                     "zh-Hans":  "Ground BGM (Ska Ver.)",
-                                     "zh-Hant":  "Ground BGM (Ska Ver.)"
+                                     "zh-Hans":  "地上BGM 斯卡Ver.",
+                                     "zh-Hant":  "地上BGM 斯卡Ver."
                                  },
                        "titles":  {
                                       "en":  "Ground BGM",
                                       "ja":  "地上BGM",
-                                      "zh-Hans":  "Ground BGM",
-                                      "zh-Hant":  "Ground BGM"
+                                      "zh-Hans":  "地上BGM",
+                                      "zh-Hant":  "地上BGM"
                                   },
                        "arrangements":  {
                                             "en":  "Ska",
                                             "ja":  "スカVer.",
-                                            "zh-Hans":  "Ska Ver.",
-                                            "zh-Hant":  "Ska Ver."
+                                            "zh-Hans":  "斯卡Ver.",
+                                            "zh-Hant":  "斯卡Ver."
                                         }
                    },
                    {
@@ -1322,20 +1322,20 @@
                        "names":  {
                                      "en":  "Ground BGM (Country)",
                                      "ja":  "地上BGM カントリーVer.",
-                                     "zh-Hans":  "Ground BGM (Country Ver.)",
-                                     "zh-Hant":  "Ground BGM (Country Ver.)"
+                                     "zh-Hans":  "地上BGM 乡村音乐Ver.",
+                                     "zh-Hant":  "地上BGM 鄉村音樂Ver."
                                  },
                        "titles":  {
                                       "en":  "Ground BGM",
                                       "ja":  "地上BGM",
-                                      "zh-Hans":  "Ground BGM",
-                                      "zh-Hant":  "Ground BGM"
+                                      "zh-Hans":  "地上BGM",
+                                      "zh-Hant":  "地上BGM"
                                   },
                        "arrangements":  {
                                             "en":  "Country",
                                             "ja":  "カントリーVer.",
-                                            "zh-Hans":  "Country Ver.",
-                                            "zh-Hant":  "Country Ver."
+                                            "zh-Hans":  "乡村音乐Ver.",
+                                            "zh-Hant":  "鄉村音樂Ver."
                                         }
                    },
                    {
@@ -1357,14 +1357,14 @@
                        "names":  {
                                      "en":  "Underground BGM",
                                      "ja":  "地下BGM",
-                                     "zh-Hans":  "Underground BGM",
-                                     "zh-Hant":  "Underground BGM"
+                                     "zh-Hans":  "地下BGM",
+                                     "zh-Hant":  "地下BGM"
                                  },
                        "titles":  {
                                       "en":  "Underground BGM",
                                       "ja":  "地下BGM",
-                                      "zh-Hans":  "Underground BGM",
-                                      "zh-Hant":  "Underground BGM"
+                                      "zh-Hans":  "地下BGM",
+                                      "zh-Hant":  "地下BGM"
                                   }
                    },
                    {
@@ -1386,14 +1386,14 @@
                        "names":  {
                                      "en":  "Underwater BGM",
                                      "ja":  "水中BGM",
-                                     "zh-Hans":  "Underwater BGM",
-                                     "zh-Hant":  "Underwater BGM"
+                                     "zh-Hans":  "水中BGM",
+                                     "zh-Hant":  "水中BGM"
                                  },
                        "titles":  {
                                       "en":  "Underwater BGM",
                                       "ja":  "水中BGM",
-                                      "zh-Hans":  "Underwater BGM",
-                                      "zh-Hant":  "Underwater BGM"
+                                      "zh-Hans":  "水中BGM",
+                                      "zh-Hant":  "水中BGM"
                                   }
                    },
                    {
@@ -1415,14 +1415,14 @@
                        "names":  {
                                      "en":  "Bonus Game BGM",
                                      "ja":  "ボーナス面BGM",
-                                     "zh-Hans":  "Bonus Game BGM",
-                                     "zh-Hant":  "Bonus Game BGM"
+                                     "zh-Hans":  "奖励关BGM",
+                                     "zh-Hant":  "獎勵關BGM"
                                  },
                        "titles":  {
                                       "en":  "Bonus Game BGM",
                                       "ja":  "ボーナス面BGM",
-                                      "zh-Hans":  "Bonus Game BGM",
-                                      "zh-Hant":  "Bonus Game BGM"
+                                      "zh-Hans":  "奖励关BGM",
+                                      "zh-Hant":  "獎勵關BGM"
                                   }
                    },
                    {
@@ -1444,14 +1444,14 @@
                        "names":  {
                                      "en":  "Castle BGM",
                                      "ja":  "お城BGM",
-                                     "zh-Hans":  "Castle BGM",
-                                     "zh-Hant":  "Castle BGM"
+                                     "zh-Hans":  "城堡BGM",
+                                     "zh-Hant":  "城堡BGM"
                                  },
                        "titles":  {
                                       "en":  "Castle BGM",
                                       "ja":  "お城BGM",
-                                      "zh-Hans":  "Castle BGM",
-                                      "zh-Hant":  "Castle BGM"
+                                      "zh-Hans":  "城堡BGM",
+                                      "zh-Hant":  "城堡BGM"
                                   }
                    },
                    {
@@ -1473,14 +1473,14 @@
                        "names":  {
                                      "en":  "Koopalings BGM",
                                      "ja":  "コクッパBGM",
-                                     "zh-Hans":  "Koopalings BGM",
-                                     "zh-Hant":  "Koopalings BGM"
+                                     "zh-Hans":  "酷霸7人组BGM",
+                                     "zh-Hant":  "庫巴7人眾BGM"
                                  },
                        "titles":  {
                                       "en":  "Koopalings BGM",
                                       "ja":  "コクッパBGM",
-                                      "zh-Hans":  "Koopalings BGM",
-                                      "zh-Hant":  "Koopalings BGM"
+                                      "zh-Hans":  "酷霸7人组BGM",
+                                      "zh-Hant":  "庫巴7人眾BGM"
                                   }
                    },
                    {
@@ -1502,14 +1502,14 @@
                        "names":  {
                                      "en":  "Ending",
                                      "ja":  "エンディング",
-                                     "zh-Hans":  "Ending",
-                                     "zh-Hant":  "Ending"
+                                     "zh-Hans":  "片尾曲",
+                                     "zh-Hant":  "片尾曲"
                                  },
                        "titles":  {
                                       "en":  "Ending",
                                       "ja":  "エンディング",
-                                      "zh-Hans":  "Ending",
-                                      "zh-Hant":  "Ending"
+                                      "zh-Hans":  "片尾曲",
+                                      "zh-Hant":  "片尾曲"
                                   }
                    },
                    {
@@ -1531,14 +1531,14 @@
                        "names":  {
                                      "en":  "Painting Mode 1",
                                      "ja":  "お絵描きスクリーン1",
-                                     "zh-Hans":  "Painting Mode 1",
-                                     "zh-Hant":  "Painting Mode 1"
+                                     "zh-Hans":  "绘画模式1",
+                                     "zh-Hant":  "繪圖模式1"
                                  },
                        "titles":  {
                                       "en":  "Painting Mode 1",
                                       "ja":  "お絵描きスクリーン1",
-                                      "zh-Hans":  "Painting Mode 1",
-                                      "zh-Hant":  "Painting Mode 1"
+                                      "zh-Hans":  "绘画模式1",
+                                      "zh-Hant":  "繪圖模式1"
                                   }
                    },
                    {
@@ -1560,14 +1560,14 @@
                        "names":  {
                                      "en":  "Flyswatter Level 1",
                                      "ja":  "ハエタタキ：レベル1",
-                                     "zh-Hans":  "Flyswatter Level 1",
-                                     "zh-Hant":  "Flyswatter Level 1"
+                                     "zh-Hans":  "拍苍蝇：关卡1",
+                                     "zh-Hant":  "拍蒼蠅：關卡1"
                                  },
                        "titles":  {
                                       "en":  "Flyswatter Level 1",
                                       "ja":  "ハエタタキ：レベル1",
-                                      "zh-Hans":  "Flyswatter Level 1",
-                                      "zh-Hant":  "Flyswatter Level 1"
+                                      "zh-Hans":  "拍苍蝇：关卡1",
+                                      "zh-Hant":  "拍蒼蠅：關卡1"
                                   }
                    },
                    {
@@ -1932,14 +1932,14 @@
                        "names":  {
                                      "en":  "Main Theme",
                                      "ja":  "メインテーマ",
-                                     "zh-Hans":  "Main Theme",
-                                     "zh-Hant":  "Main Theme"
+                                     "zh-Hans":  "主题曲",
+                                     "zh-Hant":  "主題曲"
                                  },
                        "titles":  {
                                       "en":  "Main Theme",
                                       "ja":  "メインテーマ",
-                                      "zh-Hans":  "Main Theme",
-                                      "zh-Hant":  "Main Theme"
+                                      "zh-Hans":  "主题曲",
+                                      "zh-Hant":  "主題曲"
                                   }
                    },
                    {
@@ -1961,14 +1961,14 @@
                        "names":  {
                                      "en":  "Main Theme",
                                      "ja":  "メインテーマ",
-                                     "zh-Hans":  "Main Theme",
-                                     "zh-Hant":  "Main Theme"
+                                     "zh-Hans":  "主题曲",
+                                     "zh-Hant":  "主題曲"
                                  },
                        "titles":  {
                                       "en":  "Main Theme",
                                       "ja":  "メインテーマ",
-                                      "zh-Hans":  "Main Theme",
-                                      "zh-Hant":  "Main Theme"
+                                      "zh-Hans":  "主题曲",
+                                      "zh-Hant":  "主題曲"
                                   }
                    },
                    {
@@ -1990,14 +1990,14 @@
                        "names":  {
                                      "en":  "DK Island Swing",
                                      "ja":  "JUNGLE LEVEL",
-                                     "zh-Hans":  "DK Island Swing",
-                                     "zh-Hant":  "DK Island Swing"
+                                     "zh-Hans":  "咚奇刚岛摇摆",
+                                     "zh-Hant":  "咚奇剛島搖擺"
                                  },
                        "titles":  {
                                       "en":  "DK Island Swing",
                                       "ja":  "JUNGLE LEVEL",
-                                      "zh-Hans":  "DK Island Swing",
-                                      "zh-Hant":  "DK Island Swing"
+                                      "zh-Hans":  "咚奇刚岛摇摆",
+                                      "zh-Hant":  "咚奇剛島搖擺"
                                   }
                    },
                    {
@@ -2019,14 +2019,14 @@
                        "names":  {
                                      "en":  "Opening Melody",
                                      "ja":  "ものがたりオルゴール",
-                                     "zh-Hans":  "Opening Melody",
-                                     "zh-Hant":  "Opening Melody"
+                                     "zh-Hans":  "开场八音盒",
+                                     "zh-Hant":  "開場音樂盒"
                                  },
                        "titles":  {
                                       "en":  "Opening Melody",
                                       "ja":  "ものがたりオルゴール",
-                                      "zh-Hans":  "Opening Melody",
-                                      "zh-Hant":  "Opening Melody"
+                                      "zh-Hans":  "开场八音盒",
+                                      "zh-Hant":  "開場音樂盒"
                                   }
                    },
                    {
@@ -2048,20 +2048,20 @@
                        "names":  {
                                      "en":  "Flower Field BGM (Ska)",
                                      "ja":  "おはなばたけ スカVer.",
-                                     "zh-Hans":  "Flower Field BGM (Ska Ver.)",
-                                     "zh-Hant":  "Flower Field BGM (Ska Ver.)"
+                                     "zh-Hans":  "花田BGM 斯卡Ver.",
+                                     "zh-Hant":  "花田BGM 斯卡Ver."
                                  },
                        "titles":  {
                                       "en":  "Flower Field BGM",
                                       "ja":  "おはなばたけ",
-                                      "zh-Hans":  "Flower Field BGM",
-                                      "zh-Hant":  "Flower Field BGM"
+                                      "zh-Hans":  "花田BGM",
+                                      "zh-Hant":  "花田BGM"
                                   },
                        "arrangements":  {
                                             "en":  "Ska",
                                             "ja":  "スカVer.",
-                                            "zh-Hans":  "Ska Ver.",
-                                            "zh-Hant":  "Ska Ver."
+                                            "zh-Hans":  "斯卡Ver.",
+                                            "zh-Hant":  "斯卡Ver."
                                         }
                    },
                    {
@@ -2083,20 +2083,20 @@
                        "names":  {
                                      "en":  "Flower Field BGM (Jazz)",
                                      "ja":  "おはなばたけ ジャズVer.",
-                                     "zh-Hans":  "Flower Field BGM (Jazz Ver.)",
-                                     "zh-Hant":  "Flower Field BGM (Jazz Ver.)"
+                                     "zh-Hans":  "花田BGM 爵士乐Ver.",
+                                     "zh-Hant":  "花田BGM 爵士樂Ver."
                                  },
                        "titles":  {
                                       "en":  "Flower Field BGM",
                                       "ja":  "おはなばたけ",
-                                      "zh-Hans":  "Flower Field BGM",
-                                      "zh-Hant":  "Flower Field BGM"
+                                      "zh-Hans":  "花田BGM",
+                                      "zh-Hant":  "花田BGM"
                                   },
                        "arrangements":  {
                                             "en":  "Jazz",
                                             "ja":  "ジャズVer.",
-                                            "zh-Hans":  "Jazz Ver.",
-                                            "zh-Hant":  "Jazz Ver."
+                                            "zh-Hans":  "爵士乐Ver.",
+                                            "zh-Hant":  "爵士樂Ver."
                                         }
                    },
                    {
@@ -2118,20 +2118,20 @@
                        "names":  {
                                      "en":  "Stage Boss (Jazz)",
                                      "ja":  "中ボス ジャズVer.",
-                                     "zh-Hans":  "Stage Boss (Jazz Ver.)",
-                                     "zh-Hant":  "Stage Boss (Jazz Ver.)"
+                                     "zh-Hans":  "关卡Boss 爵士乐Ver.",
+                                     "zh-Hant":  "關卡Boss 爵士樂Ver."
                                  },
                        "titles":  {
                                       "en":  "Stage Boss",
                                       "ja":  "中ボス",
-                                      "zh-Hans":  "Stage Boss",
-                                      "zh-Hant":  "Stage Boss"
+                                      "zh-Hans":  "关卡Boss",
+                                      "zh-Hant":  "關卡Boss"
                                   },
                        "arrangements":  {
                                             "en":  "Jazz",
                                             "ja":  "ジャズVer.",
-                                            "zh-Hans":  "Jazz Ver.",
-                                            "zh-Hant":  "Jazz Ver."
+                                            "zh-Hans":  "爵士乐Ver.",
+                                            "zh-Hant":  "爵士樂Ver."
                                         }
                    },
                    {
@@ -2153,20 +2153,20 @@
                        "names":  {
                                      "en":  "Stage Boss (Rock \u0027n\u0027 Roll)",
                                      "ja":  "中ボス ロックンロールVer.",
-                                     "zh-Hans":  "Stage Boss (Rock \u0027n\u0027 Roll Ver.)",
-                                     "zh-Hant":  "Stage Boss (Rock \u0027n\u0027 Roll Ver.)"
+                                     "zh-Hans":  "关卡Boss 摇滚乐Ver.",
+                                     "zh-Hant":  "關卡Boss 搖滾樂Ver."
                                  },
                        "titles":  {
                                       "en":  "Stage Boss",
                                       "ja":  "中ボス",
-                                      "zh-Hans":  "Stage Boss",
-                                      "zh-Hant":  "Stage Boss"
+                                      "zh-Hans":  "关卡Boss",
+                                      "zh-Hant":  "關卡Boss"
                                   },
                        "arrangements":  {
                                             "en":  "Rock \u0027n\u0027 Roll",
                                             "ja":  "ロックンロールVer.",
-                                            "zh-Hans":  "Rock \u0027n\u0027 Roll Ver.",
-                                            "zh-Hant":  "Rock \u0027n\u0027 Roll Ver."
+                                            "zh-Hans":  "摇滚乐Ver.",
+                                            "zh-Hant":  "搖滾樂Ver."
                                         }
                    },
                    {
@@ -2188,14 +2188,14 @@
                        "names":  {
                                      "en":  "Athletic BGM",
                                      "ja":  "アスレチック",
-                                     "zh-Hans":  "Athletic BGM",
-                                     "zh-Hant":  "Athletic BGM"
+                                     "zh-Hans":  "运动关卡BGM",
+                                     "zh-Hant":  "運動關卡BGM"
                                  },
                        "titles":  {
                                       "en":  "Athletic BGM",
                                       "ja":  "アスレチック",
-                                      "zh-Hans":  "Athletic BGM",
-                                      "zh-Hant":  "Athletic BGM"
+                                      "zh-Hans":  "运动关卡BGM",
+                                      "zh-Hant":  "運動關卡BGM"
                                   }
                    },
                    {
@@ -2217,14 +2217,14 @@
                        "names":  {
                                      "en":  "Bowser",
                                      "ja":  "クッパ",
-                                     "zh-Hans":  "Bowser",
-                                     "zh-Hant":  "Bowser"
+                                     "zh-Hans":  "酷霸",
+                                     "zh-Hant":  "庫巴"
                                  },
                        "titles":  {
                                       "en":  "Bowser",
                                       "ja":  "クッパ",
-                                      "zh-Hans":  "Bowser",
-                                      "zh-Hant":  "Bowser"
+                                      "zh-Hans":  "酷霸",
+                                      "zh-Hant":  "庫巴"
                                   }
                    },
                    {
@@ -2246,14 +2246,14 @@
                        "names":  {
                                      "en":  "File Select",
                                      "ja":  "ファイルセレクト",
-                                     "zh-Hans":  "File Select",
-                                     "zh-Hant":  "File Select"
+                                     "zh-Hans":  "选择存档",
+                                     "zh-Hant":  "選擇存檔"
                                  },
                        "titles":  {
                                       "en":  "File Select",
                                       "ja":  "ファイルセレクト",
-                                      "zh-Hans":  "File Select",
-                                      "zh-Hant":  "File Select"
+                                      "zh-Hans":  "选择存档",
+                                      "zh-Hant":  "選擇存檔"
                                   }
                    },
                    {
@@ -2275,20 +2275,20 @@
                        "names":  {
                                      "en":  "Title Theme (Big Band)",
                                      "ja":  "メインテーマ ビックバンドVer.",
-                                     "zh-Hans":  "Title Theme (Big Band Ver.)",
-                                     "zh-Hant":  "Title Theme (Big Band Ver.)"
+                                     "zh-Hans":  "主题曲 大乐队Ver.",
+                                     "zh-Hant":  "主題曲 大樂團Ver."
                                  },
                        "titles":  {
                                       "en":  "Title Theme",
                                       "ja":  "メインテーマ",
-                                      "zh-Hans":  "Title Theme",
-                                      "zh-Hant":  "Title Theme"
+                                      "zh-Hans":  "主题曲",
+                                      "zh-Hant":  "主題曲"
                                   },
                        "arrangements":  {
                                             "en":  "Big Band",
                                             "ja":  "ビックバンドVer.",
-                                            "zh-Hans":  "Big Band Ver.",
-                                            "zh-Hant":  "Big Band Ver."
+                                            "zh-Hans":  "大乐队Ver.",
+                                            "zh-Hant":  "大樂團Ver."
                                         }
                    },
                    {
@@ -2310,20 +2310,20 @@
                        "names":  {
                                      "en":  "Title Theme (Latin)",
                                      "ja":  "メインテーマ ラテンVer.",
-                                     "zh-Hans":  "Title Theme (Latin Ver.)",
-                                     "zh-Hant":  "Title Theme (Latin Ver.)"
+                                     "zh-Hans":  "主题曲 拉丁Ver.",
+                                     "zh-Hant":  "主題曲 拉丁Ver."
                                  },
                        "titles":  {
                                       "en":  "Title Theme",
                                       "ja":  "メインテーマ",
-                                      "zh-Hans":  "Title Theme",
-                                      "zh-Hant":  "Title Theme"
+                                      "zh-Hans":  "主题曲",
+                                      "zh-Hant":  "主題曲"
                                   },
                        "arrangements":  {
                                             "en":  "Latin",
                                             "ja":  "ラテンVer.",
-                                            "zh-Hans":  "Latin Ver.",
-                                            "zh-Hant":  "Latin Ver."
+                                            "zh-Hans":  "拉丁Ver.",
+                                            "zh-Hant":  "拉丁Ver."
                                         }
                    },
                    {
@@ -2345,14 +2345,14 @@
                        "names":  {
                                      "en":  "Slider",
                                      "ja":  "スライダー",
-                                     "zh-Hans":  "Slider",
-                                     "zh-Hant":  "Slider"
+                                     "zh-Hans":  "滑道",
+                                     "zh-Hant":  "滑道"
                                  },
                        "titles":  {
                                       "en":  "Slider",
                                       "ja":  "スライダー",
-                                      "zh-Hans":  "Slider",
-                                      "zh-Hant":  "Slider"
+                                      "zh-Hans":  "滑道",
+                                      "zh-Hant":  "滑道"
                                   }
                    },
                    {
@@ -2374,14 +2374,14 @@
                        "names":  {
                                      "en":  "Peach\u0027s Castle",
                                      "ja":  "ピーチのお城",
-                                     "zh-Hans":  "Peach\u0027s Castle",
-                                     "zh-Hant":  "Peach\u0027s Castle"
+                                     "zh-Hans":  "碧姬城堡",
+                                     "zh-Hant":  "碧姬城堡"
                                  },
                        "titles":  {
                                       "en":  "Peach\u0027s Castle",
                                       "ja":  "ピーチのお城",
-                                      "zh-Hans":  "Peach\u0027s Castle",
-                                      "zh-Hant":  "Peach\u0027s Castle"
+                                      "zh-Hans":  "碧姬城堡",
+                                      "zh-Hant":  "碧姬城堡"
                                   }
                    },
                    {
@@ -2403,14 +2403,14 @@
                        "names":  {
                                      "en":  "Dire, Dire Docks",
                                      "ja":  "ウォーターランド",
-                                     "zh-Hans":  "Dire, Dire Docks",
-                                     "zh-Hant":  "Dire, Dire Docks"
+                                     "zh-Hans":  "恐怖船坞",
+                                     "zh-Hant":  "深海基地"
                                  },
                        "titles":  {
                                       "en":  "Dire, Dire Docks",
                                       "ja":  "ウォーターランド",
-                                      "zh-Hans":  "Dire, Dire Docks",
-                                      "zh-Hant":  "Dire, Dire Docks"
+                                      "zh-Hans":  "恐怖船坞",
+                                      "zh-Hant":  "深海基地"
                                   }
                    },
                    {
@@ -2432,14 +2432,14 @@
                        "names":  {
                                      "en":  "Cool, Cool Mountain",
                                      "ja":  "さむいさむいマウンテン",
-                                     "zh-Hans":  "Cool, Cool Mountain",
-                                     "zh-Hant":  "Cool, Cool Mountain"
+                                     "zh-Hans":  "冰冰冷冷山",
+                                     "zh-Hant":  "冰冰冷冷山"
                                  },
                        "titles":  {
                                       "en":  "Cool, Cool Mountain",
                                       "ja":  "さむいさむいマウンテン",
-                                      "zh-Hans":  "Cool, Cool Mountain",
-                                      "zh-Hant":  "Cool, Cool Mountain"
+                                      "zh-Hans":  "冰冰冷冷山",
+                                      "zh-Hant":  "冰冰冷冷山"
                                   }
                    },
                    {
@@ -2461,14 +2461,14 @@
                        "names":  {
                                      "en":  "Piranha Plant\u0027s Lullaby",
                                      "ja":  "パックンフラワーの子守唄",
-                                     "zh-Hans":  "Piranha Plant\u0027s Lullaby",
-                                     "zh-Hant":  "Piranha Plant\u0027s Lullaby"
+                                     "zh-Hans":  "吞食花的摇篮曲",
+                                     "zh-Hant":  "吞食花的搖籃曲"
                                  },
                        "titles":  {
                                       "en":  "Piranha Plant\u0027s Lullaby",
                                       "ja":  "パックンフラワーの子守唄",
-                                      "zh-Hans":  "Piranha Plant\u0027s Lullaby",
-                                      "zh-Hant":  "Piranha Plant\u0027s Lullaby"
+                                      "zh-Hans":  "吞食花的摇篮曲",
+                                      "zh-Hant":  "吞食花的搖籃曲"
                                   }
                    },
                    {
@@ -2490,14 +2490,14 @@
                        "names":  {
                                      "en":  "Bowser\u0027s Road",
                                      "ja":  "クッパへの道",
-                                     "zh-Hans":  "Bowser\u0027s Road",
-                                     "zh-Hant":  "Bowser\u0027s Road"
+                                     "zh-Hans":  "通往酷霸之路",
+                                     "zh-Hant":  "通往庫巴之路"
                                  },
                        "titles":  {
                                       "en":  "Bowser\u0027s Road",
                                       "ja":  "クッパへの道",
-                                      "zh-Hans":  "Bowser\u0027s Road",
-                                      "zh-Hant":  "Bowser\u0027s Road"
+                                      "zh-Hans":  "通往酷霸之路",
+                                      "zh-Hant":  "通往庫巴之路"
                                   }
                    },
                    {
@@ -2519,14 +2519,14 @@
                        "names":  {
                                      "en":  "Bowser\u0027s Theme",
                                      "ja":  "クッパのテーマ",
-                                     "zh-Hans":  "Bowser\u0027s Theme",
-                                     "zh-Hant":  "Bowser\u0027s Theme"
+                                     "zh-Hans":  "酷霸主题曲",
+                                     "zh-Hant":  "庫巴主題曲"
                                  },
                        "titles":  {
                                       "en":  "Bowser\u0027s Theme",
                                       "ja":  "クッパのテーマ",
-                                      "zh-Hans":  "Bowser\u0027s Theme",
-                                      "zh-Hant":  "Bowser\u0027s Theme"
+                                      "zh-Hans":  "酷霸主题曲",
+                                      "zh-Hant":  "庫巴主題曲"
                                   }
                    },
                    {
@@ -2548,14 +2548,14 @@
                        "names":  {
                                      "en":  "Staff Roll",
                                      "ja":  "スタッフロール",
-                                     "zh-Hans":  "Staff Roll",
-                                     "zh-Hant":  "Staff Roll"
+                                     "zh-Hans":  "制作人员名单",
+                                     "zh-Hant":  "工作人員名單"
                                  },
                        "titles":  {
                                       "en":  "Staff Roll",
                                       "ja":  "スタッフロール",
-                                      "zh-Hans":  "Staff Roll",
-                                      "zh-Hant":  "Staff Roll"
+                                      "zh-Hans":  "制作人员名单",
+                                      "zh-Hant":  "工作人員名單"
                                   }
                    },
                    {
@@ -2949,20 +2949,20 @@
                        "names":  {
                                      "en":  "Yoshi\u0027s Song (Latin)",
                                      "ja":  "ヨッシーのうた ラテンVer.",
-                                     "zh-Hans":  "Yoshi\u0027s Song (Latin Ver.)",
-                                     "zh-Hant":  "Yoshi\u0027s Song (Latin Ver.)"
+                                     "zh-Hans":  "耀西之歌 拉丁Ver.",
+                                     "zh-Hant":  "耀西之歌 拉丁Ver."
                                  },
                        "titles":  {
                                       "en":  "Yoshi\u0027s Song",
                                       "ja":  "ヨッシーのうた",
-                                      "zh-Hans":  "Yoshi\u0027s Song",
-                                      "zh-Hant":  "Yoshi\u0027s Song"
+                                      "zh-Hans":  "耀西之歌",
+                                      "zh-Hant":  "耀西之歌"
                                   },
                        "arrangements":  {
                                             "en":  "Latin",
                                             "ja":  "ラテンVer.",
-                                            "zh-Hans":  "Latin Ver.",
-                                            "zh-Hant":  "Latin Ver."
+                                            "zh-Hans":  "拉丁Ver.",
+                                            "zh-Hant":  "拉丁Ver."
                                         }
                    },
                    {
@@ -2984,20 +2984,20 @@
                        "names":  {
                                      "en":  "Yoshi\u0027s Song (Bossa Nova)",
                                      "ja":  "ヨッシーのうた ボサノヴァVer.",
-                                     "zh-Hans":  "Yoshi\u0027s Song (Bossa Nova Ver.)",
-                                     "zh-Hant":  "Yoshi\u0027s Song (Bossa Nova Ver.)"
+                                     "zh-Hans":  "耀西之歌 巴萨诺瓦Ver.",
+                                     "zh-Hant":  "耀西之歌 巴薩諾瓦Ver."
                                  },
                        "titles":  {
                                       "en":  "Yoshi\u0027s Song",
                                       "ja":  "ヨッシーのうた",
-                                      "zh-Hans":  "Yoshi\u0027s Song",
-                                      "zh-Hant":  "Yoshi\u0027s Song"
+                                      "zh-Hans":  "耀西之歌",
+                                      "zh-Hant":  "耀西之歌"
                                   },
                        "arrangements":  {
                                             "en":  "Bossa Nova",
                                             "ja":  "ボサノヴァVer.",
-                                            "zh-Hans":  "Bossa Nova Ver.",
-                                            "zh-Hant":  "Bossa Nova Ver."
+                                            "zh-Hans":  "巴萨诺瓦Ver.",
+                                            "zh-Hant":  "巴薩諾瓦Ver."
                                         }
                    },
                    {
@@ -3019,14 +3019,14 @@
                        "names":  {
                                      "en":  "Yoshi\u0027s Tale",
                                      "ja":  "ヨッシーのおはなし",
-                                     "zh-Hans":  "Yoshi\u0027s Tale",
-                                     "zh-Hant":  "Yoshi\u0027s Tale"
+                                     "zh-Hans":  "耀西的故事",
+                                     "zh-Hant":  "耀西的故事"
                                  },
                        "titles":  {
                                       "en":  "Yoshi\u0027s Tale",
                                       "ja":  "ヨッシーのおはなし",
-                                      "zh-Hans":  "Yoshi\u0027s Tale",
-                                      "zh-Hant":  "Yoshi\u0027s Tale"
+                                      "zh-Hans":  "耀西的故事",
+                                      "zh-Hant":  "耀西的故事"
                                   }
                    },
                    {
@@ -3280,20 +3280,20 @@
                        "names":  {
                                      "en":  "Title Theme (Humming)",
                                      "ja":  "メインテーマ（鼻歌）",
-                                     "zh-Hans":  "Title Theme (Humming)",
-                                     "zh-Hant":  "Title Theme (Humming)"
+                                     "zh-Hans":  "主题曲 哼唱",
+                                     "zh-Hant":  "主題曲 哼唱"
                                  },
                        "titles":  {
                                       "en":  "Title Theme",
                                       "ja":  "メインテーマ",
-                                      "zh-Hans":  "Title Theme",
-                                      "zh-Hant":  "Title Theme"
+                                      "zh-Hans":  "主题曲",
+                                      "zh-Hant":  "主題曲"
                                   },
                        "arrangements":  {
                                             "en":  "Humming",
                                             "ja":  "鼻歌",
-                                            "zh-Hans":  "Humming",
-                                            "zh-Hant":  "Humming"
+                                            "zh-Hans":  "哼唱",
+                                            "zh-Hant":  "哼唱"
                                         }
                    },
                    {
@@ -3315,14 +3315,14 @@
                        "names":  {
                                      "en":  "Delfino Plaza",
                                      "ja":  "ドルピックタウン",
-                                     "zh-Hans":  "Delfino Plaza",
-                                     "zh-Hant":  "Delfino Plaza"
+                                     "zh-Hans":  "德尔皮克镇",
+                                     "zh-Hant":  "德爾皮克鎮"
                                  },
                        "titles":  {
                                       "en":  "Delfino Plaza",
                                       "ja":  "ドルピックタウン",
-                                      "zh-Hans":  "Delfino Plaza",
-                                      "zh-Hant":  "Delfino Plaza"
+                                      "zh-Hans":  "德尔皮克镇",
+                                      "zh-Hant":  "德爾皮克鎮"
                                   }
                    },
                    {
@@ -3344,14 +3344,14 @@
                        "names":  {
                                      "en":  "Bianco Hills",
                                      "ja":  "ビアンコヒルズ",
-                                     "zh-Hans":  "Bianco Hills",
-                                     "zh-Hant":  "Bianco Hills"
+                                     "zh-Hans":  "碧安科山",
+                                     "zh-Hant":  "碧安科山"
                                  },
                        "titles":  {
                                       "en":  "Bianco Hills",
                                       "ja":  "ビアンコヒルズ",
-                                      "zh-Hans":  "Bianco Hills",
-                                      "zh-Hant":  "Bianco Hills"
+                                      "zh-Hans":  "碧安科山",
+                                      "zh-Hant":  "碧安科山"
                                   }
                    },
                    {
@@ -3373,14 +3373,14 @@
                        "names":  {
                                      "en":  "Ricco Harbor",
                                      "ja":  "リコハーバー",
-                                     "zh-Hans":  "Ricco Harbor",
-                                     "zh-Hant":  "Ricco Harbor"
+                                     "zh-Hans":  "里科港",
+                                     "zh-Hant":  "里科港"
                                  },
                        "titles":  {
                                       "en":  "Ricco Harbor",
                                       "ja":  "リコハーバー",
-                                      "zh-Hans":  "Ricco Harbor",
-                                      "zh-Hant":  "Ricco Harbor"
+                                      "zh-Hans":  "里科港",
+                                      "zh-Hant":  "里科港"
                                   }
                    },
                    {
@@ -3402,14 +3402,14 @@
                        "names":  {
                                      "en":  "Secret Course - Sky and Sea",
                                      "ja":  "ヒミツコース 空と海",
-                                     "zh-Hans":  "Secret Course - Sky and Sea",
-                                     "zh-Hant":  "Secret Course - Sky and Sea"
+                                     "zh-Hans":  "秘密关卡 天空与海洋",
+                                     "zh-Hant":  "秘密關卡 天空與海洋"
                                  },
                        "titles":  {
                                       "en":  "Secret Course - Sky and Sea",
                                       "ja":  "ヒミツコース 空と海",
-                                      "zh-Hans":  "Secret Course - Sky and Sea",
-                                      "zh-Hant":  "Secret Course - Sky and Sea"
+                                      "zh-Hans":  "秘密关卡 天空与海洋",
+                                      "zh-Hant":  "秘密關卡 天空與海洋"
                                   }
                    },
                    {
@@ -3431,14 +3431,14 @@
                        "names":  {
                                      "en":  "Voices Being Carried on the Waves",
                                      "ja":  "声の漂う波間まで",
-                                     "zh-Hans":  "Voices Being Carried on the Waves",
-                                     "zh-Hant":  "Voices Being Carried on the Waves"
+                                     "zh-Hans":  "随波漂流的声音",
+                                     "zh-Hant":  "隨波漂流的聲音"
                                  },
                        "titles":  {
                                       "en":  "Voices Being Carried on the Waves",
                                       "ja":  "声の漂う波間まで",
-                                      "zh-Hans":  "Voices Being Carried on the Waves",
-                                      "zh-Hant":  "Voices Being Carried on the Waves"
+                                      "zh-Hans":  "随波漂流的声音",
+                                      "zh-Hant":  "隨波漂流的聲音"
                                   }
                    },
                    {
@@ -4052,14 +4052,14 @@
                        "names":  {
                                      "en":  "Ground BGM",
                                      "ja":  "地上BGM",
-                                     "zh-Hans":  "Ground BGM",
-                                     "zh-Hant":  "Ground BGM"
+                                     "zh-Hans":  "地上BGM",
+                                     "zh-Hant":  "地上BGM"
                                  },
                        "titles":  {
                                       "en":  "Ground BGM",
                                       "ja":  "地上BGM",
-                                      "zh-Hans":  "Ground BGM",
-                                      "zh-Hant":  "Ground BGM"
+                                      "zh-Hans":  "地上BGM",
+                                      "zh-Hant":  "地上BGM"
                                   }
                    },
                    {
@@ -4081,14 +4081,14 @@
                        "names":  {
                                      "en":  "Castle BGM",
                                      "ja":  "城BGM",
-                                     "zh-Hans":  "Castle BGM",
-                                     "zh-Hant":  "Castle BGM"
+                                     "zh-Hans":  "城堡BGM",
+                                     "zh-Hant":  "城堡BGM"
                                  },
                        "titles":  {
                                       "en":  "Castle BGM",
                                       "ja":  "城BGM",
-                                      "zh-Hans":  "Castle BGM",
-                                      "zh-Hant":  "Castle BGM"
+                                      "zh-Hans":  "城堡BGM",
+                                      "zh-Hant":  "城堡BGM"
                                   }
                    },
                    {
@@ -4110,14 +4110,14 @@
                        "names":  {
                                      "en":  "Egg Planet",
                                      "ja":  "エッグプラネット",
-                                     "zh-Hans":  "Egg Planet",
-                                     "zh-Hant":  "Egg Planet"
+                                     "zh-Hans":  "蛋蛋星",
+                                     "zh-Hant":  "蛋蛋星"
                                  },
                        "titles":  {
                                       "en":  "Egg Planet",
                                       "ja":  "エッグプラネット",
-                                      "zh-Hans":  "Egg Planet",
-                                      "zh-Hant":  "Egg Planet"
+                                      "zh-Hans":  "蛋蛋星",
+                                      "zh-Hant":  "蛋蛋星"
                                   }
                    },
                    {
@@ -4139,14 +4139,14 @@
                        "names":  {
                                      "en":  "Space Junk Road",
                                      "ja":  "スターダストロード",
-                                     "zh-Hans":  "Space Junk Road",
-                                     "zh-Hant":  "Space Junk Road"
+                                     "zh-Hans":  "星尘之路",
+                                     "zh-Hant":  "星塵之路"
                                  },
                        "titles":  {
                                       "en":  "Space Junk Road",
                                       "ja":  "スターダストロード",
-                                      "zh-Hans":  "Space Junk Road",
-                                      "zh-Hant":  "Space Junk Road"
+                                      "zh-Hans":  "星尘之路",
+                                      "zh-Hant":  "星塵之路"
                                   }
                    },
                    {
@@ -4168,14 +4168,14 @@
                        "names":  {
                                      "en":  "Enter Bowser Jr.!",
                                      "ja":  "クッパJr.登場",
-                                     "zh-Hans":  "Enter Bowser Jr.!",
-                                     "zh-Hant":  "Enter Bowser Jr.!"
+                                     "zh-Hans":  "酷霸Jr.登场",
+                                     "zh-Hant":  "庫巴Jr.登場"
                                  },
                        "titles":  {
                                       "en":  "Enter Bowser Jr.!",
                                       "ja":  "クッパJr.登場",
-                                      "zh-Hans":  "Enter Bowser Jr.!",
-                                      "zh-Hant":  "Enter Bowser Jr.!"
+                                      "zh-Hans":  "酷霸Jr.登场",
+                                      "zh-Hant":  "庫巴Jr.登場"
                                   }
                    },
                    {
@@ -4197,14 +4197,14 @@
                        "names":  {
                                      "en":  "Buoy Base Galaxy",
                                      "ja":  "フローターランド",
-                                     "zh-Hans":  "Buoy Base Galaxy",
-                                     "zh-Hant":  "Buoy Base Galaxy"
+                                     "zh-Hans":  "漂浮要塞银河",
+                                     "zh-Hant":  "漂浮要塞銀河"
                                  },
                        "titles":  {
                                       "en":  "Buoy Base Galaxy",
                                       "ja":  "フローターランド",
-                                      "zh-Hans":  "Buoy Base Galaxy",
-                                      "zh-Hant":  "Buoy Base Galaxy"
+                                      "zh-Hans":  "漂浮要塞银河",
+                                      "zh-Hant":  "漂浮要塞銀河"
                                   }
                    },
                    {
@@ -4226,14 +4226,14 @@
                        "names":  {
                                      "en":  "Gusty Garden Galaxy",
                                      "ja":  "ウィンドガーデン",
-                                     "zh-Hans":  "Gusty Garden Galaxy",
-                                     "zh-Hant":  "Gusty Garden Galaxy"
+                                     "zh-Hans":  "风之花园银河",
+                                     "zh-Hant":  "風之花園銀河"
                                  },
                        "titles":  {
                                       "en":  "Gusty Garden Galaxy",
                                       "ja":  "ウィンドガーデン",
-                                      "zh-Hans":  "Gusty Garden Galaxy",
-                                      "zh-Hant":  "Gusty Garden Galaxy"
+                                      "zh-Hans":  "风之花园银河",
+                                      "zh-Hant":  "風之花園銀河"
                                   }
                    },
                    {
@@ -4255,14 +4255,14 @@
                        "names":  {
                                      "en":  "Rosalina in the Observatory 3",
                                      "ja":  "天文台のロゼッタ3",
-                                     "zh-Hans":  "Rosalina in the Observatory 3",
-                                     "zh-Hant":  "Rosalina in the Observatory 3"
+                                     "zh-Hans":  "天文台的罗莎塔3",
+                                     "zh-Hant":  "天文台的羅潔塔3"
                                  },
                        "titles":  {
                                       "en":  "Rosalina in the Observatory 3",
                                       "ja":  "天文台のロゼッタ3",
-                                      "zh-Hans":  "Rosalina in the Observatory 3",
-                                      "zh-Hant":  "Rosalina in the Observatory 3"
+                                      "zh-Hans":  "天文台的罗莎塔3",
+                                      "zh-Hant":  "天文台的羅潔塔3"
                                   }
                    },
                    {
@@ -4284,14 +4284,14 @@
                        "names":  {
                                      "en":  "Final Battle with Bowser",
                                      "ja":  "大王星の決戦",
-                                     "zh-Hans":  "Final Battle with Bowser",
-                                     "zh-Hant":  "Final Battle with Bowser"
+                                     "zh-Hans":  "大王星决战",
+                                     "zh-Hant":  "大王星決戰"
                                  },
                        "titles":  {
                                       "en":  "Final Battle with Bowser",
                                       "ja":  "大王星の決戦",
-                                      "zh-Hans":  "Final Battle with Bowser",
-                                      "zh-Hant":  "Final Battle with Bowser"
+                                      "zh-Hans":  "大王星决战",
+                                      "zh-Hant":  "大王星決戰"
                                   }
                    },
                    {
@@ -4313,14 +4313,14 @@
                        "names":  {
                                      "en":  "Purple Comet",
                                      "ja":  "パープルコメット",
-                                     "zh-Hans":  "Purple Comet",
-                                     "zh-Hant":  "Purple Comet"
+                                     "zh-Hans":  "紫色彗星",
+                                     "zh-Hant":  "紫色彗星"
                                  },
                        "titles":  {
                                       "en":  "Purple Comet",
                                       "ja":  "パープルコメット",
-                                      "zh-Hans":  "Purple Comet",
-                                      "zh-Hant":  "Purple Comet"
+                                      "zh-Hans":  "紫色彗星",
+                                      "zh-Hant":  "紫色彗星"
                                   }
                    },
                    {
@@ -4731,14 +4731,14 @@
                        "names":  {
                                      "en":  "Mario Drawing Song",
                                      "ja":  "マリオ絵描き歌",
-                                     "zh-Hans":  "Mario Drawing Song",
-                                     "zh-Hant":  "Mario Drawing Song"
+                                     "zh-Hans":  "马力欧绘画歌",
+                                     "zh-Hant":  "瑪利歐繪畫歌"
                                  },
                        "titles":  {
                                       "en":  "Mario Drawing Song",
                                       "ja":  "マリオ絵描き歌",
-                                      "zh-Hans":  "Mario Drawing Song",
-                                      "zh-Hant":  "Mario Drawing Song"
+                                      "zh-Hans":  "马力欧绘画歌",
+                                      "zh-Hant":  "瑪利歐繪畫歌"
                                   }
                    },
                    {
@@ -4760,14 +4760,14 @@
                        "names":  {
                                      "en":  "Underwater BGM",
                                      "ja":  "水中BGM",
-                                     "zh-Hans":  "Underwater BGM",
-                                     "zh-Hant":  "Underwater BGM"
+                                     "zh-Hans":  "水中BGM",
+                                     "zh-Hant":  "水中BGM"
                                  },
                        "titles":  {
                                       "en":  "Underwater BGM",
                                       "ja":  "水中BGM",
-                                      "zh-Hans":  "Underwater BGM",
-                                      "zh-Hant":  "Underwater BGM"
+                                      "zh-Hans":  "水中BGM",
+                                      "zh-Hant":  "水中BGM"
                                   }
                    },
                    {
@@ -4789,14 +4789,14 @@
                        "names":  {
                                      "en":  "Castle BGM",
                                      "ja":  "城BGM",
-                                     "zh-Hans":  "Castle BGM",
-                                     "zh-Hant":  "Castle BGM"
+                                     "zh-Hans":  "城堡BGM",
+                                     "zh-Hant":  "城堡BGM"
                                  },
                        "titles":  {
                                       "en":  "Castle BGM",
                                       "ja":  "城BGM",
-                                      "zh-Hans":  "Castle BGM",
-                                      "zh-Hant":  "Castle BGM"
+                                      "zh-Hans":  "城堡BGM",
+                                      "zh-Hant":  "城堡BGM"
                                   }
                    },
                    {
@@ -4818,14 +4818,14 @@
                        "names":  {
                                      "en":  "Castle Boss",
                                      "ja":  "城ボス戦",
-                                     "zh-Hans":  "Castle Boss",
-                                     "zh-Hant":  "Castle Boss"
+                                     "zh-Hans":  "城堡Boss战",
+                                     "zh-Hant":  "城堡Boss戰"
                                  },
                        "titles":  {
                                       "en":  "Castle Boss",
                                       "ja":  "城ボス戦",
-                                      "zh-Hans":  "Castle Boss",
-                                      "zh-Hant":  "Castle Boss"
+                                      "zh-Hans":  "城堡Boss战",
+                                      "zh-Hant":  "城堡Boss戰"
                                   }
                    },
                    {
@@ -4847,14 +4847,14 @@
                        "names":  {
                                      "en":  "Desert BGM",
                                      "ja":  "砂漠BGM",
-                                     "zh-Hans":  "Desert BGM",
-                                     "zh-Hant":  "Desert BGM"
+                                     "zh-Hans":  "沙漠BGM",
+                                     "zh-Hant":  "沙漠BGM"
                                  },
                        "titles":  {
                                       "en":  "Desert BGM",
                                       "ja":  "砂漠BGM",
-                                      "zh-Hans":  "Desert BGM",
-                                      "zh-Hant":  "Desert BGM"
+                                      "zh-Hans":  "沙漠BGM",
+                                      "zh-Hant":  "沙漠BGM"
                                   }
                    },
                    {
@@ -4876,14 +4876,14 @@
                        "names":  {
                                      "en":  "Beach Theme",
                                      "ja":  "海岸BGM",
-                                     "zh-Hans":  "Beach Theme",
-                                     "zh-Hant":  "Beach Theme"
+                                     "zh-Hans":  "海岸BGM",
+                                     "zh-Hant":  "海岸BGM"
                                  },
                        "titles":  {
                                       "en":  "Beach Theme",
                                       "ja":  "海岸BGM",
-                                      "zh-Hans":  "Beach Theme",
-                                      "zh-Hant":  "Beach Theme"
+                                      "zh-Hans":  "海岸BGM",
+                                      "zh-Hant":  "海岸BGM"
                                   }
                    },
                    {
@@ -4905,14 +4905,14 @@
                        "names":  {
                                      "en":  "Volcano BGM",
                                      "ja":  "火山BGM",
-                                     "zh-Hans":  "Volcano BGM",
-                                     "zh-Hant":  "Volcano BGM"
+                                     "zh-Hans":  "火山BGM",
+                                     "zh-Hant":  "火山BGM"
                                  },
                        "titles":  {
                                       "en":  "Volcano BGM",
                                       "ja":  "火山BGM",
-                                      "zh-Hans":  "Volcano BGM",
-                                      "zh-Hant":  "Volcano BGM"
+                                      "zh-Hans":  "火山BGM",
+                                      "zh-Hant":  "火山BGM"
                                   }
                    },
                    {
@@ -4934,14 +4934,14 @@
                        "names":  {
                                      "en":  "Credits Theme 1",
                                      "ja":  "スタッフクレジット",
-                                     "zh-Hans":  "Credits Theme 1",
-                                     "zh-Hant":  "Credits Theme 1"
+                                     "zh-Hans":  "制作人员名单1",
+                                     "zh-Hant":  "工作人員名單1"
                                  },
                        "titles":  {
                                       "en":  "Credits Theme 1",
                                       "ja":  "スタッフクレジット",
-                                      "zh-Hans":  "Credits Theme 1",
-                                      "zh-Hant":  "Credits Theme 1"
+                                      "zh-Hans":  "制作人员名单1",
+                                      "zh-Hant":  "工作人員名單1"
                                   }
                    },
                    {
@@ -4963,14 +4963,14 @@
                        "names":  {
                                      "en":  "Sky Station Galaxy",
                                      "ja":  "空島",
-                                     "zh-Hans":  "Sky Station Galaxy",
-                                     "zh-Hant":  "Sky Station Galaxy"
+                                     "zh-Hans":  "空岛银河",
+                                     "zh-Hant":  "空島銀河"
                                  },
                        "titles":  {
                                       "en":  "Sky Station Galaxy",
                                       "ja":  "空島",
-                                      "zh-Hans":  "Sky Station Galaxy",
-                                      "zh-Hant":  "Sky Station Galaxy"
+                                      "zh-Hans":  "空岛银河",
+                                      "zh-Hant":  "空島銀河"
                                   }
                    },
                    {
@@ -4992,14 +4992,14 @@
                        "names":  {
                                      "en":  "Yoshi Star Galaxy",
                                      "ja":  "ヨースター",
-                                     "zh-Hans":  "Yoshi Star Galaxy",
-                                     "zh-Hant":  "Yoshi Star Galaxy"
+                                     "zh-Hans":  "耀星银河",
+                                     "zh-Hant":  "耀星銀河"
                                  },
                        "titles":  {
                                       "en":  "Yoshi Star Galaxy",
                                       "ja":  "ヨースター",
-                                      "zh-Hans":  "Yoshi Star Galaxy",
-                                      "zh-Hant":  "Yoshi Star Galaxy"
+                                      "zh-Hans":  "耀星银河",
+                                      "zh-Hant":  "耀星銀河"
                                   }
                    },
                    {
@@ -5021,14 +5021,14 @@
                        "names":  {
                                      "en":  "Starship Mario 1",
                                      "ja":  "星船マリオ1",
-                                     "zh-Hans":  "Starship Mario 1",
-                                     "zh-Hant":  "Starship Mario 1"
+                                     "zh-Hans":  "星船马力欧号1",
+                                     "zh-Hant":  "星船瑪利歐號1"
                                  },
                        "titles":  {
                                       "en":  "Starship Mario 1",
                                       "ja":  "星船マリオ1",
-                                      "zh-Hans":  "Starship Mario 1",
-                                      "zh-Hant":  "Starship Mario 1"
+                                      "zh-Hans":  "星船马力欧号1",
+                                      "zh-Hant":  "星船瑪利歐號1"
                                   }
                    },
                    {
@@ -5050,14 +5050,14 @@
                        "names":  {
                                      "en":  "The Starship\u0027s Journey",
                                      "ja":  "星船はゆけ",
-                                     "zh-Hans":  "The Starship\u0027s Journey",
-                                     "zh-Hant":  "The Starship\u0027s Journey"
+                                     "zh-Hans":  "星船启航",
+                                     "zh-Hant":  "星船啟航"
                                  },
                        "titles":  {
                                       "en":  "The Starship\u0027s Journey",
                                       "ja":  "星船はゆけ",
-                                      "zh-Hans":  "The Starship\u0027s Journey",
-                                      "zh-Hant":  "The Starship\u0027s Journey"
+                                      "zh-Hans":  "星船启航",
+                                      "zh-Hant":  "星船啟航"
                                   }
                    },
                    {
@@ -5079,14 +5079,14 @@
                        "names":  {
                                      "en":  "Digga-Leg",
                                      "ja":  "ホリホリレッグ",
-                                     "zh-Hans":  "Digga-Leg",
-                                     "zh-Hant":  "Digga-Leg"
+                                     "zh-Hans":  "掘地机器腿",
+                                     "zh-Hant":  "掘地機器腿"
                                  },
                        "titles":  {
                                       "en":  "Digga-Leg",
                                       "ja":  "ホリホリレッグ",
-                                      "zh-Hans":  "Digga-Leg",
-                                      "zh-Hant":  "Digga-Leg"
+                                      "zh-Hans":  "掘地机器腿",
+                                      "zh-Hant":  "掘地機器腿"
                                   }
                    },
                    {
@@ -5108,14 +5108,14 @@
                        "names":  {
                                      "en":  "Puzzle Plank Galaxy",
                                      "ja":  "かくざいもくざい",
-                                     "zh-Hans":  "Puzzle Plank Galaxy",
-                                     "zh-Hant":  "Puzzle Plank Galaxy"
+                                     "zh-Hans":  "角材木材银河",
+                                     "zh-Hant":  "角材木材銀河"
                                  },
                        "titles":  {
                                       "en":  "Puzzle Plank Galaxy",
                                       "ja":  "かくざいもくざい",
-                                      "zh-Hans":  "Puzzle Plank Galaxy",
-                                      "zh-Hant":  "Puzzle Plank Galaxy"
+                                      "zh-Hans":  "角材木材银河",
+                                      "zh-Hant":  "角材木材銀河"
                                   }
                    },
                    {
@@ -5137,14 +5137,14 @@
                        "names":  {
                                      "en":  "Wild Glide Galaxy",
                                      "ja":  "ジャングルグライダー",
-                                     "zh-Hans":  "Wild Glide Galaxy",
-                                     "zh-Hant":  "Wild Glide Galaxy"
+                                     "zh-Hans":  "丛林滑翔机银河",
+                                     "zh-Hant":  "叢林滑翔機銀河"
                                  },
                        "titles":  {
                                       "en":  "Wild Glide Galaxy",
                                       "ja":  "ジャングルグライダー",
-                                      "zh-Hans":  "Wild Glide Galaxy",
-                                      "zh-Hant":  "Wild Glide Galaxy"
+                                      "zh-Hans":  "丛林滑翔机银河",
+                                      "zh-Hant":  "叢林滑翔機銀河"
                                   }
                    },
                    {
@@ -5166,14 +5166,14 @@
                        "names":  {
                                      "en":  "Cloudy Court Galaxy",
                                      "ja":  "クラウドガーデン",
-                                     "zh-Hans":  "Cloudy Court Galaxy",
-                                     "zh-Hant":  "Cloudy Court Galaxy"
+                                     "zh-Hans":  "云间花园银河",
+                                     "zh-Hant":  "雲間花園銀河"
                                  },
                        "titles":  {
                                       "en":  "Cloudy Court Galaxy",
                                       "ja":  "クラウドガーデン",
-                                      "zh-Hans":  "Cloudy Court Galaxy",
-                                      "zh-Hant":  "Cloudy Court Galaxy"
+                                      "zh-Hans":  "云间花园银河",
+                                      "zh-Hant":  "雲間花園銀河"
                                   }
                    },
                    {
@@ -5195,14 +5195,14 @@
                        "names":  {
                                      "en":  "Melty Monster Galaxy",
                                      "ja":  "マグマモンスター",
-                                     "zh-Hans":  "Melty Monster Galaxy",
-                                     "zh-Hant":  "Melty Monster Galaxy"
+                                     "zh-Hans":  "岩浆魔怪银河",
+                                     "zh-Hant":  "岩漿魔怪銀河"
                                  },
                        "titles":  {
                                       "en":  "Melty Monster Galaxy",
                                       "ja":  "マグマモンスター",
-                                      "zh-Hans":  "Melty Monster Galaxy",
-                                      "zh-Hant":  "Melty Monster Galaxy"
+                                      "zh-Hans":  "岩浆魔怪银河",
+                                      "zh-Hant":  "岩漿魔怪銀河"
                                   }
                    },
                    {
@@ -5224,14 +5224,14 @@
                        "names":  {
                                      "en":  "Bowser\u0027s Galaxy Generator",
                                      "ja":  "新銀河帝国",
-                                     "zh-Hans":  "Bowser\u0027s Galaxy Generator",
-                                     "zh-Hant":  "Bowser\u0027s Galaxy Generator"
+                                     "zh-Hans":  "酷霸的新银河帝国",
+                                     "zh-Hant":  "庫巴的新銀河帝國"
                                  },
                        "titles":  {
                                       "en":  "Bowser\u0027s Galaxy Generator",
                                       "ja":  "新銀河帝国",
-                                      "zh-Hans":  "Bowser\u0027s Galaxy Generator",
-                                      "zh-Hant":  "Bowser\u0027s Galaxy Generator"
+                                      "zh-Hans":  "酷霸的新银河帝国",
+                                      "zh-Hant":  "庫巴的新銀河帝國"
                                   }
                    },
                    {
@@ -5253,14 +5253,14 @@
                        "names":  {
                                      "en":  "Ground Theme",
                                      "ja":  "地上のテーマ",
-                                     "zh-Hans":  "Ground Theme",
-                                     "zh-Hant":  "Ground Theme"
+                                     "zh-Hans":  "地上主题",
+                                     "zh-Hant":  "地上主題"
                                  },
                        "titles":  {
                                       "en":  "Ground Theme",
                                       "ja":  "地上のテーマ",
-                                      "zh-Hans":  "Ground Theme",
-                                      "zh-Hant":  "Ground Theme"
+                                      "zh-Hans":  "地上主题",
+                                      "zh-Hant":  "地上主題"
                                   }
                    },
                    {
@@ -5282,20 +5282,20 @@
                        "names":  {
                                      "en":  "Beach Theme (Jazz)",
                                      "ja":  "海のテーマ ジャズVer.",
-                                     "zh-Hans":  "Beach Theme (Jazz Ver.)",
-                                     "zh-Hant":  "Beach Theme (Jazz Ver.)"
+                                     "zh-Hans":  "海洋主题 爵士乐Ver.",
+                                     "zh-Hant":  "海洋主題 爵士樂Ver."
                                  },
                        "titles":  {
                                       "en":  "Beach Theme",
                                       "ja":  "海のテーマ",
-                                      "zh-Hans":  "Beach Theme",
-                                      "zh-Hant":  "Beach Theme"
+                                      "zh-Hans":  "海洋主题",
+                                      "zh-Hant":  "海洋主題"
                                   },
                        "arrangements":  {
                                             "en":  "Jazz",
                                             "ja":  "ジャズVer.",
-                                            "zh-Hans":  "Jazz Ver.",
-                                            "zh-Hant":  "Jazz Ver."
+                                            "zh-Hans":  "爵士乐Ver.",
+                                            "zh-Hant":  "爵士樂Ver."
                                         }
                    },
                    {
@@ -5317,20 +5317,20 @@
                        "names":  {
                                      "en":  "Beach Theme (Bossa Nova)",
                                      "ja":  "海のテーマ ボサノヴァVer.",
-                                     "zh-Hans":  "Beach Theme (Bossa Nova Ver.)",
-                                     "zh-Hant":  "Beach Theme (Bossa Nova Ver.)"
+                                     "zh-Hans":  "海洋主题 巴萨诺瓦Ver.",
+                                     "zh-Hant":  "海洋主題 巴薩諾瓦Ver."
                                  },
                        "titles":  {
                                       "en":  "Beach Theme",
                                       "ja":  "海のテーマ",
-                                      "zh-Hans":  "Beach Theme",
-                                      "zh-Hant":  "Beach Theme"
+                                      "zh-Hans":  "海洋主题",
+                                      "zh-Hant":  "海洋主題"
                                   },
                        "arrangements":  {
                                             "en":  "Bossa Nova",
                                             "ja":  "ボサノヴァVer.",
-                                            "zh-Hans":  "Bossa Nova Ver.",
-                                            "zh-Hant":  "Bossa Nova Ver."
+                                            "zh-Hans":  "巴萨诺瓦Ver.",
+                                            "zh-Hant":  "巴薩諾瓦Ver."
                                         }
                    },
                    {
@@ -5352,14 +5352,14 @@
                        "names":  {
                                      "en":  "Snow Mountain Theme",
                                      "ja":  "雪山のテーマ",
-                                     "zh-Hans":  "Snow Mountain Theme",
-                                     "zh-Hant":  "Snow Mountain Theme"
+                                     "zh-Hans":  "雪山主题",
+                                     "zh-Hant":  "雪山主題"
                                  },
                        "titles":  {
                                       "en":  "Snow Mountain Theme",
                                       "ja":  "雪山のテーマ",
-                                      "zh-Hans":  "Snow Mountain Theme",
-                                      "zh-Hant":  "Snow Mountain Theme"
+                                      "zh-Hans":  "雪山主题",
+                                      "zh-Hant":  "雪山主題"
                                   }
                    },
                    {
@@ -5642,14 +5642,14 @@
                        "names":  {
                                      "en":  "Ground Theme",
                                      "ja":  "地上のテーマ",
-                                     "zh-Hans":  "Ground Theme",
-                                     "zh-Hant":  "Ground Theme"
+                                     "zh-Hans":  "地上主题",
+                                     "zh-Hant":  "地上主題"
                                  },
                        "titles":  {
                                       "en":  "Ground Theme",
                                       "ja":  "地上のテーマ",
-                                      "zh-Hans":  "Ground Theme",
-                                      "zh-Hant":  "Ground Theme"
+                                      "zh-Hans":  "地上主题",
+                                      "zh-Hant":  "地上主題"
                                   }
                    },
                    {
@@ -5671,14 +5671,14 @@
                        "names":  {
                                      "en":  "Super Bell Hill",
                                      "ja":  "スーパーベルの丘",
-                                     "zh-Hans":  "Super Bell Hill",
-                                     "zh-Hant":  "Super Bell Hill"
+                                     "zh-Hans":  "超级铃铛山丘",
+                                     "zh-Hant":  "超級鈴鐺山丘"
                                  },
                        "titles":  {
                                       "en":  "Super Bell Hill",
                                       "ja":  "スーパーベルの丘",
-                                      "zh-Hans":  "Super Bell Hill",
-                                      "zh-Hant":  "Super Bell Hill"
+                                      "zh-Hans":  "超级铃铛山丘",
+                                      "zh-Hant":  "超級鈴鐺山丘"
                                   }
                    },
                    {
@@ -5700,14 +5700,14 @@
                        "names":  {
                                      "en":  "Shifty Boo Mansion",
                                      "ja":  "オバケ屋敷のうごく床",
-                                     "zh-Hans":  "Shifty Boo Mansion",
-                                     "zh-Hant":  "Shifty Boo Mansion"
+                                     "zh-Hans":  "鬼屋的移动地板",
+                                     "zh-Hant":  "鬼屋的移動地板"
                                  },
                        "titles":  {
                                       "en":  "Shifty Boo Mansion",
                                       "ja":  "オバケ屋敷のうごく床",
-                                      "zh-Hans":  "Shifty Boo Mansion",
-                                      "zh-Hant":  "Shifty Boo Mansion"
+                                      "zh-Hans":  "鬼屋的移动地板",
+                                      "zh-Hant":  "鬼屋的移動地板"
                                   }
                    },
                    {
@@ -5729,14 +5729,14 @@
                        "names":  {
                                      "en":  "Captain Toad Goes Forth",
                                      "ja":  "キノピオ隊長のさいしょの冒険",
-                                     "zh-Hans":  "Captain Toad Goes Forth",
-                                     "zh-Hant":  "Captain Toad Goes Forth"
+                                     "zh-Hans":  "奇诺比奥队长的最初冒险",
+                                     "zh-Hant":  "奇諾比奧隊長的最初冒險"
                                  },
                        "titles":  {
                                       "en":  "Captain Toad Goes Forth",
                                       "ja":  "キノピオ隊長のさいしょの冒険",
-                                      "zh-Hans":  "Captain Toad Goes Forth",
-                                      "zh-Hant":  "Captain Toad Goes Forth"
+                                      "zh-Hans":  "奇诺比奥队长的最初冒险",
+                                      "zh-Hant":  "奇諾比奧隊長的最初冒險"
                                   }
                    },
                    {
@@ -5758,20 +5758,20 @@
                        "names":  {
                                      "en":  "Athletic Theme (Jazz)",
                                      "ja":  "アスレチック ジャズVer.",
-                                     "zh-Hans":  "Athletic Theme (Jazz Ver.)",
-                                     "zh-Hant":  "Athletic Theme (Jazz Ver.)"
+                                     "zh-Hans":  "运动主题 爵士乐Ver.",
+                                     "zh-Hant":  "運動主題 爵士樂Ver."
                                  },
                        "titles":  {
                                       "en":  "Athletic Theme",
                                       "ja":  "アスレチック",
-                                      "zh-Hans":  "Athletic Theme",
-                                      "zh-Hant":  "Athletic Theme"
+                                      "zh-Hans":  "运动主题",
+                                      "zh-Hant":  "運動主題"
                                   },
                        "arrangements":  {
                                             "en":  "Jazz",
                                             "ja":  "ジャズVer.",
-                                            "zh-Hans":  "Jazz Ver.",
-                                            "zh-Hant":  "Jazz Ver."
+                                            "zh-Hans":  "爵士乐Ver.",
+                                            "zh-Hant":  "爵士樂Ver."
                                         }
                    },
                    {
@@ -5793,20 +5793,20 @@
                        "names":  {
                                      "en":  "Athletic Theme (Soul)",
                                      "ja":  "アスレチック ソウルVer.",
-                                     "zh-Hans":  "Athletic Theme (Soul Ver.)",
-                                     "zh-Hant":  "Athletic Theme (Soul Ver.)"
+                                     "zh-Hans":  "运动主题 灵魂乐Ver.",
+                                     "zh-Hant":  "運動主題 靈魂樂Ver."
                                  },
                        "titles":  {
                                       "en":  "Athletic Theme",
                                       "ja":  "アスレチック",
-                                      "zh-Hans":  "Athletic Theme",
-                                      "zh-Hant":  "Athletic Theme"
+                                      "zh-Hans":  "运动主题",
+                                      "zh-Hant":  "運動主題"
                                   },
                        "arrangements":  {
                                             "en":  "Soul",
                                             "ja":  "ソウルVer.",
-                                            "zh-Hans":  "Soul Ver.",
-                                            "zh-Hant":  "Soul Ver."
+                                            "zh-Hans":  "灵魂乐Ver.",
+                                            "zh-Hant":  "靈魂樂Ver."
                                         }
                    },
                    {
@@ -5828,14 +5828,14 @@
                        "names":  {
                                      "en":  "Hisstocrat",
                                      "ja":  "ヘビースネーク",
-                                     "zh-Hans":  "Hisstocrat",
-                                     "zh-Hant":  "Hisstocrat"
+                                     "zh-Hans":  "沉重蛇",
+                                     "zh-Hant":  "沉重蛇"
                                  },
                        "titles":  {
                                       "en":  "Hisstocrat",
                                       "ja":  "ヘビースネーク",
-                                      "zh-Hans":  "Hisstocrat",
-                                      "zh-Hant":  "Hisstocrat"
+                                      "zh-Hans":  "沉重蛇",
+                                      "zh-Hant":  "沉重蛇"
                                   }
                    },
                    {
@@ -5857,14 +5857,14 @@
                        "names":  {
                                      "en":  "Sprawling Savanna",
                                      "ja":  "ワイルドサバンナ",
-                                     "zh-Hans":  "Sprawling Savanna",
-                                     "zh-Hant":  "Sprawling Savanna"
+                                     "zh-Hans":  "奔跑吧！荒野大草原",
+                                     "zh-Hant":  "奔跑吧！荒野大草原"
                                  },
                        "titles":  {
                                       "en":  "Sprawling Savanna",
                                       "ja":  "ワイルドサバンナ",
-                                      "zh-Hans":  "Sprawling Savanna",
-                                      "zh-Hant":  "Sprawling Savanna"
+                                      "zh-Hans":  "奔跑吧！荒野大草原",
+                                      "zh-Hant":  "奔跑吧！荒野大草原"
                                   }
                    },
                    {
@@ -5886,14 +5886,14 @@
                        "names":  {
                                      "en":  "Bowser\u0027s Highway Showdown",
                                      "ja":  "ハイウェイ・バトル",
-                                     "zh-Hans":  "Bowser\u0027s Highway Showdown",
-                                     "zh-Hant":  "Bowser\u0027s Highway Showdown"
+                                     "zh-Hans":  "酷霸的高速公路对决",
+                                     "zh-Hant":  "庫巴的高速公路對決"
                                  },
                        "titles":  {
                                       "en":  "Bowser\u0027s Highway Showdown",
                                       "ja":  "ハイウェイ・バトル",
-                                      "zh-Hans":  "Bowser\u0027s Highway Showdown",
-                                      "zh-Hant":  "Bowser\u0027s Highway Showdown"
+                                      "zh-Hans":  "酷霸的高速公路对决",
+                                      "zh-Hant":  "庫巴的高速公路對決"
                                   }
                    },
                    {
@@ -5915,14 +5915,14 @@
                        "names":  {
                                      "en":  "Double Cherry Pass",
                                      "ja":  "ダブルチェリー峠",
-                                     "zh-Hans":  "Double Cherry Pass",
-                                     "zh-Hant":  "Double Cherry Pass"
+                                     "zh-Hans":  "双樱桃山道",
+                                     "zh-Hant":  "雙櫻桃山道"
                                  },
                        "titles":  {
                                       "en":  "Double Cherry Pass",
                                       "ja":  "ダブルチェリー峠",
-                                      "zh-Hans":  "Double Cherry Pass",
-                                      "zh-Hant":  "Double Cherry Pass"
+                                      "zh-Hans":  "双樱桃山道",
+                                      "zh-Hant":  "雙櫻桃山道"
                                   }
                    },
                    {
@@ -5944,14 +5944,14 @@
                        "names":  {
                                      "en":  "Hands-On Hall",
                                      "ja":  "謎のからくり城",
-                                     "zh-Hans":  "Hands-On Hall",
-                                     "zh-Hant":  "Hands-On Hall"
+                                     "zh-Hans":  "谜样的机关城堡",
+                                     "zh-Hant":  "謎樣的機關城堡"
                                  },
                        "titles":  {
                                       "en":  "Hands-On Hall",
                                       "ja":  "謎のからくり城",
-                                      "zh-Hans":  "Hands-On Hall",
-                                      "zh-Hant":  "Hands-On Hall"
+                                      "zh-Hans":  "谜样的机关城堡",
+                                      "zh-Hant":  "謎樣的機關城堡"
                                   }
                    },
                    {
@@ -5973,14 +5973,14 @@
                        "names":  {
                                      "en":  "Piranha Creeper Creek",
                                      "ja":  "のびのびパックンの沼",
-                                     "zh-Hans":  "Piranha Creeper Creek",
-                                     "zh-Hant":  "Piranha Creeper Creek"
+                                     "zh-Hans":  "长长吞食花沼泽",
+                                     "zh-Hant":  "長長吞食花沼澤"
                                  },
                        "titles":  {
                                       "en":  "Piranha Creeper Creek",
                                       "ja":  "のびのびパックンの沼",
-                                      "zh-Hans":  "Piranha Creeper Creek",
-                                      "zh-Hant":  "Piranha Creeper Creek"
+                                      "zh-Hans":  "长长吞食花沼泽",
+                                      "zh-Hant":  "長長吞食花沼澤"
                                   }
                    },
                    {
@@ -6002,14 +6002,14 @@
                        "names":  {
                                      "en":  "World 8",
                                      "ja":  "WORLD8",
-                                     "zh-Hans":  "World 8",
-                                     "zh-Hant":  "World 8"
+                                     "zh-Hans":  "世界8",
+                                     "zh-Hant":  "世界8"
                                  },
                        "titles":  {
                                       "en":  "World 8",
                                       "ja":  "WORLD8",
-                                      "zh-Hans":  "World 8",
-                                      "zh-Hant":  "World 8"
+                                      "zh-Hans":  "世界8",
+                                      "zh-Hant":  "世界8"
                                   }
                    },
                    {
@@ -6845,14 +6845,14 @@
                        "names":  {
                                      "en":  "Title Screen",
                                      "ja":  "タイトル",
-                                     "zh-Hans":  "Title Screen",
-                                     "zh-Hant":  "Title Screen"
+                                     "zh-Hans":  "标题",
+                                     "zh-Hant":  "標題"
                                  },
                        "titles":  {
                                       "en":  "Title Screen",
                                       "ja":  "タイトル",
-                                      "zh-Hans":  "Title Screen",
-                                      "zh-Hant":  "Title Screen"
+                                      "zh-Hans":  "标题",
+                                      "zh-Hant":  "標題"
                                   }
                    },
                    {
@@ -6932,20 +6932,20 @@
                        "names":  {
                                      "en":  "Steam Gardens (Rock)",
                                      "ja":  "スチームガーデン ロックVer.",
-                                     "zh-Hans":  "Steam Gardens (Rock Ver.)",
-                                     "zh-Hant":  "Steam Gardens (Rock Ver.)"
+                                     "zh-Hans":  "思机姆伽庭 摇滚Ver.",
+                                     "zh-Hant":  "斯機姆花園 搖滾Ver."
                                  },
                        "titles":  {
                                       "en":  "Steam Gardens",
                                       "ja":  "スチームガーデン",
-                                      "zh-Hans":  "Steam Gardens",
-                                      "zh-Hant":  "Steam Gardens"
+                                      "zh-Hans":  "思机姆伽庭",
+                                      "zh-Hant":  "斯機姆花園"
                                   },
                        "arrangements":  {
                                             "en":  "Rock",
                                             "ja":  "ロックVer.",
-                                            "zh-Hans":  "Rock Ver.",
-                                            "zh-Hant":  "Rock Ver."
+                                            "zh-Hans":  "摇滚Ver.",
+                                            "zh-Hant":  "搖滾Ver."
                                         }
                    },
                    {
@@ -6967,20 +6967,20 @@
                        "names":  {
                                      "en":  "Steam Gardens (Soul)",
                                      "ja":  "スチームガーデン ソウルVer.",
-                                     "zh-Hans":  "Steam Gardens (Soul Ver.)",
-                                     "zh-Hant":  "Steam Gardens (Soul Ver.)"
+                                     "zh-Hans":  "思机姆伽庭 灵魂乐Ver.",
+                                     "zh-Hant":  "斯機姆花園 靈魂樂Ver."
                                  },
                        "titles":  {
                                       "en":  "Steam Gardens",
                                       "ja":  "スチームガーデン",
-                                      "zh-Hans":  "Steam Gardens",
-                                      "zh-Hant":  "Steam Gardens"
+                                      "zh-Hans":  "思机姆伽庭",
+                                      "zh-Hant":  "斯機姆花園"
                                   },
                        "arrangements":  {
                                             "en":  "Soul",
                                             "ja":  "ソウルVer.",
-                                            "zh-Hans":  "Soul Ver.",
-                                            "zh-Hant":  "Soul Ver."
+                                            "zh-Hans":  "灵魂乐Ver.",
+                                            "zh-Hant":  "靈魂樂Ver."
                                         }
                    },
                    {
@@ -7031,14 +7031,14 @@
                        "names":  {
                                      "en":  "Jump Up, Super Star!",
                                      "ja":  "Jump Up, Super Star!",
-                                     "zh-Hans":  "Jump Up, Super Star!",
-                                     "zh-Hant":  "Jump Up, Super Star!"
+                                     "zh-Hans":  "Jump Up, Super Star!（跳跃吧，超级巨星！）",
+                                     "zh-Hant":  "Jump Up, Super Star!（跳躍吧，超級巨星！）"
                                  },
                        "titles":  {
                                       "en":  "Jump Up, Super Star!",
                                       "ja":  "Jump Up, Super Star!",
-                                      "zh-Hans":  "Jump Up, Super Star!",
-                                      "zh-Hant":  "Jump Up, Super Star!"
+                                      "zh-Hans":  "Jump Up, Super Star!（跳跃吧，超级巨星！）",
+                                      "zh-Hant":  "Jump Up, Super Star!（跳躍吧，超級巨星！）"
                                   }
                    },
                    {
@@ -7122,14 +7122,14 @@
                        "names":  {
                                      "en":  "Bowser\u0027s Castle: Main Courtyard",
                                      "ja":  "クッパ城 本丸",
-                                     "zh-Hans":  "Bowser\u0027s Castle: Main Courtyard",
-                                     "zh-Hant":  "Bowser\u0027s Castle: Main Courtyard"
+                                     "zh-Hans":  "酷霸城堡 主殿",
+                                     "zh-Hant":  "庫巴城堡 主殿"
                                  },
                        "titles":  {
                                       "en":  "Bowser\u0027s Castle: Main Courtyard",
                                       "ja":  "クッパ城 本丸",
-                                      "zh-Hans":  "Bowser\u0027s Castle: Main Courtyard",
-                                      "zh-Hant":  "Bowser\u0027s Castle: Main Courtyard"
+                                      "zh-Hans":  "酷霸城堡 主殿",
+                                      "zh-Hant":  "庫巴城堡 主殿"
                                   }
                    },
                    {
@@ -7151,14 +7151,14 @@
                        "names":  {
                                      "en":  "Break Free (Lead the Way)",
                                      "ja":  "Break Free (Lead The Way)",
-                                     "zh-Hans":  "Break Free (Lead The Way)",
-                                     "zh-Hant":  "Break Free (Lead The Way)"
+                                     "zh-Hans":  "Break Free (Lead The Way)（挣脱束缚）",
+                                     "zh-Hant":  "Break Free (Lead The Way)（掙脫束縛）"
                                  },
                        "titles":  {
                                       "en":  "Break Free (Lead the Way)",
                                       "ja":  "Break Free (Lead The Way)",
-                                      "zh-Hans":  "Break Free (Lead The Way)",
-                                      "zh-Hant":  "Break Free (Lead The Way)"
+                                      "zh-Hans":  "Break Free (Lead The Way)（挣脱束缚）",
+                                      "zh-Hant":  "Break Free (Lead The Way)（掙脫束縛）"
                                   }
                    },
                    {
@@ -7441,14 +7441,14 @@
                        "names":  {
                                      "en":  "Plessie Ride!",
                                      "ja":  "プレッシー搭乗！",
-                                     "zh-Hans":  "Plessie Ride!",
-                                     "zh-Hant":  "Plessie Ride!"
+                                     "zh-Hans":  "乘坐浦雷斯！",
+                                     "zh-Hant":  "乘坐浦雷斯！"
                                  },
                        "titles":  {
                                       "en":  "Plessie Ride!",
                                       "ja":  "プレッシー搭乗！",
-                                      "zh-Hans":  "Plessie Ride!",
-                                      "zh-Hant":  "Plessie Ride!"
+                                      "zh-Hans":  "乘坐浦雷斯！",
+                                      "zh-Hant":  "乘坐浦雷斯！"
                                   }
                    },
                    {
@@ -7470,14 +7470,14 @@
                        "names":  {
                                      "en":  "Attack! Bowser\u0027s Fury",
                                      "ja":  "襲来！フューリークッパ",
-                                     "zh-Hans":  "Attack! Bowser\u0027s Fury",
-                                     "zh-Hant":  "Attack! Bowser\u0027s Fury"
+                                     "zh-Hans":  "袭来！狂怒酷霸",
+                                     "zh-Hant":  "襲來！狂怒庫巴"
                                  },
                        "titles":  {
                                       "en":  "Attack! Bowser\u0027s Fury",
                                       "ja":  "襲来！フューリークッパ",
-                                      "zh-Hans":  "Attack! Bowser\u0027s Fury",
-                                      "zh-Hant":  "Attack! Bowser\u0027s Fury"
+                                      "zh-Hans":  "袭来！狂怒酷霸",
+                                      "zh-Hant":  "襲來！狂怒庫巴"
                                   }
                    }
                ]

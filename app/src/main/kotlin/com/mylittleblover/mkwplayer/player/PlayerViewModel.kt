@@ -32,7 +32,6 @@ import com.mylittleblover.mkwplayer.library.StageFlow
 import com.mylittleblover.mkwplayer.library.StageFlowDiscovery
 import com.mylittleblover.mkwplayer.library.FolderAudioSource
 import com.mylittleblover.mkwplayer.library.StageFlowReader
-import com.mylittleblover.mkwplayer.unlock.ListeningProgress
 import com.mylittleblover.mkwplayer.unlock.SpecialCupUnlock
 import com.mylittleblover.mkwplayer.unlock.SpecialCupRules
 import com.mylittleblover.mkwplayer.unlock.UnlockStore
@@ -60,8 +59,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.security.MessageDigest
 
@@ -1015,21 +1012,6 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
-    private fun recordLinearPlayStat(entry: LinearQueue.Entry) {
-        if (entry.key == CEREMONY_ENTRY_KEY) return
-        val canonicalId = when {
-            !entry.courseCode.isNullOrBlank() -> entry.courseCode.removeSuffix("_00")
-            entry.sourceType == LinearSessionStore.SourceType.JUKEBOX ->
-                "${PlaylistItemRef.PREFIX_JUKEBOX}${entry.sourceTrackKey ?: entry.key}"
-            entry.key.startsWith(PlaylistItemRef.PREFIX_SFC) ||
-                entry.key.startsWith(PlaylistItemRef.PREFIX_BATTLE) ||
-                entry.key.startsWith(PlaylistItemRef.PREFIX_EXTRA) ||
-                entry.key.startsWith(PlaylistItemRef.PREFIX_JUKEBOX) -> entry.key
-            else -> entry.key
-        }
-        recordCanonicalPlayStat(canonicalId)
-    }
-
     private fun fadeOutLinearAndStop() {
         viewModelScope.launch(Dispatchers.Main.immediate) {
             if (isCeremonyLocked || !session.state.value.active) return@launch
@@ -1134,8 +1116,8 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
     private val store = LibraryStore(java.io.File(application.filesDir, "library.json"))
 
-    /** Special Cup progress, persisted separately from the library so a corrupt one cannot lose both. */
-    private val unlockStore = UnlockStore(java.io.File(application.filesDir, SPECIAL_CUP_FILE))
+    private val unlockCoordinator: UnlockProgressCoordinator
+        get() = PlaybackHolder.unlock()
 
     private val unlockTestStore = UnlockTestStore(java.io.File(application.filesDir, "unlock-test-mode.json"))
     private var naturalUnlockUi: UnlockUi? = null
@@ -1146,24 +1128,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             _ui.value.unlock?.ceremonyPlaying == true ||
             session.uninterruptible
 
-    private var lastCreditedStage: String? = null
-    private var lastCreditedFrame: Long = -1L
-    private var lastUnlockSavedMs: Long = 0L
     private var lastTimingSnapshotMs: Long = 0L
-    private val unlockSaveMutex = Mutex()
-
-    private fun saveUnlockAsync(state: SpecialCupUnlock.UnlockState) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val problem = unlockSaveMutex.withLock {
-                unlockStore.save(state)
-            }
-            if (problem != null) {
-                withContext(Dispatchers.Main.immediate) {
-                    _ui.value = _ui.value.copy(detail = problem)
-                }
-            }
-        }
-    }
 
     private fun projectUnlock(natural: UnlockUi?): UnlockUi? {
         naturalUnlockUi = natural
@@ -1221,77 +1186,30 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         code.removePrefix("BGM_Stage_").removeSuffix("_00").equals("Rainbow", true) &&
             !com.mylittleblover.mkwplayer.ui.CupVisibility.mayReveal(_ui.value.unlock)
 
-    /** The cup's rules and progress, or null until there is a library to derive eligibility from. */
-    private var cup: SpecialCupUnlock? = null
-
-    /** Bridges the transport to the rules; null in the same condition as [cup]. */
-    private var listening: ListeningProgress? = null
-
     /**
-     * Feeds a transport sample to the cup.
+     * Feeds a transport sample to the shared unlock coordinator.
      *
      * Only playing samples count, and only for the stage the sample belongs to. Counts both
      * interactive stage playback and linear course medleys / route stops / presets.
      */
     private fun creditListening(state: PlaybackSession.State) {
         if (isCeremonyLocked) return
-        val bridge = listening ?: return
-        val activeLinear = _ui.value.linearTrack
-        val linearCourse = if (_ui.value.linearMode &&
-            (activeLinear?.sourceType == LinearSessionStore.SourceType.MEDLEY ||
-                activeLinear?.sourceType == LinearSessionStore.SourceType.PRESET)
-        ) {
-            activeLinear.courseCode
-        } else {
-            null
-        }
-        val rawPrefix = currentStageCode
-            ?: linearCourse
-            ?: state.title.takeIf { it.isNotEmpty() && !_ui.value.linearMode }?.let(StageFlowDiscovery::prefixOf)
-            ?: return
-        val prefix = rawPrefix.removePrefix("BGM_Stage_").removeSuffix("_00")
-        if (prefix.isBlank()) return
-
-        val beforeCompleted = bridge.snapshot.completedStages.size
-        val beforeEntitled = bridge.snapshot.entitled
-        val beforeCeremony = bridge.snapshot.ceremony
-
-        if (bridge.snapshot.currentStage != prefix) {
-            bridge.begin(prefix, state.totalFrames.coerceAtLeast(0L), state.sampleRate.coerceAtLeast(48_000))
-        } else if (prefix == lastCreditedStage && state.positionFrames < lastCreditedFrame) {
-            // Restarted or looped from earlier position in the same stage: reset cursor before sampling.
-            bridge.stopped()
-        }
-        if (!state.playing && !state.paused) bridge.stopped()
-
-        val outcome = bridge.sample(state.positionFrames, state.playing)
-        lastCreditedStage = prefix
-        lastCreditedFrame = state.positionFrames
-        val offered = outcome.offeredNow || _ui.value.unlock?.offered == true
-
-        if (outcome.ignoredReason == null) {
-            val milestone = outcome.state.completedStages.size != beforeCompleted ||
-                outcome.state.entitled != beforeEntitled ||
-                outcome.state.ceremony != beforeCeremony ||
-                outcome.offeredNow
-            val nextUnlock = projectUnlock(UnlockUi.from(bridge, offered))
-            if (milestone || nextUnlock != _ui.value.unlock) {
-                _ui.value = _ui.value.copy(unlock = nextUnlock)
-            }
-            val nowMs = android.os.SystemClock.elapsedRealtime()
-            val stageInProgress = prefix !in outcome.state.completedStages
-            if (milestone || (stageInProgress && nowMs - lastUnlockSavedMs >= 5_000L)) {
-                lastUnlockSavedMs = nowMs
-                saveUnlockAsync(outcome.state)
-            }
-            if (outcome.newlyEntitled) {
-                postUnlockReadyNotification()
-            }
+        unlockCoordinator.creditSample(
+            state = state,
+            isCeremonyLocked = isCeremonyLocked,
+            seekSequence = session.seekSequence,
+            playbackSpeed = session.currentPlaybackSpeed,
+        )
+        val projected = projectUnlock(unlockCoordinator.naturalUnlockUi.value)
+        if (projected != _ui.value.unlock) {
+            _ui.value = _ui.value.copy(unlock = projected)
         }
     }
 
     init {
         val appCtx = getApplication<Application>()
+        linearCoordinator.configureSessionStore(linearSessionStore)
+        linearCoordinator.attach(appCtx, _ui.value.jukebox)
         val initTrim = com.mylittleblover.mkwplayer.audio.OutputTrimSettings.current(appCtx)
         val initRate = com.mylittleblover.mkwplayer.audio.AudioEffectSettings.currentRate(appCtx)
         val initDsp = com.mylittleblover.mkwplayer.audio.AudioEffectSettings.currentDsp(appCtx)
@@ -1325,8 +1243,28 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                 triggerInteractiveTimedAction(action)
             }
         }
-        linearCoordinator.onTrackOpened = { entry ->
-            recordLinearPlayStat(entry)
+        viewModelScope.launch {
+            unlockCoordinator.naturalUnlockUi.collect { natural ->
+                val projected = projectUnlock(natural)
+                if (projected != _ui.value.unlock) {
+                    _ui.value = _ui.value.copy(unlock = projected)
+                }
+            }
+        }
+        viewModelScope.launch {
+            unlockCoordinator.needsNotificationPermission.collect { needed ->
+                if (needed) {
+                    requestNotificationPermissionIfNeeded()
+                    unlockCoordinator.consumeNotificationPermissionEvent()
+                }
+            }
+        }
+        viewModelScope.launch {
+            unlockCoordinator.saveError.collect { problem ->
+                if (problem != null) {
+                    _ui.value = _ui.value.copy(detail = problem)
+                }
+            }
         }
         viewModelScope.launch {
             com.mylittleblover.mkwplayer.library.PlayStatsRepository.stats.collect { stats ->
@@ -1397,7 +1335,9 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                     }
                     val namesDef = async { localizedNames }
                     val extraDef = async { extraCatalog }
-                    val unlockDef = async { unlockStore.load() }
+                    val unlockDef = async {
+                        UnlockStore(java.io.File(appCtx.filesDir, SPECIAL_CUP_FILE)).load()
+                    }
                     val checkpointDef = async { PackImportCoordinator.checkPendingCheckpoint(appCtx, packRoot) }
 
                     val anchors = anchorsDef.await()
@@ -1577,7 +1517,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                         session.uninterruptible = false
                         val wasTesting = testingCeremonyPlaying
                         testingCeremonyPlaying = false
-                        if (listening?.snapshot?.ceremony == SpecialCupUnlock.CeremonyPhase.PLAYING) {
+                        if (unlockCoordinator.snapshot()?.ceremony == SpecialCupUnlock.CeremonyPhase.PLAYING) {
                             leaveCeremony()
                         } else if (wasTesting) {
                             _ui.value = _ui.value.copy(unlock = projectUnlock(naturalUnlockUi))
@@ -1619,33 +1559,18 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
             manifest.unlock.stages.toSet().ifEmpty { manifest.stages.map { it.code }.toSet() }
         } ?: SpecialCupRules.eligibleStages(names)
         val eligible = rawEligible
-            .map { it.removePrefix("BGM_Stage_").removeSuffix("_00") }
+            .map { SpecialCupRules.normalizeStageCode(it) }
             .filter { it.isNotBlank() && !SpecialCupRules.isExcludedFromUnlock(it) }
             .toSet()
-        if (eligible.isEmpty()) {
-            cup = null
-            listening = null
-            _ui.value = _ui.value.copy(unlock = projectUnlock(null))
-            return
-        }
 
-        val restored = preloadedUnlock ?: unlockStore.load()
-        restored.problem?.let { _ui.value = _ui.value.copy(detail = it) }
-
-        val rules = SpecialCupUnlock(eligible).let { fresh ->
-            restored.state?.let { fresh.withState(it) } ?: fresh
-        }
-        cup = rules
-
-        val bridge = ListeningProgress(rules)
-        listening = bridge
-        // The offer is only claimed if the stored phase says the user was already offered it, so a
-        // restart does not re-notify.
-        val offered = restored.state?.ceremony == SpecialCupUnlock.CeremonyPhase.PENDING ||
-            restored.state?.ceremony == SpecialCupUnlock.CeremonyPhase.PLAYING ||
-            restored.state?.ceremony == SpecialCupUnlock.CeremonyPhase.COMPLETED
-        _ui.value = _ui.value.copy(unlock = projectUnlock(UnlockUi.from(bridge, offered)))
-        if (restored.repairedCeremony && pack?.directory != null) {
+        val outcome = unlockCoordinator.configure(
+            context = getApplication(),
+            eligibleStages = eligible,
+            preloadedUnlock = preloadedUnlock,
+        )
+        outcome.problem?.let { _ui.value = _ui.value.copy(detail = it) }
+        _ui.value = _ui.value.copy(unlock = projectUnlock(unlockCoordinator.naturalUnlockUi.value))
+        if (outcome.repairedCeremony && pack?.directory != null) {
             startSpecialCupUnlockCeremony()
         }
     }
@@ -1672,48 +1597,8 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         return true
     }
 
-    private var pendingUnlockNotification = false
-
     private fun postUnlockReadyNotification() {
-        val context = getApplication<Application>()
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            val granted = context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
-                android.content.pm.PackageManager.PERMISSION_GRANTED
-            if (!granted) {
-                pendingUnlockNotification = true
-                requestNotificationPermissionIfNeeded()
-                return
-            }
-        }
-        pendingUnlockNotification = false
-        val nm = context.getSystemService(android.app.NotificationManager::class.java) ?: return
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            val ch = android.app.NotificationChannel(
-                UNLOCK_CHANNEL_ID,
-                context.getString(com.mylittleblover.mkwplayer.R.string.unlock_notif_channel),
-                android.app.NotificationManager.IMPORTANCE_DEFAULT,
-            )
-            nm.createNotificationChannel(ch)
-        }
-        val launchIntent = android.content.Intent(context, com.mylittleblover.mkwplayer.MainActivity::class.java)
-            .putExtra(com.mylittleblover.mkwplayer.MainActivity.EXTRA_ENTER_CEREMONY, true)
-            .addFlags(android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        val pendingIntent = android.app.PendingIntent.getActivity(
-            context,
-            UNLOCK_NOTIFICATION_ID,
-            launchIntent,
-            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
-        )
-        val notification = androidx.core.app.NotificationCompat.Builder(context, UNLOCK_CHANNEL_ID)
-            .setSmallIcon(com.mylittleblover.mkwplayer.R.drawable.ic_stat_jukekart)
-            .setColor(0xFFC52D49.toInt())
-            .setContentTitle(context.getString(com.mylittleblover.mkwplayer.R.string.unlock_notif_title))
-            .setContentText(context.getString(com.mylittleblover.mkwplayer.R.string.unlock_notif_body))
-            .setContentIntent(pendingIntent)
-            .setAutoCancel(true)
-            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_DEFAULT)
-            .build()
-        nm.notify(UNLOCK_NOTIFICATION_ID, notification)
+        unlockCoordinator.postUnlockReadyNotification(getApplication())
     }
 
     /** Developer setting helper to pop up the Special Cup unlock reminder notification and top in-app banner. */
@@ -1727,12 +1612,9 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         if (isCeremonyLocked) {
             releaseTransport()
         }
-        val resetErr = unlockStore.reset()
+        val resetErr = unlockCoordinator.reset(getApplication())
         val testReset = unlockTestStore.reset()
         testingCeremonyPlaying = false
-        lastCreditedStage = null
-        lastCreditedFrame = -1L
-        cancelUnlockNotification()
         establishCup(preloadedUnlock = UnlockStore.Loaded(null))
         val combinedErr = resetErr ?: testReset.exceptionOrNull()?.message
         _ui.value = _ui.value.copy(
@@ -1749,7 +1631,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     fun enterUnlockFromBanner() {
         _ui.value = _ui.value.copy(debugUnlockBannerVisible = false)
         cancelUnlockNotification()
-        val snap = listening?.snapshot
+        val snap = unlockCoordinator.snapshot()
         if (snap != null && snap.entitled && snap.ceremony != SpecialCupUnlock.CeremonyPhase.PLAYING) {
             startSpecialCupUnlockCeremony()
         } else {
@@ -1762,9 +1644,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     }
 
     private fun cancelUnlockNotification() {
-        pendingUnlockNotification = false
-        val nm = getApplication<Application>().getSystemService(android.app.NotificationManager::class.java)
-        nm?.cancel(UNLOCK_NOTIFICATION_ID)
+        unlockCoordinator.cancelUnlockNotification(getApplication())
     }
 
     private fun syncSessionArtworkMetadata() {
@@ -1780,12 +1660,8 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     /** Developer setting helper to preview/replay the Special Cup unlock ceremony VFX & uninterruptible audio. */
     fun replayCeremonyForTesting() {
         if (isCeremonyLocked) return
-        val rules = cup
-        val bridge = listening
-        if (rules != null && bridge != null &&
-            rules.withState(bridge.snapshot).isEntitled &&
-            bridge.snapshot.ceremony != SpecialCupUnlock.CeremonyPhase.PLAYING
-        ) {
+        val snap = unlockCoordinator.snapshot()
+        if (unlockCoordinator.isEntitled() && snap?.ceremony != SpecialCupUnlock.CeremonyPhase.PLAYING) {
             startSpecialCupUnlockCeremony()
             return
         }
@@ -1845,33 +1721,24 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         if (wasTesting) {
             _ui.value = _ui.value.copy(unlock = projectUnlock(naturalUnlockUi))
         }
-        val bridge = listening
-        if (bridge != null && bridge.snapshot.ceremony == SpecialCupUnlock.CeremonyPhase.PLAYING) {
+        if (unlockCoordinator.snapshot()?.ceremony == SpecialCupUnlock.CeremonyPhase.PLAYING) {
             ceremonyReachedEnd()
         }
     }
 
     /** Enters the ceremony. Fails loudly rather than pretending when the cup is not open. */
     fun enterCeremony(): Boolean {
-        val rules = cup ?: return false
-        val bridge = listening ?: return false
-        if (bridge.snapshot.ceremony == SpecialCupUnlock.CeremonyPhase.PLAYING) return false
-        val next = rules.withState(bridge.snapshot).beginCeremony()
-        bridge.seed(next)
-        saveUnlockAsync(next)
-        _ui.value = _ui.value.copy(unlock = projectUnlock(UnlockUi.from(bridge, offered = true)))
-        return true
+        val entered = unlockCoordinator.enterCeremony()
+        if (entered) {
+            _ui.value = _ui.value.copy(unlock = projectUnlock(unlockCoordinator.naturalUnlockUi.value))
+        }
+        return entered
     }
 
     /** Leaves the ceremony early. The entitlement is preserved by the rules. */
     fun leaveCeremony() {
-        val rules = cup ?: return
-        val bridge = listening ?: return
-        if (bridge.snapshot.ceremony != SpecialCupUnlock.CeremonyPhase.PLAYING) return
-        val next = rules.withState(bridge.snapshot).leaveCeremonyEarly()
-        bridge.seed(next)
-        saveUnlockAsync(next)
-        _ui.value = _ui.value.copy(unlock = projectUnlock(UnlockUi.from(bridge, offered = true)))
+        unlockCoordinator.leaveCeremony()
+        _ui.value = _ui.value.copy(unlock = projectUnlock(unlockCoordinator.naturalUnlockUi.value))
     }
 
     /**
@@ -1881,24 +1748,15 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
      * the fake-completion the specification forbids.
      */
     fun ceremonyReachedEnd() {
-        val rules = cup ?: return
-        val bridge = listening ?: return
-        if (bridge.snapshot.ceremony != SpecialCupUnlock.CeremonyPhase.PLAYING) return
-        val next = rules.withState(bridge.snapshot).finishCeremony(reachedEnd = true)
-        bridge.seed(next)
-        saveUnlockAsync(next)
-        _ui.value = _ui.value.copy(unlock = projectUnlock(UnlockUi.from(bridge, offered = true)))
+        unlockCoordinator.ceremonyReachedEnd()
+        _ui.value = _ui.value.copy(unlock = projectUnlock(unlockCoordinator.naturalUnlockUi.value))
     }
 
     /** Consumes the first-time congratulations, if it is owed. */
     fun dismissCongratulations() {
-        val rules = cup ?: return
-        val bridge = listening ?: return
-        if (!rules.withState(bridge.snapshot).owesCongratulations) return
-        val next = rules.withState(bridge.snapshot).markCongratulated()
-        bridge.seed(next)
-        saveUnlockAsync(next)
-        _ui.value = _ui.value.copy(unlock = projectUnlock(UnlockUi.from(bridge, offered = true)))
+        if (!unlockCoordinator.owesCongratulations()) return
+        unlockCoordinator.markCongratulated()
+        _ui.value = _ui.value.copy(unlock = projectUnlock(unlockCoordinator.naturalUnlockUi.value))
     }
 
     /**
@@ -5249,11 +5107,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                 "Notifications are off, so the media controls will not appear."
             },
         )
-        if (granted && pendingUnlockNotification) {
-            postUnlockReadyNotification()
-        } else if (!granted) {
-            pendingUnlockNotification = false
-        }
+        unlockCoordinator.onNotificationPermissionResult(getApplication(), granted)
     }
 
     private fun startPolling() {
@@ -5583,8 +5437,5 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
 
         /** Where Special Cup progress lives, beside the library rather than inside it. */
         const val SPECIAL_CUP_FILE = "special-cup.json"
-
-        private const val UNLOCK_CHANNEL_ID = "mkw.unlock"
-        private const val UNLOCK_NOTIFICATION_ID = 1002
     }
 }

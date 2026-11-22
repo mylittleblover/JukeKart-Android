@@ -141,7 +141,23 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
             }
         }
     }
-    fun recordRecent(code: String) = updateRecent { recent.record(code.removeSuffix("_00")) }
+    fun reloadRecent() = updateRecent { recent.read() }
+
+    fun recordRecent(rawRefId: String) {
+        val trimmed = rawRefId.trim()
+        if (trimmed.isEmpty()) return
+        val canonical = if (
+            trimmed.startsWith(com.mylittleblover.mkwplayer.library.PlaylistItemRef.PREFIX_JUKEBOX) ||
+            trimmed.startsWith(com.mylittleblover.mkwplayer.library.PlaylistItemRef.PREFIX_SFC) ||
+            trimmed.startsWith(com.mylittleblover.mkwplayer.library.PlaylistItemRef.PREFIX_BATTLE) ||
+            trimmed.startsWith(com.mylittleblover.mkwplayer.library.PlaylistItemRef.PREFIX_EXTRA)
+        ) {
+            trimmed
+        } else {
+            trimmed.removeSuffix("_00")
+        }
+        updateRecent { recent.record(canonical) }
+    }
     private fun updatePlaylists(operation: () -> Result<List<com.mylittleblover.mkwplayer.library.UserPlaylist>>) {
         viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
             withContext(NonCancellable) {

@@ -2,6 +2,7 @@ package com.mylittleblover.mkwplayer.unlock
 
 import com.mylittleblover.mkwplayer.registry.AudioAssetId
 import com.mylittleblover.mkwplayer.library.StageFlowDiscovery
+import java.util.Locale
 
 /**
  * Tracks listening progress toward the hidden Special Cup, and owns the unlock ceremony's state.
@@ -127,6 +128,23 @@ internal class SpecialCupUnlock(
     /** How many stages the cup requires. Exposed so the screen can count without guessing. */
     val eligibleCount: Int get() = eligibleStages.size
 
+    private val canonicalToEligible: Map<String, String> = buildMap {
+        for (stage in eligibleStages) {
+            val normalized = SpecialCupRules.normalizeStageCode(stage).lowercase(Locale.ROOT)
+            if (normalized.isNotEmpty()) {
+                putIfAbsent(normalized, stage)
+            }
+            put(stage.lowercase(Locale.ROOT), stage)
+        }
+    }
+
+    /** Resolves [stage] (with or without `_00`, `BGM_Stage_`, `_SFC`, or `_PatternN`) to its canonical key in [eligibleStages]. */
+    fun resolveEligibleStage(stage: String): String? {
+        if (stage in eligibleStages) return stage
+        val normalized = SpecialCupRules.normalizeStageCode(stage).lowercase(Locale.ROOT)
+        return canonicalToEligible[normalized] ?: canonicalToEligible[stage.lowercase(Locale.ROOT)]
+    }
+
     /** Stage prefixes that are still outstanding. */
     fun remainingStages(): Set<String> = eligibleStages - state.completedStages
 
@@ -145,8 +163,9 @@ internal class SpecialCupUnlock(
         require(stage.isNotBlank()) { "stage must not be blank" }
         require(trackFrames >= 0) { "track frames must not be negative, got $trackFrames" }
         require(sampleRate > 0) { "sample rate must be positive, got $sampleRate" }
+        val resolved = resolveEligibleStage(stage) ?: stage
         return copyState(
-            currentStage = stage,
+            currentStage = resolved,
             lastReportedFrames = -1,
             currentTrackFrames = trackFrames,
             currentSampleRate = sampleRate,
@@ -336,7 +355,47 @@ internal class SpecialCupUnlock(
     fun stageOf(fileName: String): String = StageFlowDiscovery.prefixOf(fileName)
 
     /** Convenience for callers that only have asset ids. */
-    fun isEligibleStage(stage: String): Boolean = stage in eligibleStages
+    fun isEligibleStage(stage: String): Boolean = resolveEligibleStage(stage) != null
+
+    /**
+     * Normalizes persisted [listenedFrames] and [completedStages] keys against [eligibleStages]
+     * and retroactively grants entitlement if all eligible stages are already satisfied.
+     */
+    fun reconcile(defaultSampleRate: Int = 48_000): UnlockState {
+        val required = requiredFrames(defaultSampleRate)
+        val normalizedListened = LinkedHashMap<String, Long>()
+        for ((rawStage, frames) in state.listenedFrames) {
+            if (frames < 0L) continue
+            val canonical = resolveEligibleStage(rawStage) ?: continue
+            val existing = normalizedListened[canonical] ?: 0L
+            normalizedListened[canonical] = maxOf(existing, frames).coerceAtMost(required)
+        }
+        val normalizedCompleted = LinkedHashSet<String>()
+        for (rawStage in state.completedStages) {
+            val canonical = resolveEligibleStage(rawStage) ?: continue
+            normalizedCompleted += canonical
+        }
+        for ((stage, frames) in normalizedListened) {
+            if (frames >= required) {
+                normalizedCompleted += stage
+            }
+        }
+        val allDone = eligibleStages.isNotEmpty() && normalizedCompleted.containsAll(eligibleStages)
+        val entitled = state.entitled || allDone
+        val ceremony = if (entitled && state.ceremony == CeremonyPhase.NONE) {
+            CeremonyPhase.PENDING
+        } else {
+            state.ceremony
+        }
+        val currentStage = state.currentStage?.let { resolveEligibleStage(it) ?: it }
+        return copyState(
+            listenedFrames = normalizedListened,
+            completedStages = normalizedCompleted,
+            entitled = entitled,
+            ceremony = ceremony,
+            currentStage = currentStage,
+        )
+    }
 
     /** Unused parameter guard: assets are accepted so callers do not need a separate mapping. */
     fun stageOfAsset(asset: AudioAssetId, name: String): String = stageOf(name)

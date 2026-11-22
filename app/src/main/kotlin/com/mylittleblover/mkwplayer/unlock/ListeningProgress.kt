@@ -100,6 +100,82 @@ internal class ListeningProgress(
     }
 
     /**
+     * Feeds a continuous transport sample from live playback polling.
+     *
+     * Unlike raw [sample], this recovers safely from legitimate poll delays or fast playback rates
+     * (e.g., 2.0x speed or background timer jitter exceeding 1s) by stepping within the wall-time
+     * budget, and re-anchors the cursor if an unexpected discontinuity occurs so one slow poll
+     * never permanently blocks progress for the remainder of the track.
+     */
+    fun sampleContinuous(
+        frames: Long,
+        playing: Boolean,
+        wallDeltaMs: Long = 1_000L,
+        maxPlaybackSpeed: Double = 2.0,
+    ): Outcome {
+        if (!playing) {
+            return sample(frames, playing = false)
+        }
+        val before = current
+        val rate = before.currentSampleRate
+        if (before.currentStage == null || rate <= 0) {
+            return sample(frames, playing = true)
+        }
+        val previous = before.lastReportedFrames
+        if (previous < 0L) {
+            return sample(frames, playing = true)
+        }
+        val delta = frames - previous
+        if (delta < 0L) {
+            // Looped or restarted from an earlier frame: start a fresh run from the new position.
+            stopped()
+            return sample(frames, playing = true)
+        }
+        val maxCredit = SpecialCupUnlock.MAX_CREDIT_SECONDS.toLong() * rate
+        if (delta <= maxCredit) {
+            return sample(frames, playing = true)
+        }
+        val safeSpeed = maxPlaybackSpeed.coerceIn(1.0, 2.5)
+        val safeWallMs = wallDeltaMs.coerceIn(1L, 10_000L)
+        val wallBudgetFrames = ((safeWallMs * rate * safeSpeed) / 1000.0).toLong() + rate / 2L
+        if (delta <= wallBudgetFrames && delta <= maxCredit * 5L) {
+            var cursor = previous
+            var anyNewlyEntitled = false
+            var anyOfferedNow = false
+            while (cursor < frames) {
+                val nextCursor = (cursor + maxCredit).coerceAtMost(frames)
+                val stepOutcome = sample(nextCursor, playing = true)
+                if (stepOutcome.newlyEntitled) anyNewlyEntitled = true
+                if (stepOutcome.offeredNow) anyOfferedNow = true
+                if (stepOutcome.ignoredReason != null && stepOutcome.ignoredReason != "below step") {
+                    stopped()
+                    return sample(frames, playing = true)
+                }
+                cursor = nextCursor
+            }
+            return Outcome(
+                state = current,
+                newlyEntitled = anyNewlyEntitled,
+                offeredNow = anyOfferedNow,
+            )
+        }
+        // Un-notified jump larger than wall-clock budget: credit nothing for the jump and re-anchor.
+        stopped()
+        return sample(frames, playing = true)
+    }
+
+    /**
+     * Normalizes stored stage keys against the active eligible stages and grants retroactive
+     * entitlement if all eligible stages are already satisfied.
+     */
+    fun reconcile(defaultSampleRate: Int = 48_000): Boolean {
+        val next = unlock.withState(current).reconcile(defaultSampleRate)
+        if (next == current) return false
+        current = next
+        return true
+    }
+
+    /**
      * Adopts a restored state.
      *
      * Used when progress comes back from disk and there is no transport yet. Kept separate from

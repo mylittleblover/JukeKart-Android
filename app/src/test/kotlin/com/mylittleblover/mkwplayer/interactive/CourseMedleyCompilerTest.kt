@@ -188,6 +188,20 @@ class CourseMedleyCompilerTest {
             koopaB.clips.drop(2),
             "KoopaTroopaBeach Suite B after Pre_Short must match Suite A after Pre",
         )
+
+        val dkJpA = cat.forCourse("DKJungleParkway").single { it.normalizedSuiteVariant == "a" }
+        val dkJpB = cat.forCourse("DKJungleParkway").single { it.normalizedSuiteVariant == "b" }
+        val preShortClips = dkJpB.clips.take(2)
+        assertTrue(preShortClips.all { it.stem == "BGM_Stage_DKJungleParkway_Pre_Short" })
+        assertEquals(0L to 738_461L, preShortClips[0].sourceOffset to preShortClips[0].sourceLength)
+        assertEquals(147_692L to 516_922L, preShortClips[1].sourceOffset to preShortClips[1].sourceLength)
+        assertEquals(738_461L, preShortClips[1].start)
+        val dkJpShift = dkJpA.clips.drop(2).first().start - dkJpB.clips.drop(2).first().start
+        assertEquals(
+            dkJpA.clips.drop(2).map { it.copy(start = it.start - dkJpShift) },
+            dkJpB.clips.drop(2),
+            "DKJungleParkway Suite B after Pre_Short must match Suite A after Pre",
+        )
     }
 
     @Test

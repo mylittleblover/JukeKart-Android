@@ -191,4 +191,19 @@
     <string name="settings_non_affiliation">非公式のファン制作ツールであり、任天堂とは一切関係なく、公式の許諾・推奨を受けたものではありません。</string>
     <string name="settings_feedback_repo">要望・不具合報告：github.com/mylittleblover/MarioKartWorldPlayer-Android</string>
     <string name="settings_licenses_close">閉じる</string>
+
+    <string name="onboarding_welcome_title">JukeKart へようこそ</string>
+    <string name="onboarding_welcome_subtitle">インタラクティブなマルチステージBGM、ワールドマップのルート巡回、フリーラン・ジュークボックスをひとつに。</string>
+    <string name="onboarding_feature_courses">ダイナミックなコース楽曲ミックスとカスタムプリセット</string>
+    <string name="onboarding_feature_routes">グランプリやサバイバルのルート連動と道中BGM再生</string>
+    <string name="onboarding_feature_jukebox">フリーラン・ジュークボックスと歴代サウンドトラック</string>
+    <string name="onboarding_step_permission_title">通知権限を許可</string>
+    <string name="onboarding_step_permission_body">バックグラウンド再生コントロール、パックのインポート進捗、スペシャルカップ解放通知に使用します。</string>
+    <string name="onboarding_permission_granted">許可済み ✓</string>
+    <string name="onboarding_permission_action">通知を許可する</string>
+    <string name="onboarding_step_pack_title">.mkwpack パックをインポート</string>
+    <string name="onboarding_step_pack_body">.mkwpack ファイルを選択すると、コース音源・マップアート・ジュークボックス曲が利用できるようになります。</string>
+    <string name="onboarding_import_cta">.mkwpack を選択してインポート</string>
+    <string name="onboarding_import_resumable_cta">中断したインポートを再開</string>
+    <string name="onboarding_skip_later">あとで設定からインポート</string>
 </resources>

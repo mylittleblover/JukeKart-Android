@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +33,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
 
 internal val artworkDecoder = Dispatchers.IO.limitedParallelism(4)
 
@@ -47,6 +49,10 @@ private data class CachedResourceArtwork(
 
 private val resourceArtworkCache = object : LruCache<String, CachedResourceArtwork>(12 * 1024 * 1024) {
     override fun sizeOf(key: String, value: CachedResourceArtwork): Int = value.byteCount.coerceAtLeast(1)
+}
+
+internal fun evictResourceArtworkCache() {
+    resourceArtworkCache.evictAll()
 }
 
 /** Owns the decode only while the laid-out slot intersects the clipped viewport. */
@@ -73,16 +79,18 @@ internal fun rememberResourceArtwork(resourceId: Int?, maxEdge: Int): PackArtwor
 @Composable
 internal fun rememberResourceArtworkState(resourceId: Int?, maxEdge: Int): ArtworkLookup {
     val context = LocalContext.current
+    val activePackDir by PackArtwork.activePackDirectory.collectAsState()
     if (resourceId == null || maxEdge == 0) return ArtworkLookup(null, fromCache = false)
-    return key(context, resourceId, maxEdge) {
-        val cacheKey = "$resourceId@$maxEdge"
+    val packPath = activePackDir?.path
+    return key(context, resourceId, maxEdge, packPath) {
+        val cacheKey = if (packPath != null) "$packPath|$resourceId@$maxEdge" else "$resourceId@$maxEdge"
         val immediate = resourceArtworkCache.get(cacheKey)?.loaded
         if (immediate != null) {
             ArtworkLookup(immediate, fromCache = true)
         } else {
-            val image by produceState<PackArtwork.Loaded?>(null, resourceId, maxEdge) {
+            val image by produceState<PackArtwork.Loaded?>(null, resourceId, maxEdge, packPath) {
                 value = resourceArtworkCache.get(cacheKey)?.loaded ?: withContext(artworkDecoder) {
-                    decodeDrawableArtwork(context, resourceId, maxEdge)?.also { loaded ->
+                    decodePackOrDrawableArtwork(context, activePackDir, resourceId, maxEdge)?.also { loaded ->
                         val bytes = runCatching { loaded.bitmap.asAndroidBitmap().allocationByteCount }
                             .getOrDefault(loaded.bitmap.width * loaded.bitmap.height * 4)
                         resourceArtworkCache.put(cacheKey, CachedResourceArtwork(loaded, bytes))
@@ -92,6 +100,29 @@ internal fun rememberResourceArtworkState(resourceId: Int?, maxEdge: Int): Artwo
             ArtworkLookup(image, fromCache = false)
         }
     }
+}
+
+private fun decodePackOrDrawableArtwork(
+    context: Context,
+    packDir: File?,
+    resourceId: Int,
+    maxEdge: Int,
+): PackArtwork.Loaded? {
+    if (packDir != null) {
+        val entryName = runCatching { context.resources.getResourceEntryName(resourceId) }.getOrNull()
+        if (!entryName.isNullOrBlank()) {
+            val candidates = listOf(
+                File(packDir, "artwork/$entryName.png"),
+                File(packDir, "artwork/$entryName.webp"),
+            )
+            for (file in candidates) {
+                if (file.isFile) {
+                    decodeArtwork(maxEdge) { BitmapFactory.decodeFile(file.path, it) }?.let { return it }
+                }
+            }
+        }
+    }
+    return decodeDrawableArtwork(context, resourceId, maxEdge)
 }
 
 internal fun decodeDrawableArtwork(context: Context, resourceId: Int, maxEdge: Int): PackArtwork.Loaded? {

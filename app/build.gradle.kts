@@ -34,9 +34,9 @@ android {
         applicationId = "com.mylittleblover.mkwplayer"
         minSdk = 26
         targetSdk = 35
-        // Beta 01: Landscape unlock ceremony fallback canvas + external pack support, original JukeKart vector icons/atlas, 16KB ELF alignment, Lint/Android 14-16 fixes, Release R8 config.
-        versionCode = 26
-        versionName = "0.1.0-beta01"
+        // Beta 02: MarioWiki Jukebox zh i18n, runtime pack icons & sharp map, all-type recent plays, spacious map UI, onboarding, unlock & background handover fixes.
+        versionCode = 27
+        versionName = "0.1.0-beta02"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

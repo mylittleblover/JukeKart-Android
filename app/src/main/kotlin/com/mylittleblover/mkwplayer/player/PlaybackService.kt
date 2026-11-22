@@ -12,6 +12,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
+import android.os.SystemClock
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
@@ -64,6 +66,7 @@ class PlaybackService : Service() {
         override fun run() {
             if (!session.state.value.active) {
                 PlaybackTimers.tickFromSession(session)
+                releaseWakeLock()
                 polling = false
                 return
             }
@@ -72,18 +75,44 @@ class PlaybackService : Service() {
             if (st.linear && st.active) {
                 PlaybackHolder.linear().onPositionObserved(st.positionFrames, st.playing)
             }
-            refresh()
-            handler.postDelayed(this, POLL_INTERVAL_MS)
+            PlaybackHolder.unlock().creditSample(
+                state = st,
+                isCeremonyLocked = session.uninterruptible,
+                seekSequence = session.seekSequence,
+                playbackSpeed = session.currentPlaybackSpeed,
+            )
+            syncWakeLock(st)
+            val nowMs = SystemClock.elapsedRealtime()
+            val refreshKey = buildRefreshKey(st)
+            if (!st.active || refreshKey != lastRefreshKey || nowMs - lastFullRefreshMs >= FULL_REFRESH_INTERVAL_MS) {
+                refresh()
+            }
+            if (polling && session.state.value.active) {
+                handler.postDelayed(this, nextPollDelayMs(session.state.value))
+            }
         }
     }
     private var polling = false
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var lastWakeLockAcquireMs: Long = 0L
+    private var lastFullRefreshMs: Long = 0L
+    private var lastRefreshKey: String? = null
     private val artExecutor = Executors.newSingleThreadExecutor()
     private val artCache = object : LruCache<String, Bitmap>(4) {}
     private var currentArtKey: String? = null
     private var currentArtBitmap: Bitmap? = null
     private var pendingArtKey: String? = null
     private var lastMetadataKey: String? = null
+    private val fallbackLauncherIcon: Bitmap? by lazy {
+        val drawable = androidx.core.content.ContextCompat.getDrawable(this, R.mipmap.ic_launcher) ?: return@lazy null
+        val size = 192
+        Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also { bmp ->
+            val canvas = android.graphics.Canvas(bmp)
+            drawable.setBounds(0, 0, size, size)
+            drawable.draw(canvas)
+        }
+    }
 
     private fun currentCoverBitmap(state: PlaybackSession.State): Bitmap? {
         val key = coverKeyFor(state.packDirPath, state.artworkName, state.courseCode) ?: run {
@@ -131,10 +160,58 @@ class PlaybackService : Service() {
         return null
     }
 
+    private fun nextPollDelayMs(state: PlaybackSession.State): Long {
+        if (PlaybackHolder.linear().state.value.loading || session.isSeeking) {
+            return FAST_POLL_INTERVAL_MS
+        }
+        if (state.linear && state.playing && state.totalFrames > 0L && state.sampleRate > 0) {
+            val remainingFrames = (state.totalFrames - state.positionFrames).coerceAtLeast(0L)
+            val remainingMs = remainingFrames * 1000L / state.sampleRate
+            if (remainingMs <= NEAR_END_WINDOW_MS) {
+                return FAST_POLL_INTERVAL_MS
+            }
+        }
+        return if (state.playing) POLL_INTERVAL_MS else PAUSED_POLL_INTERVAL_MS
+    }
+
+    private fun buildRefreshKey(state: PlaybackSession.State): String =
+        "${state.title}|${state.playing}|${state.paused}|${state.loaded}|${state.subtitle}|" +
+            "${state.courseCode}|${state.artworkName}|${session.uninterruptible}|" +
+            "${state.linear && session.canSkipQueue?.invoke() == true}"
+
+    private fun syncWakeLock(state: PlaybackSession.State) {
+        val loadingOrTransitioning = PlaybackHolder.linear().state.value.loading || session.isSeeking
+        val needLock = state.active && (state.playing || loadingOrTransitioning)
+        if (!needLock) {
+            releaseWakeLock()
+            return
+        }
+        val wl = wakeLock ?: run {
+            val pm = getSystemService(PowerManager::class.java) ?: return
+            pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE_LOCK_TAG).apply {
+                setReferenceCounted(false)
+                wakeLock = this
+            }
+        }
+        val nowMs = SystemClock.elapsedRealtime()
+        if (!wl.isHeld || nowMs - lastWakeLockAcquireMs >= WAKE_LOCK_RENEW_MS) {
+            wl.acquire(WAKE_LOCK_LEASE_MS)
+            lastWakeLockAcquireMs = nowMs
+        }
+    }
+
+    private fun releaseWakeLock() {
+        val wl = wakeLock ?: return
+        if (wl.isHeld) {
+            runCatching { wl.release() }
+        }
+        lastWakeLockAcquireMs = 0L
+    }
+
     private fun startPolling() {
         if (polling) return
         polling = true
-        handler.postDelayed(pollTicker, POLL_INTERVAL_MS)
+        handler.postDelayed(pollTicker, nextPollDelayMs(session.state.value))
     }
 
     private fun stopPolling() {
@@ -360,6 +437,7 @@ class PlaybackService : Service() {
         focus.abandon()
         pausedByFocus = false
         stopPolling()
+        releaseWakeLock()
         pendingArtKey = null
         currentArtBitmap = null
         lastMetadataKey = null
@@ -380,6 +458,9 @@ class PlaybackService : Service() {
     /** Rebuilds the notification and the media session state from the session. */
     private fun refresh() {
         val state = session.state.value
+        lastFullRefreshMs = SystemClock.elapsedRealtime()
+        lastRefreshKey = buildRefreshKey(state)
+        syncWakeLock(state)
         updatePlaybackState(state)
         manager.notify(NOTIFICATION_ID, buildNotification())
         com.mylittleblover.mkwplayer.widget.PlayerWidgetUpdater.updateAll(
@@ -392,6 +473,7 @@ class PlaybackService : Service() {
         if (state.active) startPolling() else stopPolling()
 
         if (!state.active) {
+            releaseWakeLock()
             // REMOVE, not DETACH: detaching leaves the notification behind after the
             // service dies, so a stopped player would keep a media control in the shade
             // with nothing behind it.
@@ -484,7 +566,7 @@ class PlaybackService : Service() {
             .setContentTitle(titleText)
             .setContentText(subtitleText)
             .setSubText(state.courseCode?.takeIf { it.isNotBlank() }?.removeSuffix("_00"))
-            .setLargeIcon(cover)
+            .setLargeIcon(cover ?: fallbackLauncherIcon)
             .setColorized(cover != null)
             .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
             .setShowWhen(false)
@@ -582,8 +664,15 @@ class PlaybackService : Service() {
         const val NOTIFICATION_ID = 1
         const val MEDIA_SESSION_TAG = "mkwplayer"
 
-        /** 500 ms: smooth enough for a progress bar, cheap enough to run indefinitely. */
-        const val POLL_INTERVAL_MS = 500L
+        /** 200 ms keeps background polling responsive while 40 ms near track end cuts handover latency. */
+        const val POLL_INTERVAL_MS = 200L
+        private const val PAUSED_POLL_INTERVAL_MS = 500L
+        private const val FAST_POLL_INTERVAL_MS = 40L
+        private const val NEAR_END_WINDOW_MS = 1_500L
+        private const val FULL_REFRESH_INTERVAL_MS = 1_000L
+        private const val WAKE_LOCK_TAG = "JukeKart:PlaybackWakeLock"
+        private const val WAKE_LOCK_LEASE_MS = 10 * 60 * 1000L
+        private const val WAKE_LOCK_RENEW_MS = 5 * 60 * 1000L
 
         const val ACTION_TOGGLE = "com.mylittleblover.mkwplayer.TOGGLE"
         const val ACTION_PAUSE = "com.mylittleblover.mkwplayer.PAUSE"

@@ -17,6 +17,7 @@ internal object PlaybackHolder {
 
     private var instance: PlaybackSession? = null
     private var coordinatorInstance: LinearPlaybackCoordinator? = null
+    private var unlockInstance: UnlockProgressCoordinator? = null
 
     fun get(): PlaybackSession = instance ?: PlaybackSession(
         createEngine = { AudioEngine.create() },
@@ -26,6 +27,10 @@ internal object PlaybackHolder {
     fun linear(): LinearPlaybackCoordinator = coordinatorInstance ?: LinearPlaybackCoordinator(
         sessionProvider = { get() },
     ).also { coordinatorInstance = it }
+
+    fun unlock(): UnlockProgressCoordinator = unlockInstance ?: UnlockProgressCoordinator().also {
+        unlockInstance = it
+    }
 
     /** Replaces the session. Test-only; production never calls this. */
     fun overrideForTest(session: PlaybackSession?) {

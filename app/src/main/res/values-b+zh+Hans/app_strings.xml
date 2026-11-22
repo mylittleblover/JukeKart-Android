@@ -191,4 +191,19 @@
     <string name="settings_non_affiliation">独立开发的爱好者工具，与 Nintendo 无关，亦未获得任天堂官方授权或背书。</string>
     <string name="settings_feedback_repo">问题反馈与仓库：github.com/mylittleblover/MarioKartWorldPlayer-Android</string>
     <string name="settings_licenses_close">关闭</string>
+
+    <string name="onboarding_welcome_title">欢迎来到 JukeKart</string>
+    <string name="onboarding_welcome_subtitle">专为交互式多段赛道配乐、世界地图连线巡游与自由驾驶点唱机打造的音乐播放器。</string>
+    <string name="onboarding_feature_courses">多段交互式赛道配乐与自定义编排预设</string>
+    <string name="onboarding_feature_routes">世界地图大奖赛、生存赛连线与沿途公路音乐</string>
+    <string name="onboarding_feature_jukebox">自由驾驶点唱机与系列原声曲库</string>
+    <string name="onboarding_step_permission_title">开启通知权限</string>
+    <string name="onboarding_step_permission_body">用于后台锁屏播控、曲包流式导入进度显示，以及特别杯解锁提醒。</string>
+    <string name="onboarding_permission_granted">已开启 ✓</string>
+    <string name="onboarding_permission_action">开启通知权限</string>
+    <string name="onboarding_step_pack_title">导入 .mkwpack 资源包</string>
+    <string name="onboarding_step_pack_body">选择你的 .mkwpack 资源包即可加载全部赛道音频、世界地图插画与自由驾驶曲库。</string>
+    <string name="onboarding_import_cta">选择并导入 .mkwpack</string>
+    <string name="onboarding_import_resumable_cta">继续未完成的导入</string>
+    <string name="onboarding_skip_later">稍后在设置中导入</string>
 </resources>

@@ -21,6 +21,7 @@ internal class AudioOutput private constructor(
     val sampleRate: Int,
 ) : SessionAudioOutput {
     private var closed = false
+    private var suspended = false
 
     companion object {
         /**
@@ -52,7 +53,7 @@ internal class AudioOutput private constructor(
      * `outputSnapshot` returns `[rate, lastError, rebuilds, callbacks]`; a zero
      * rate means the device never opened, not that audio is silent.
      */
-    fun isRunning(): Boolean = !closed && (snapshotRate() ?: 0) > 0
+    fun isRunning(): Boolean = !closed && !suspended && (snapshotRate() ?: 0) > 0
 
     private fun snapshotRate(): Int? =
         NativeAudioLibrary.outputSnapshot(handle)?.takeIf { it.isNotEmpty() }?.get(0)?.toInt()
@@ -76,13 +77,39 @@ internal class AudioOutput private constructor(
      * refused; the caller should then stop and reopen rather than render into a
      * dead stream.
      */
-    fun rebuild(rate: Int): Boolean = !closed && NativeAudioLibrary.rebuildOutput(handle, rate)
+    fun rebuild(rate: Int): Boolean = !closed && !suspended && NativeAudioLibrary.rebuildOutput(handle, rate)
+
+    /**
+     * Stops the stream and releases the engine output lease without destroying the
+     * underlying native output object or its recovery thread.
+     */
+    override fun suspendStream(): Boolean {
+        if (closed) return false
+        if (suspended) return true
+        NativeAudioLibrary.stopOutput(handle)
+        suspended = true
+        return true
+    }
+
+    /** Restarts a previously suspended stream on the same native output handle. */
+    override fun resumeStream(sampleRate: Int): Boolean {
+        if (closed) return false
+        if (!suspended) return true
+        if (!NativeAudioLibrary.startOutput(handle, sampleRate)) {
+            return false
+        }
+        suspended = false
+        return true
+    }
 
     /** Stops and releases the consumer. Safe to call more than once. */
     override fun close() {
         if (closed) return
         closed = true
-        NativeAudioLibrary.stopOutput(handle)
+        if (!suspended) {
+            NativeAudioLibrary.stopOutput(handle)
+        }
+        suspended = false
         NativeAudioLibrary.destroyOutput(handle)
     }
 }

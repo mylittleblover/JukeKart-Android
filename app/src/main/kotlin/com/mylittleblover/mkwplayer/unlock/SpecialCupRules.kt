@@ -36,8 +36,42 @@ internal object SpecialCupRules {
      */
     val EXCLUDED_STAGES: Set<String> = setOf("Rainbow", "BigTree", "SFCMarioCircuit")
 
+    private val PATTERN_SUFFIX_REGEX = Regex("_Pattern\\d+$", RegexOption.IGNORE_CASE)
+    private val SFC_SUFFIX_REGEX = Regex("_SFC$", RegexOption.IGNORE_CASE)
+    private val ZERO_ZERO_SUFFIX_REGEX = Regex("_00$", RegexOption.IGNORE_CASE)
+
+    /**
+     * Normalizes a stage identifier or file stem to its logical stage code
+     * (e.g., `BGM_Stage_AirshipFortress_00` -> `AirshipFortress`,
+     * `Cinema_SFC` -> `Cinema`, `SnowMountain_Pattern2` -> `SnowMountain`).
+     */
+    fun normalizeStageCode(raw: String): String {
+        var code = raw.trim()
+        if (code.isEmpty()) return ""
+        if (code.endsWith(".bwav", ignoreCase = true) ||
+            code.contains("_Pre", ignoreCase = true) ||
+            code.contains("_Bridge", ignoreCase = true) ||
+            code.contains("_Outro", ignoreCase = true) ||
+            code.contains("_Fast", ignoreCase = true)
+        ) {
+            code = StageFlowDiscovery.prefixOf(code)
+        }
+        if (code.startsWith("BGM_Stage_", ignoreCase = true)) {
+            code = code.substring("BGM_Stage_".length)
+        }
+        while (true) {
+            val next = code
+                .replace(PATTERN_SUFFIX_REGEX, "")
+                .replace(SFC_SUFFIX_REGEX, "")
+                .replace(ZERO_ZERO_SUFFIX_REGEX, "")
+            if (next == code) break
+            code = next
+        }
+        return code
+    }
+
     fun isExcludedFromUnlock(stageCode: String): Boolean {
-        val clean = stageCode.removePrefix("BGM_Stage_").removeSuffix("_00")
+        val clean = normalizeStageCode(stageCode)
         return EXCLUDED_STAGES.any { it.equals(clean, ignoreCase = true) }
     }
 

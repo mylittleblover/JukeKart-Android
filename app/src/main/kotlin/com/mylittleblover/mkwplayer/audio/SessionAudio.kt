@@ -31,5 +31,7 @@ internal interface SessionAudioEngine : PlaybackEngine {
 
 internal interface SessionAudioOutput {
     fun timingSnapshot(): LongArray?
+    fun suspendStream(): Boolean = false
+    fun resumeStream(sampleRate: Int): Boolean = false
     fun close()
 }

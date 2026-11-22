@@ -11,11 +11,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.layout.ContentScale
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
 internal object PackArtwork {
+    val activePackDirectory = MutableStateFlow<File?>(null)
     data class Loaded(
         val bitmap: ImageBitmap,
         val aspectRatio: Float,
@@ -39,13 +41,16 @@ internal object PackArtwork {
     private val artworkIndexCache = ConcurrentHashMap<String, Set<String>>()
 
     fun evictAll() {
+        activePackDirectory.value = null
         resolvedNameCache.evictAll()
         bitmapCache.evictAll()
         artworkIndexCache.clear()
+        evictResourceArtworkCache()
     }
 
     /** Indexes available artwork filenames once on I/O so missing files skip unnecessary disk reads & fallback flashes. */
     fun warmArtworkIndex(packDirectory: File?): Set<String>? {
+        activePackDirectory.value = packDirectory
         packDirectory ?: return null
         val key = packDirectory.path
         artworkIndexCache[key]?.let { return it }

@@ -145,14 +145,15 @@ import com.mylittleblover.mkwplayer.ui.routes.hasKnownPool
 import com.mylittleblover.mkwplayer.ui.routes.isMissingOrIncomplete
 
 @Composable
-private fun CourseTile(
-    code: String,
-    name: String,
+private fun RecentTrackTile(
+    title: String,
+    subtitle: String,
     favorite: Boolean,
     onOpen: () -> Unit,
     onFavorite: () -> Unit,
     packDirectory: java.io.File? = null,
     artworkName: String? = null,
+    fallbackCourseCode: String? = null,
 ) {
     val tileInteraction = remember { MutableInteractionSource() }
     val pressScale = com.mylittleblover.mkwplayer.ui.rememberPressScale(tileInteraction, pressedScale = 0.97f)
@@ -169,12 +170,29 @@ private fun CourseTile(
                     onClick = onOpen,
                 ),
         ) {
-            com.mylittleblover.mkwplayer.ui.art.CourseCover(
-                code = code,
-                modifier = Modifier.fillMaxSize(),
-                packDirectory = packDirectory,
-                artworkName = artworkName,
-            )
+            if (fallbackCourseCode != null) {
+                com.mylittleblover.mkwplayer.ui.art.CourseCover(
+                    code = fallbackCourseCode,
+                    modifier = Modifier.fillMaxSize(),
+                    packDirectory = packDirectory,
+                    artworkName = artworkName,
+                )
+            } else {
+                PackArtwork.Thumbnail(
+                    packDirectory = packDirectory,
+                    artworkNames = listOfNotNull(artworkName),
+                    modifier = Modifier.fillMaxSize().background(MkwKitTokens.Palette.rose),
+                ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Outlined.MusicNote,
+                            contentDescription = null,
+                            tint = MkwKitTokens.Palette.crimsonDeep,
+                            modifier = Modifier.size(44.dp),
+                        )
+                    }
+                }
+            }
             MkwIconButton(
                 icon = if (favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                 contentDescription = stringResource(if (favorite) R.string.discovery_favorite_remove else R.string.discovery_favorite_add),
@@ -194,9 +212,10 @@ private fun CourseTile(
             ).padding(horizontal = 2.dp),
             verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            Text(name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
                 maxLines = 2, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
-            Text(stringResource(R.string.discovery_course_music), style = MaterialTheme.typography.labelSmall,
+            Text(subtitle, style = MaterialTheme.typography.labelSmall,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -382,8 +401,45 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
             }
             .distinctBy { it.rawRef }
     }
-    val recent = remember(state.recentIds, visibleCourseSet) {
-        state.recentIds.filter { it in visibleCourseSet }.take(10)
+    val recent = remember(
+        state.recentIds,
+        visibleCourseSet,
+        catalog,
+        unlocked,
+        language,
+        extraCatalog,
+        jukebox,
+        coursesSubtitle,
+        sfcSubtitle,
+        battleSubtitle,
+        freeSubtitle,
+        otherSubtitle,
+        soundsSubtitle,
+        nmSubtitle,
+    ) {
+        state.recentIds
+            .mapNotNull { rawId ->
+                resolveSmartPlaylistEntry(
+                    rawId = rawId,
+                    catalog = catalog,
+                    unlocked = unlocked,
+                    language = language,
+                    extraCatalog = extraCatalog,
+                    jukeboxItemsByKey = jukebox.itemsByKey,
+                    gamesById = gamesById,
+                    visibleCourseSet = visibleCourseSet,
+                    coursesLabel = coursesSubtitle,
+                    sfcLabel = sfcSubtitle,
+                    battleLabel = battleSubtitle,
+                    freeLabel = freeSubtitle,
+                    otherLabel = otherSubtitle,
+                    soundsLabel = soundsSubtitle,
+                    nmLabel = nmSubtitle,
+                    playCount = 0,
+                )
+            }
+            .distinctBy { it.rawRef }
+            .take(12)
     }
     LazyColumn(
         Modifier.fillMaxSize(),
@@ -639,15 +695,16 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
                     contentPadding = PaddingValues(horizontal = 18.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(recent, key = { "recent:$it" }) { id ->
-                        CourseTile(
-                            code = id,
-                            name = catalog?.displayName(id, language) ?: id,
-                            favorite = id in state.favorites,
-                            onOpen = { onOpen(id) },
-                            onFavorite = { onFavorite(id) },
+                    items(recent, key = { "recent:${it.rawRef}" }) { entry ->
+                        RecentTrackTile(
+                            title = entry.title,
+                            subtitle = entry.subtitle,
+                            favorite = entry.rawRef in state.favorites,
+                            onOpen = { onOpen(entry.rawRef) },
+                            onFavorite = { onFavorite(entry.rawRef) },
                             packDirectory = packDirectory,
-                            artworkName = courseArtwork[id] ?: courseArtwork[id.removeSuffix("_00")],
+                            artworkName = entry.artworkName,
+                            fallbackCourseCode = entry.fallbackCourseCode,
                         )
                     }
                 }
@@ -1090,7 +1147,7 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                                                 color = MkwKitTokens.Palette.crimson,
                                                 modifier = Modifier.align(Alignment.TopEnd).size(40.dp),
                                             ) {
-                                                ResourceArtwork(R.drawable.media_free_roam, Modifier.fillMaxSize().padding(7.dp))
+                                                ResourceArtwork(R.drawable.media_free_roam, Modifier.fillMaxSize().padding(4.dp))
                                             }
                                             3 -> ResourceArtwork(R.drawable.media_other_music, Modifier.align(Alignment.TopEnd).size(40.dp))
                                             4 -> ResourceArtwork(R.drawable.media_short_sfx, Modifier.align(Alignment.TopEnd).size(40.dp))
@@ -2425,7 +2482,8 @@ private fun resolveSmartPlaylistEntry(
                 rawRef = ref.raw,
                 title = item.localizedDisplayName(language),
                 subtitle = gameName,
-                artworkName = item.ostIndex?.let { "t_%03d.webp".format(java.util.Locale.ROOT, it) },
+                artworkName = item.ostIndex?.let { "t_%03d.webp".format(java.util.Locale.ROOT, it) }
+                    ?: extraCatalog.jukeboxGameArtwork[item.gameId],
                 fallbackCourseCode = null,
                 playCount = playCount,
             )

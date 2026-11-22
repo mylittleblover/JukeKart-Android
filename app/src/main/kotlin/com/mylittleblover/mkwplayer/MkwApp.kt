@@ -1,5 +1,6 @@
 package com.mylittleblover.mkwplayer
 
+import android.content.pm.PackageManager
 import androidx.compose.material.icons.Icons
 import com.mylittleblover.mkwplayer.ui.unpadHorizontal
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
@@ -129,7 +130,9 @@ import com.mylittleblover.mkwplayer.ui.kit.MkwUtilityDock
 import com.mylittleblover.mkwplayer.ui.kit.MkwUtilityTile
 import com.mylittleblover.mkwplayer.ui.tabIconVector
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -143,6 +146,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -157,7 +164,6 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Velocity
@@ -204,6 +210,8 @@ import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import com.mylittleblover.mkwplayer.ui.routes.RoutesScreen
+import com.mylittleblover.mkwplayer.ui.onboarding.OnboardingStore
+import com.mylittleblover.mkwplayer.ui.onboarding.WelcomeOnboardingScreen
 import com.mylittleblover.mkwplayer.ui.settings.importItems
 import com.mylittleblover.mkwplayer.ui.settings.settingsItems
 
@@ -257,9 +265,37 @@ internal fun MkwApp(
     }
     val openFiles = { filePicker.launch(arrayOf("audio/*", "*/*")) }
 
+    val context = LocalContext.current
+    val packDir = model.packDirectory
+    SideEffect {
+        if (PackArtwork.activePackDirectory.value != packDir) {
+            PackArtwork.activePackDirectory.value = packDir
+        }
+    }
+    LaunchedEffect(packDir, ui.libraryGeneration) {
+        PackArtwork.activePackDirectory.value = packDir
+        if (packDir != null) {
+            withContext(Dispatchers.IO) {
+                PackArtwork.warmArtworkIndex(packDir)
+            }
+        }
+    }
+
+    fun isNotificationPermissionGranted(): Boolean =
+        android.os.Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+
+    var notificationGranted by remember { mutableStateOf(isNotificationPermissionGranted()) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
     val notificationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { granted -> model.onNotificationPermissionResult(granted) }
+    ) { granted ->
+        val effectiveGranted = granted || isNotificationPermissionGranted()
+        notificationGranted = effectiveGranted
+        model.onNotificationPermissionResult(effectiveGranted)
+    }
 
     LaunchedEffect(ui.needsNotificationPermission) {
         if (ui.needsNotificationPermission && android.os.Build.VERSION.SDK_INT >= 33) {
@@ -279,6 +315,25 @@ internal fun MkwApp(
         }
     }
 
+    var onboardingChecked by remember { mutableStateOf(false) }
+    var onboardingCompleted by remember { mutableStateOf(true) }
+    LaunchedEffect(context, ui.libraryReady, ui.pack, ui.libraryGeneration) {
+        if (!ui.libraryReady) return@LaunchedEffect
+        val done = withContext(Dispatchers.IO) {
+            if (ui.pack != null) {
+                if (!OnboardingStore.isCompleted(context)) {
+                    OnboardingStore.markCompleted(context)
+                }
+                true
+            } else {
+                OnboardingStore.isCompleted(context)
+            }
+        }
+        onboardingCompleted = done
+        onboardingChecked = true
+    }
+    val showOnboarding = onboardingChecked && !onboardingCompleted && ui.pack == null
+
     val ceremonyPlaying = ui.unlock?.ceremonyPlaying == true
     var previewUnlockVfx by remember { mutableStateOf(false) }
     LaunchedEffect(previewUnlockVfx) {
@@ -287,9 +342,8 @@ internal fun MkwApp(
             previewUnlockVfx = false
         }
     }
-    BackHandler(enabled = nav.canGoBack && !ceremonyPlaying) { nav = nav.back() ?: nav }
+    BackHandler(enabled = nav.canGoBack && !ceremonyPlaying && !showOnboarding) { nav = nav.back() ?: nav }
     BackHandler(enabled = ceremonyPlaying) {}
-    val context = LocalContext.current
     val language = AppLanguageSettings.current(context)
     val languageTag = LocalConfiguration.current.locales[0].toLanguageTag()
     // The master trim is a device preference, read once and pushed to the running engine when it changes.
@@ -304,6 +358,20 @@ internal fun MkwApp(
     LaunchedEffect(playbackBehavior) { model.applyPlaybackBehavior(playbackBehavior) }
     val discovery: com.mylittleblover.mkwplayer.ui.home.DiscoveryViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val discoveryState by discovery.state.collectAsStateWithLifecycle()
+    DisposableEffect(lifecycleOwner, context, discovery, model) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val granted = isNotificationPermissionGranted()
+                notificationGranted = granted
+                if (granted && com.mylittleblover.mkwplayer.player.PlaybackHolder.unlock().pendingUnlockNotification) {
+                    model.onNotificationPermissionResult(true)
+                }
+                discovery.reloadRecent()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val coroutineScope = rememberCoroutineScope()
     var showSleepTimerSheet by rememberSaveable { mutableStateOf(false) }
     var backupStatusMessage by rememberSaveable { mutableStateOf<String?>(null) }
@@ -540,12 +608,24 @@ internal fun MkwApp(
         discovery.updateEligible(computed)
     }
     val playingCourse = model.currentStageCode
-    var lastRecordedCourse by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(ui.canStop, ui.canPause, ui.flow?.voiceCount, playingCourse) {
-        if (!ui.canStop) lastRecordedCourse = null
-        else if (ui.canPause && playingCourse != null && (ui.flow?.voiceCount ?: 0) > 0 && lastRecordedCourse != playingCourse) {
-            discovery.recordRecent(playingCourse)
-            lastRecordedCourse = playingCourse
+    val activeRecentId = remember(playingCourse, ui.activeFavoriteId, ui.linearTrack?.key, ui.linearMode) {
+        activeRecentRefId(playingCourse, ui, model.extraCatalog)
+    }
+    var lastRecordedRecentId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(ui.canStop, ui.canPause, ui.linearMode, ui.flow?.voiceCount, activeRecentId, ui.linearTrack?.key) {
+        discovery.reloadRecent()
+        if (!ui.canStop) {
+            lastRecordedRecentId = null
+        } else {
+            val activeReady = if (ui.linearMode) {
+                ui.linearTrack != null && !ui.trackLoading
+            } else {
+                (ui.flow?.voiceCount ?: 0) > 0
+            }
+            if (ui.canPause && activeRecentId != null && activeReady && lastRecordedRecentId != activeRecentId) {
+                discovery.recordRecent(activeRecentId)
+                lastRecordedRecentId = activeRecentId
+            }
         }
     }
     val configuration = LocalConfiguration.current
@@ -1431,7 +1511,33 @@ internal fun MkwApp(
                                             model.playExtraLinearQueue(listOf(entry), 0, LinearQueue.RepeatMode.OFF, false)
                                             nav = nav.open(NavState.Detail.Track)
                                         }
-                                        null -> Unit
+                                        null -> {
+                                            val simple = model.extraCatalog.shortSounds.firstOrNull { it.id == ref.extraId }
+                                                ?: model.extraCatalog.nintendoMusicSpecial.firstOrNull { it.id == ref.extraId }
+                                            if (simple != null) {
+                                                val sub = if (model.extraCatalog.shortSounds.any { it.id == ref.extraId }) {
+                                                    context.getString(R.string.discovery_sounds)
+                                                } else {
+                                                    context.getString(R.string.discovery_nintendo_music)
+                                                }
+                                                val entry = LinearQueue.Entry(
+                                                    key = "extra:${simple.id}",
+                                                    title = simple.localizedName(languageTag),
+                                                    subtitle = sub,
+                                                    sourceType = com.mylittleblover.mkwplayer.player.LinearSessionStore.SourceType.EXTRA,
+                                                    ostIndex = simple.ostIndex,
+                                                    durationMs = simple.durationMs,
+                                                    artworkName = simple.artwork,
+                                                    assetSha256 = simple.asset.sha256,
+                                                    loop = simple.asset.loop,
+                                                    loopStart = simple.asset.loopStart,
+                                                    loopEnd = simple.asset.loopEnd,
+                                                )
+                                                val mode = if (simple.asset.loop) LinearQueue.RepeatMode.SINGLE else LinearQueue.RepeatMode.OFF
+                                                model.playExtraLinearQueue(listOf(entry), 0, mode, false)
+                                                nav = nav.open(NavState.Detail.Track)
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -1663,6 +1769,34 @@ internal fun MkwApp(
             }
             }
         }
+    }
+    AnimatedVisibility(
+        visible = showOnboarding,
+        enter = fadeIn(tween(if (reduceMotion) 0 else 200, easing = com.mylittleblover.mkwplayer.ui.AppMotion.easeOut)),
+        exit = fadeOut(tween(if (reduceMotion) 0 else 220, easing = com.mylittleblover.mkwplayer.ui.AppMotion.easeOut)),
+    ) {
+        WelcomeOnboardingScreen(
+            notificationGranted = notificationGranted,
+            busy = ui.busy,
+            importState = ui.importState,
+            onRequestNotificationPermission = {
+                if (android.os.Build.VERSION.SDK_INT >= 33) {
+                    notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                }
+            },
+            onPickPack = openPack,
+            onResumeImport = model::resumePackImport,
+            onRepickImport = openRepickPack,
+            onCancelImport = { model.cancelPackImport() },
+            onSkipForLater = {
+                coroutineScope.launch {
+                    withContext(Dispatchers.IO) {
+                        OnboardingStore.markCompleted(context)
+                    }
+                    onboardingCompleted = true
+                }
+            },
+        )
     }
     com.mylittleblover.mkwplayer.ui.unlock.SpecialCupUnlockCeremonyStage(
         visible = ceremonyPlaying || previewUnlockVfx,
@@ -2164,7 +2298,7 @@ private fun MapPage(
     val rallyLabel = androidx.compose.ui.res.stringResource(R.string.discovery_rally)
     val roadPrefix = androidx.compose.ui.res.stringResource(R.string.route_road_prefix)
     val subTag = androidx.compose.ui.res.stringResource(R.string.route_custom_substitute_tag)
-    val loaded by produceState<Result<MapResources>?>(null, model) {
+    val loaded by produceState<Result<MapResources>?>(null, model, model.packDirectory, ui.libraryGeneration) {
         value = withContext(Dispatchers.IO) {
             runCatching {
                 val anchors = requireNotNull(model.mapAnchors)
@@ -3892,9 +4026,8 @@ private fun SpecialCupCongratsDialog(
         onDismissRequest = onDismiss,
         title = androidx.compose.ui.res.stringResource(R.string.unlock_congrats_title),
         icon = {
-            Image(
-                painter = painterResource(CupArt.special.drawable),
-                contentDescription = CupArt.special.label,
+            ResourceArtwork(
+                resourceId = CupArt.special.drawable,
                 modifier = Modifier.size(64.dp),
                 contentScale = ContentScale.Fit,
             )
@@ -3923,6 +4056,52 @@ private fun SpecialCupCongratsDialog(
             style = MaterialTheme.typography.labelSmall,
             color = MkwKitTokens.Palette.inkSecondary,
         )
+    }
+}
+
+private fun activeRecentRefId(
+    playingCourse: String?,
+    ui: PlayerViewModel.Ui,
+    extraCatalog: com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.Catalog,
+): String? {
+    ui.activeFavoriteId?.takeIf { it.isNotBlank() }?.let { return it }
+    if (!playingCourse.isNullOrBlank()) return playingCourse.removeSuffix("_00")
+    val entry = ui.linearTrack ?: return null
+    if (entry.key == "__special_cup_ceremony__") return null
+    if (entry.sourceType == com.mylittleblover.mkwplayer.player.LinearSessionStore.SourceType.JUKEBOX) {
+        val rawKey = (entry.sourceTrackKey ?: entry.key).removePrefix(com.mylittleblover.mkwplayer.library.PlaylistItemRef.PREFIX_JUKEBOX)
+        return "${com.mylittleblover.mkwplayer.library.PlaylistItemRef.PREFIX_JUKEBOX}$rawKey"
+    }
+    val code = entry.courseCode
+    if (!code.isNullOrBlank()) {
+        if (!code.startsWith(com.mylittleblover.mkwplayer.library.PlaylistItemRef.PREFIX_EXTRA)) {
+            return code.removeSuffix("_00")
+        }
+        val tid = code.removePrefix(com.mylittleblover.mkwplayer.library.PlaylistItemRef.PREFIX_EXTRA)
+        return when {
+            extraCatalog.sfcCourses.any { it.id == tid } -> "${com.mylittleblover.mkwplayer.library.PlaylistItemRef.PREFIX_SFC}$tid"
+            extraCatalog.battleTracks.any { it.id == tid } -> "${com.mylittleblover.mkwplayer.library.PlaylistItemRef.PREFIX_BATTLE}$tid"
+            else -> "${com.mylittleblover.mkwplayer.library.PlaylistItemRef.PREFIX_EXTRA}$tid"
+        }
+    }
+    entry.overlaidOpening?.id?.let { return "${com.mylittleblover.mkwplayer.library.PlaylistItemRef.PREFIX_EXTRA}$it" }
+    return when {
+        entry.key.startsWith(com.mylittleblover.mkwplayer.library.PlaylistItemRef.PREFIX_SFC) ||
+            entry.key.startsWith(com.mylittleblover.mkwplayer.library.PlaylistItemRef.PREFIX_BATTLE) ||
+            entry.key.startsWith(com.mylittleblover.mkwplayer.library.PlaylistItemRef.PREFIX_JUKEBOX) -> entry.key
+        entry.key.startsWith(com.mylittleblover.mkwplayer.library.PlaylistItemRef.PREFIX_EXTRA) -> {
+            val tid = entry.key.removePrefix(com.mylittleblover.mkwplayer.library.PlaylistItemRef.PREFIX_EXTRA)
+            when {
+                extraCatalog.sfcCourses.any { it.id == tid } -> "${com.mylittleblover.mkwplayer.library.PlaylistItemRef.PREFIX_SFC}$tid"
+                extraCatalog.battleTracks.any { it.id == tid } -> "${com.mylittleblover.mkwplayer.library.PlaylistItemRef.PREFIX_BATTLE}$tid"
+                else -> "${com.mylittleblover.mkwplayer.library.PlaylistItemRef.PREFIX_EXTRA}$tid"
+            }
+        }
+        ":opening:" in entry.key -> {
+            val tid = entry.key.substringAfter(":opening:").substringBefore(':')
+            "${com.mylittleblover.mkwplayer.library.PlaylistItemRef.PREFIX_EXTRA}$tid"
+        }
+        else -> null
     }
 }
 

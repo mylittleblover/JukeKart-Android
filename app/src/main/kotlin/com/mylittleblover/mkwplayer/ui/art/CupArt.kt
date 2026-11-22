@@ -111,8 +111,34 @@ internal object CupArt {
         "turnip_rally" to 20,
     )
 
+    private val routeMaskNames: Map<String, String> = mapOf(
+        "mushroom_cup" to "map_light_gp00",
+        "flower_cup" to "map_light_gp01",
+        "star_cup" to "map_light_gp02",
+        "shell_cup" to "map_light_gp03",
+        "banana_cup" to "map_light_gp04",
+        "leaf_cup" to "map_light_gp05",
+        "lightning_cup" to "map_light_gp06",
+        "special_cup" to "map_light_gp07",
+        "golden_rally" to "map_light_sv00",
+        "ice_rally" to "map_light_sv01",
+        "moon_rally" to "map_light_sv02",
+        "spiny_rally" to "map_light_sv03",
+        "cherry_rally" to "map_light_sv04",
+        "acorn_rally" to "map_light_sv05",
+        "cloud_rally" to "map_light_sv06",
+        "heart_rally" to "map_light_sv07",
+        "drill_rally" to "map_light_sv08",
+        "boomerang_rally" to "map_light_sv09",
+        "propeller_rally" to "map_light_sv10",
+        "turnip_rally" to "map_light_sv11",
+    )
+
     /** Resolves an official route id to its procedural spotlight corridor token (`1..20`). */
     fun routeHighlightMask(routeId: String): Int? = routeMasks[routeId]
+
+    /** Resolves an official route id to its `.mkwpack/artwork/map_light_*.png` base filename. */
+    fun routeHighlightMaskName(routeId: String): String? = routeMaskNames[routeId]
 }
 
 /**

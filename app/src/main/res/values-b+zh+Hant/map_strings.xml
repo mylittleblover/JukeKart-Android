@@ -49,4 +49,7 @@
     <string name="map_edit_source">連接表來自遊戲匯出的 Stage_Connections_Final。</string>
     <string name="map_edit_refusal_missing">遊戲沒有定義這兩條賽道之間的連接。</string>
     <string name="map_course_connections_hidden">另有 %1$d 條連接已定義，但未顯示在這張地圖上。</string>
+    <string name="map_picker_subtitle">選擇大獎賽獎盃或生存賽拉力，在地圖上突顯路線走廊與沿途音樂。</string>
+    <string name="map_stops_sheet_action">站點與路線音樂</string>
+    <string name="map_kind_count_fmt">%1$s (%2$d)</string>
 </resources>

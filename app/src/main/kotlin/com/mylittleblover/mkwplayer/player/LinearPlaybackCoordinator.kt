@@ -4,12 +4,17 @@ import android.content.Context
 import com.mylittleblover.mkwplayer.audio.BwavHeader
 import com.mylittleblover.mkwplayer.pack.PackCoverage
 import com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -24,6 +29,8 @@ import java.io.File
 internal class LinearPlaybackCoordinator(
     private val sessionProvider: () -> PlaybackSession = { PlaybackHolder.get() },
     val queue: LinearQueue = LinearQueue(),
+    private val mainDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
 
     data class SessionContext(
@@ -57,7 +64,7 @@ internal class LinearPlaybackCoordinator(
         val abLoopEndFrame: Long? = null,
     )
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val scope = CoroutineScope(SupervisorJob() + mainDispatcher)
     private val _state = MutableStateFlow(LinearUiState())
     val state: StateFlow<LinearUiState> = _state.asStateFlow()
 
@@ -83,9 +90,25 @@ internal class LinearPlaybackCoordinator(
     private var abLoopEndFrame: Long? = null
 
     private var requestGeneration: Long = 0L
+    private var preloadGeneration: Long = 0L
+    private var preloadJob: Job? = null
+    private var preparedNext: PreparedNextEntry? = null
     private var seekEpoch: Long = 0L
-    private var seekJob: kotlinx.coroutines.Job? = null
+    private var seekJob: Job? = null
     private var sessionContext: SessionContext = SessionContext()
+
+    private data class PreparedNextEntry(
+        val entryKey: String,
+        val chainKeys: List<String>,
+        val singleLoop: Boolean,
+        val packDirPath: String,
+        val prepared: PlaybackSession.Prepared,
+        val totalFrames: Long,
+        val sampleRate: Int,
+        val loopStart: Long = -1L,
+        val loopEnd: Long = -1L,
+        val chainWindows: List<com.mylittleblover.mkwplayer.interactive.CourseMedleyChainCompiler.SegmentWindow> = emptyList(),
+    )
 
     @Volatile
     private var sessionStore: LinearSessionStore? = null
@@ -109,7 +132,7 @@ internal class LinearPlaybackCoordinator(
     fun readSavedSession(): LinearSessionStore.Snapshot? = sessionStore?.read()?.getOrNull()
 
     fun clearSavedSession() {
-        scope.launch(Dispatchers.IO) { sessionStore?.clear() }
+        scope.launch(ioDispatcher) { sessionStore?.clear() }
     }
 
     fun attach(context: Context, catalog: JukeboxCatalog.Catalog) {
@@ -192,6 +215,7 @@ internal class LinearPlaybackCoordinator(
             queue.snapshot().current?.let { openEntry(it) }
         } else {
             if (!invalidateChainIfHeadChanged()) {
+                refreshPreloadIfNeeded()
                 publishSnapshot(error = null)
             }
         }
@@ -207,6 +231,7 @@ internal class LinearPlaybackCoordinator(
             queue.snapshot().current?.let { openEntry(it) }
         } else {
             if (!invalidateChainIfHeadChanged()) {
+                refreshPreloadIfNeeded()
                 publishSnapshot(error = null)
             }
         }
@@ -220,6 +245,7 @@ internal class LinearPlaybackCoordinator(
             val pos = sessionProvider().state.value.positionFrames.coerceAtLeast(0L)
             activeChainWindows = emptyList()
             activeChainIndex = 0
+            invalidatePreload()
             openEntry(current, initialSeekFrames = pos, allowChaining = false)
             return true
         }
@@ -229,6 +255,7 @@ internal class LinearPlaybackCoordinator(
     fun removeTempAt(index: Int) {
         if (queue.removeTempAt(index)) {
             if (!invalidateChainIfHeadChanged()) {
+                refreshPreloadIfNeeded()
                 publishSnapshot(error = null)
             }
         }
@@ -237,6 +264,7 @@ internal class LinearPlaybackCoordinator(
     fun removeUpcomingAt(index: Int) {
         if (queue.removeUpcomingAt(index)) {
             if (!invalidateChainIfHeadChanged()) {
+                refreshPreloadIfNeeded()
                 publishSnapshot(error = null)
             }
         }
@@ -245,6 +273,7 @@ internal class LinearPlaybackCoordinator(
     fun moveTemp(from: Int, to: Int) {
         if (queue.moveTemp(from, to)) {
             if (!invalidateChainIfHeadChanged()) {
+                refreshPreloadIfNeeded()
                 publishSnapshot(error = null)
             }
         }
@@ -253,6 +282,7 @@ internal class LinearPlaybackCoordinator(
     fun moveUpcoming(from: Int, to: Int) {
         if (queue.moveUpcoming(from, to)) {
             if (!invalidateChainIfHeadChanged()) {
+                refreshPreloadIfNeeded()
                 publishSnapshot(error = null)
             }
         }
@@ -261,6 +291,7 @@ internal class LinearPlaybackCoordinator(
     fun clearUpcoming() {
         if (queue.clearUpcoming()) {
             if (!invalidateChainIfHeadChanged()) {
+                refreshPreloadIfNeeded()
                 publishSnapshot(error = null)
             }
         }
@@ -370,6 +401,7 @@ internal class LinearPlaybackCoordinator(
     fun toggleShuffle() {
         if (!sessionContext.allowShuffle) return
         queue.setShuffle(!queue.shuffle)
+        refreshPreloadIfNeeded()
         publishSnapshot(error = null)
     }
 
@@ -389,6 +421,7 @@ internal class LinearPlaybackCoordinator(
         val session = sessionProvider()
         val current = queue.snapshot().current
         if (abLoopStartFrame != null && abLoopEndFrame != null) {
+            refreshPreloadIfNeeded()
             publishSnapshot(error = null)
             return
         }
@@ -400,9 +433,11 @@ internal class LinearPlaybackCoordinator(
             val pos = session.state.value.positionFrames.coerceAtLeast(0L)
             activeChainWindows = emptyList()
             activeChainIndex = 0
+            invalidatePreload()
             openEntry(current, initialSeekFrames = pos, allowChaining = false)
             return
         }
+        refreshPreloadIfNeeded()
         publishSnapshot(error = null)
     }
 
@@ -471,7 +506,7 @@ internal class LinearPlaybackCoordinator(
             packFingerprints = sessionContext.packFingerprints,
             savedAtEpochMs = System.currentTimeMillis(),
         )
-        scope.launch(Dispatchers.IO) {
+        scope.launch(ioDispatcher) {
             store.write(snapshot)
         }
     }
@@ -534,6 +569,7 @@ internal class LinearPlaybackCoordinator(
 
     fun clearSession() {
         requestGeneration++
+        invalidatePreload()
         seekEpoch++
         seekJob?.cancel()
         seekJob = null
@@ -550,6 +586,7 @@ internal class LinearPlaybackCoordinator(
     /** Increments request generation when an external interactive flow takes over the session. */
     fun yieldToExternalTransport() {
         requestGeneration++
+        invalidatePreload()
         seekEpoch++
         seekJob?.cancel()
         seekJob = null
@@ -657,8 +694,324 @@ internal class LinearPlaybackCoordinator(
             error = null,
             loading = false,
         )
-        onTrackOpened?.invoke(advanced)
+        notifyTrackOpened(advanced)
         saveCurrentProgress(0L, targetWindow.displayTotalFrames, _state.value.sampleRate)
+        if (winIdx == windows.lastIndex) {
+            schedulePreloadNext(requestGeneration)
+        }
+    }
+
+    private fun notifyTrackOpened(entry: LinearQueue.Entry) {
+        onTrackOpened?.invoke(entry)
+        appContext?.let { ctx ->
+            PlaybackHolder.unlock().recordLinearTrackOpened(ctx, entry)
+        }
+    }
+
+    private fun invalidatePreload() {
+        preloadGeneration++
+        preloadJob?.cancel()
+        preloadJob = null
+        val stale = preparedNext
+        preparedNext = null
+        if (stale != null) {
+            scope.launch(NonCancellable + ioDispatcher) {
+                stale.prepared.discard()
+            }
+        }
+    }
+
+    private fun refreshPreloadIfNeeded() {
+        if (!_state.value.active) return
+        val nextKey = queue.peekNextEntries(1).firstOrNull()?.key
+        val singleLoop = queue.repeatMode == LinearQueue.RepeatMode.SINGLE
+        val currentPreload = preparedNext
+        if (currentPreload != null) {
+            val chainValid = if (currentPreload.chainWindows.isEmpty()) {
+                true
+            } else {
+                val expectedChain = LinearHandoverPlanner.collectChainEntries(
+                    queue.peekNextEntries(1).firstOrNull() ?: return,
+                    queue.peekNextEntries(LinearHandoverPlanner.MAX_CHAIN_SEGMENTS).drop(1),
+                ).map { it.key }
+                expectedChain == currentPreload.chainKeys
+            }
+            if (currentPreload.entryKey == nextKey && currentPreload.singleLoop == singleLoop && !singleLoop && chainValid) {
+                return
+            }
+            invalidatePreload()
+        }
+        schedulePreloadNext(requestGeneration)
+    }
+
+    private fun consumePreparedIfMatching(
+        entry: LinearQueue.Entry,
+        initialSeekFrames: Long,
+        allowChaining: Boolean,
+    ): PreparedNextEntry? {
+        if (initialSeekFrames != 0L) {
+            invalidatePreload()
+            return null
+        }
+        val candidate = preparedNext ?: return null
+        val singleLoop = queue.repeatMode == LinearQueue.RepeatMode.SINGLE
+        if (candidate.entryKey != entry.key || candidate.singleLoop != singleLoop) {
+            invalidatePreload()
+            return null
+        }
+        val canChain = allowChaining &&
+            entry.courseMedley != null &&
+            PlaybackTimers.sleepState.value.mode != SleepTimerMode.AFTER_CURRENT_TRACK
+        if (candidate.chainWindows.isNotEmpty()) {
+            val expectedKeys = if (canChain) {
+                LinearHandoverPlanner.collectChainEntries(
+                    entry,
+                    queue.peekNextEntries(LinearHandoverPlanner.MAX_CHAIN_SEGMENTS - 1),
+                ).map { it.key }
+            } else {
+                emptyList()
+            }
+            if (expectedKeys != candidate.chainKeys) {
+                invalidatePreload()
+                return null
+            }
+        } else if (canChain) {
+            val chainEntries = LinearHandoverPlanner.collectChainEntries(
+                entry,
+                queue.peekNextEntries(LinearHandoverPlanner.MAX_CHAIN_SEGMENTS - 1),
+            )
+            if (chainEntries.size >= 2) {
+                invalidatePreload()
+                return null
+            }
+        }
+        preparedNext = null
+        preloadGeneration++
+        preloadJob?.cancel()
+        preloadJob = null
+        return candidate
+    }
+
+    private fun schedulePreloadNext(generation: Long) {
+        val session = sessionProvider()
+        if (session.uninterruptible) return
+        if (PlaybackTimers.sleepState.value.mode == SleepTimerMode.AFTER_CURRENT_TRACK) return
+        if (queue.repeatMode == LinearQueue.RepeatMode.SINGLE) return
+        if (activeChainWindows.isNotEmpty() && activeChainIndex < activeChainWindows.lastIndex) return
+        val nextEntry = queue.peekNextEntries(1).firstOrNull() ?: return
+        if (nextEntry.key == "extra:special_cup_appears") return
+        if (preparedNext?.entryKey == nextEntry.key) return
+
+        val lookupKey = nextEntry.sourceTrackKey ?: nextEntry.key
+        val track = catalog.tracksByKey[lookupKey]
+        val packDir = catalog.packByKey[lookupKey] ?: extraPackDir ?: return
+        if (track == null &&
+            nextEntry.assetSha256 == null &&
+            nextEntry.overlaidOpening == null &&
+            nextEntry.chainedSequence == null &&
+            nextEntry.courseMedley == null
+        ) {
+            return
+        }
+
+        val upcomingAfterNext = queue.peekNextEntries(LinearHandoverPlanner.MAX_CHAIN_SEGMENTS).drop(1)
+        val chainEntries = if (nextEntry.courseMedley != null) {
+            LinearHandoverPlanner.collectChainEntries(nextEntry, upcomingAfterNext)
+        } else {
+            emptyList()
+        }
+
+        val myPreloadGen = ++preloadGeneration
+        preloadJob?.cancel()
+        preloadJob = scope.launch {
+            delay(200L)
+            if (!isActive || generation != requestGeneration || myPreloadGen != preloadGeneration) return@launch
+            val built = withContext(ioDispatcher) {
+                runCatching {
+                    prepareEntryOffMain(
+                        entry = nextEntry,
+                        chainEntries = chainEntries,
+                        packDir = packDir,
+                        sha256Override = track?.primary?.sha256,
+                        session = session,
+                    )
+                }.getOrNull()
+            } ?: return@launch
+            if (!isActive || generation != requestGeneration || myPreloadGen != preloadGeneration) {
+                withContext(NonCancellable + ioDispatcher) {
+                    built.prepared.discard()
+                }
+                return@launch
+            }
+            val old = preparedNext
+            preparedNext = built
+            if (old != null) {
+                withContext(NonCancellable + ioDispatcher) {
+                    old.prepared.discard()
+                }
+            }
+        }
+    }
+
+    private fun prepareEntryOffMain(
+        entry: LinearQueue.Entry,
+        chainEntries: List<LinearQueue.Entry>,
+        packDir: File,
+        sha256Override: String?,
+        session: PlaybackSession,
+    ): PreparedNextEntry? {
+        if (entry.overlaidOpening != null) {
+            val op = entry.overlaidOpening
+            val opBytes = readRawBwav(op.op.sha256, packDir)
+            val telopBytes = readRawBwav(op.telop.sha256, packDir)
+            val compiled = com.mylittleblover.mkwplayer.interactive.ExtraInteractiveCompilers
+                .compileOverlaidOpeningGraph(op, opBytes, telopBytes)
+            val prep = session.prepareFlow(
+                title = entry.title,
+                packet = compiled.packet,
+                assets = compiled.assets,
+                frames = compiled.totalFrames,
+                startSegment = 100,
+                streamed = false,
+                linear = true,
+            )
+            return (prep as? PlaybackSession.PrepareResult.Ok)?.let {
+                PreparedNextEntry(
+                    entryKey = entry.key,
+                    chainKeys = emptyList(),
+                    singleLoop = false,
+                    packDirPath = packDir.path,
+                    prepared = it.prepared,
+                    totalFrames = compiled.totalFrames,
+                    sampleRate = op.op.sampleRate,
+                )
+            }
+        }
+        if (entry.chainedSequence != null) {
+            val chained = entry.chainedSequence
+            val bytesByStem = buildMap {
+                chained.parts.forEach { part ->
+                    if (part.asset.stem !in this) {
+                        put(part.asset.stem, readRawBwav(part.asset.sha256, packDir))
+                    }
+                }
+            }
+            val compiled = com.mylittleblover.mkwplayer.interactive.ExtraInteractiveCompilers
+                .compileChainedSequenceGraph(chained, bytesByStem)
+            val sampleRate = chained.parts.firstOrNull()?.asset?.sampleRate ?: 48_000
+            val prep = session.prepareFlow(
+                title = entry.title,
+                packet = compiled.packet,
+                assets = compiled.assets,
+                frames = compiled.totalFrames,
+                startSegment = 100,
+                streamed = false,
+                linear = true,
+            )
+            return (prep as? PlaybackSession.PrepareResult.Ok)?.let {
+                PreparedNextEntry(
+                    entryKey = entry.key,
+                    chainKeys = emptyList(),
+                    singleLoop = false,
+                    packDirPath = packDir.path,
+                    prepared = it.prepared,
+                    totalFrames = compiled.totalFrames,
+                    sampleRate = sampleRate,
+                )
+            }
+        }
+        if (entry.courseMedley != null) {
+            if (chainEntries.size >= 2) {
+                val bytesByStem = linkedMapOf<String, ByteArray>()
+                chainEntries.forEach { item ->
+                    item.courseMedley?.stemDigests?.forEach { (stem, sha) ->
+                        if (stem !in bytesByStem) {
+                            bytesByStem[stem] = readRawBwav(sha, packDir)
+                        }
+                    }
+                }
+                val pairs = chainEntries.map { item -> item.key to item.courseMedley!! }
+                val chain = com.mylittleblover.mkwplayer.interactive.CourseMedleyChainCompiler.compileChain(pairs, bytesByStem)
+                val prep = session.prepareFlow(
+                    title = entry.title,
+                    packet = chain.packet,
+                    assets = chain.assets,
+                    frames = chain.firstTotalFrames,
+                    startSegment = 100,
+                    streamed = true,
+                    autoAdvance = chain.autoAdvance,
+                    prequeueInitial = true,
+                    linear = true,
+                )
+                return (prep as? PlaybackSession.PrepareResult.Ok)?.let {
+                    PreparedNextEntry(
+                        entryKey = entry.key,
+                        chainKeys = chainEntries.map { c -> c.key },
+                        singleLoop = false,
+                        packDirPath = packDir.path,
+                        prepared = it.prepared,
+                        totalFrames = chain.firstTotalFrames,
+                        sampleRate = chain.sampleRate,
+                        chainWindows = chain.windows,
+                    )
+                }
+            }
+            val resolved = entry.courseMedley
+            val bytesByStem = resolved.stemDigests.mapValues { (_, sha) ->
+                readRawBwav(sha, packDir)
+            }
+            val compiled = com.mylittleblover.mkwplayer.interactive.CourseMedleyCompiler.compileGraph(
+                medley = resolved.medley,
+                sampleRate = resolved.sampleRate,
+                bytesByStem = bytesByStem,
+                knownDigestsHex = resolved.stemDigests,
+            )
+            val prep = session.prepareFlow(
+                title = entry.title,
+                packet = compiled.packet,
+                assets = compiled.assets,
+                frames = compiled.totalFrames,
+                startSegment = 100,
+                streamed = true,
+                linear = true,
+            )
+            return (prep as? PlaybackSession.PrepareResult.Ok)?.let {
+                PreparedNextEntry(
+                    entryKey = entry.key,
+                    chainKeys = emptyList(),
+                    singleLoop = false,
+                    packDirPath = packDir.path,
+                    prepared = it.prepared,
+                    totalFrames = compiled.totalFrames,
+                    sampleRate = resolved.sampleRate,
+                )
+            }
+        }
+        val sha256 = sha256Override ?: entry.assetSha256 ?: return null
+        val info = inspectPlayableAudioFile(sha256, packDir, entry.loopStart, entry.loopEnd).getOrNull() ?: return null
+        val prep = session.prepareLinearFile(
+            title = entry.title,
+            file = info.file,
+            assetId = sha256,
+            frames = info.frames,
+            loop = false,
+            streamed = true,
+            loopStart = info.loopStart,
+            loopEnd = info.loopEnd,
+        )
+        return (prep as? PlaybackSession.PrepareResult.Ok)?.let {
+            PreparedNextEntry(
+                entryKey = entry.key,
+                chainKeys = emptyList(),
+                singleLoop = false,
+                packDirPath = packDir.path,
+                prepared = it.prepared,
+                totalFrames = info.frames,
+                sampleRate = info.sampleRate,
+                loopStart = info.loopStart ?: -1L,
+                loopEnd = info.loopEnd ?: -1L,
+            )
+        }
     }
 
     private fun openEntry(
@@ -672,6 +1025,46 @@ internal class LinearPlaybackCoordinator(
         seekJob = null
         activeChainWindows = emptyList()
         activeChainIndex = 0
+
+        val preloadedHit = consumePreparedIfMatching(entry, initialSeekFrames, allowChaining)
+        if (preloadedHit != null) {
+            val session = sessionProvider()
+            activeLoopStart = preloadedHit.loopStart
+            activeLoopEnd = preloadedHit.loopEnd
+            activeChainWindows = preloadedHit.chainWindows
+            activeChainIndex = 0
+            session.updateMetadata(
+                artworkName = entry.artworkName,
+                courseCode = entry.courseCode,
+                packDirPath = preloadedHit.packDirPath,
+                subtitle = entry.subtitle,
+            )
+            session.commitPrepared(preloadedHit.prepared)
+            _state.value = LinearUiState(
+                active = true,
+                current = entry,
+                queue = queue.snapshot(),
+                totalFrames = preloadedHit.totalFrames,
+                sampleRate = preloadedHit.sampleRate,
+                error = null,
+                loading = false,
+                contextKind = sessionContext.contextKind,
+                contextId = sessionContext.contextId,
+                contextTitle = sessionContext.contextTitle,
+                allowPlayNext = sessionContext.allowPlayNext,
+                allowShuffle = sessionContext.allowShuffle,
+                allowSingleRepeat = sessionContext.allowSingleRepeat,
+                allowRepeatToggle = sessionContext.allowRepeatToggle,
+                abLoopStartFrame = abLoopStartFrame,
+                abLoopEndFrame = abLoopEndFrame,
+            )
+            notifyTrackOpened(entry)
+            saveCurrentProgress(0L, preloadedHit.totalFrames, preloadedHit.sampleRate)
+            appContext?.let { PlaybackService.start(it) }
+            schedulePreloadNext(generation)
+            return
+        }
+
         publishSnapshot(active = true, error = null, loading = true)
 
         scope.launch {
@@ -768,6 +1161,7 @@ internal class LinearPlaybackCoordinator(
                         medley = resolved.medley,
                         sampleRate = resolved.sampleRate,
                         bytesByStem = bytesByStem,
+                        knownDigestsHex = resolved.stemDigests,
                     )
                 }
                 return@launch
@@ -775,7 +1169,7 @@ internal class LinearPlaybackCoordinator(
 
             val sha256 = track?.primary?.sha256 ?: entry.assetSha256!!
             val singleLoop = queue.repeatMode == LinearQueue.RepeatMode.SINGLE
-            val preparedResult = withContext(Dispatchers.IO) {
+            val preparedResult = withContext(ioDispatcher) {
                 inspectPlayableAudioFile(sha256, packDir, entry.loopStart, entry.loopEnd).map { result ->
                     val clampedSeek = initialSeekFrames.coerceIn(0L, (result.frames - 1L).coerceAtLeast(0L))
                     result to session.prepareLinearFile(
@@ -806,7 +1200,7 @@ internal class LinearPlaybackCoordinator(
                 }
                 is PlaybackSession.PrepareResult.Ok -> {
                     if (generation != requestGeneration) {
-                        withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { prep.prepared.discard() }
+                        withContext(kotlinx.coroutines.NonCancellable + ioDispatcher) { prep.prepared.discard() }
                         return@launch
                     }
                     activeLoopStart = result.loopStart ?: -1L
@@ -849,10 +1243,11 @@ internal class LinearPlaybackCoordinator(
                 abLoopStartFrame = abLoopStartFrame,
                 abLoopEndFrame = abLoopEndFrame,
             )
-            onTrackOpened?.invoke(entry)
+            notifyTrackOpened(entry)
             val savedSeek = initialSeekFrames.coerceIn(0L, (result.frames - 1L).coerceAtLeast(0L))
             saveCurrentProgress(savedSeek, result.frames, result.sampleRate)
             appContext?.let { PlaybackService.start(it) }
+            schedulePreloadNext(generation)
         }
     }
 
@@ -864,7 +1259,7 @@ internal class LinearPlaybackCoordinator(
         initialSeekFrames: Long = 0L,
     ) {
         val first = chainEntries.first()
-        val preparedResult = withContext(Dispatchers.IO) {
+        val preparedResult = withContext(ioDispatcher) {
             runCatching {
                 val bytesByStem = linkedMapOf<String, ByteArray>()
                 chainEntries.forEach { item ->
@@ -912,7 +1307,7 @@ internal class LinearPlaybackCoordinator(
             }
             is PlaybackSession.PrepareResult.Ok -> {
                 if (generation != requestGeneration) {
-                    withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { prep.prepared.discard() }
+                    withContext(kotlinx.coroutines.NonCancellable + ioDispatcher) { prep.prepared.discard() }
                     return
                 }
                 activeLoopStart = -1L
@@ -947,9 +1342,10 @@ internal class LinearPlaybackCoordinator(
             abLoopStartFrame = abLoopStartFrame,
             abLoopEndFrame = abLoopEndFrame,
         )
-        onTrackOpened?.invoke(first)
+        notifyTrackOpened(first)
         saveCurrentProgress(clampedSeek, chain.firstTotalFrames, chain.sampleRate)
         appContext?.let { PlaybackService.start(it) }
+        schedulePreloadNext(generation)
     }
 
     private suspend fun openCompiledFlowEntry(
@@ -961,7 +1357,7 @@ internal class LinearPlaybackCoordinator(
         initialSeekFrames: Long = 0L,
         compile: () -> com.mylittleblover.mkwplayer.interactive.ExtraInteractiveCompilers.CompiledLinearGraph,
     ) {
-        val preparedResult = withContext(Dispatchers.IO) {
+        val preparedResult = withContext(ioDispatcher) {
             runCatching {
                 val compiled = compile()
                 val clampedSeek = initialSeekFrames.coerceIn(0L, (compiled.totalFrames - 1L).coerceAtLeast(0L))
@@ -996,7 +1392,7 @@ internal class LinearPlaybackCoordinator(
             }
             is PlaybackSession.PrepareResult.Ok -> {
                 if (generation != requestGeneration) {
-                    withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { prep.prepared.discard() }
+                    withContext(kotlinx.coroutines.NonCancellable + ioDispatcher) { prep.prepared.discard() }
                     return
                 }
                 activeLoopStart = -1L
@@ -1028,9 +1424,10 @@ internal class LinearPlaybackCoordinator(
             abLoopStartFrame = abLoopStartFrame,
             abLoopEndFrame = abLoopEndFrame,
         )
-        onTrackOpened?.invoke(entry)
+        notifyTrackOpened(entry)
         saveCurrentProgress(clampedSeek, totalFrames, sampleRate)
         appContext?.let { PlaybackService.start(it) }
+        schedulePreloadNext(generation)
     }
 
     private fun publishSnapshot(

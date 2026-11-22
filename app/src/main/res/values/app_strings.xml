@@ -196,4 +196,19 @@
     <string name="settings_non_affiliation">Unofficial fan project. Not affiliated with, endorsed by, or licensed by Nintendo.</string>
     <string name="settings_feedback_repo">Issues &amp; feedback: github.com/mylittleblover/MarioKartWorldPlayer-Android</string>
     <string name="settings_licenses_close">Close</string>
+
+    <string name="onboarding_welcome_title">Welcome to JukeKart</string>
+    <string name="onboarding_welcome_subtitle">Interactive multi-stage course music, connected world-map routes, and Free Roam jukebox in one dedicated player.</string>
+    <string name="onboarding_feature_courses">Dynamic multi-stage course mixes &amp; custom flow presets</string>
+    <string name="onboarding_feature_routes">World-map Grand Prix &amp; Knockout Tour routes with road music</string>
+    <string name="onboarding_feature_jukebox">Complete Free Roam jukebox &amp; Mario soundtrack library</string>
+    <string name="onboarding_step_permission_title">Enable Notifications</string>
+    <string name="onboarding_step_permission_body">Used for background lock-screen playback controls, streaming pack import progress, and Special Cup unlock alerts.</string>
+    <string name="onboarding_permission_granted">Enabled ✓</string>
+    <string name="onboarding_permission_action">Enable Notifications</string>
+    <string name="onboarding_step_pack_title">Import .mkwpack Resource Pack</string>
+    <string name="onboarding_step_pack_body">Select your .mkwpack archive to load course audio, world map artwork, and the Free Roam library.</string>
+    <string name="onboarding_import_cta">Choose &amp; Import .mkwpack</string>
+    <string name="onboarding_import_resumable_cta">Resume Incomplete Import</string>
+    <string name="onboarding_skip_later">Import later in Settings</string>
 </resources>

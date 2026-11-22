@@ -1,6 +1,5 @@
 package com.mylittleblover.mkwplayer.ui.unlock
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -31,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mylittleblover.mkwplayer.ui.Tokens
 import com.mylittleblover.mkwplayer.ui.art.CupArt
+import com.mylittleblover.mkwplayer.ui.art.ResourceArtwork
 import com.mylittleblover.mkwplayer.ui.kit.MkwButtonSize
 import com.mylittleblover.mkwplayer.ui.kit.MkwDialog
 import com.mylittleblover.mkwplayer.ui.kit.MkwGhostButton
@@ -240,9 +239,8 @@ internal fun CeremonyScreen(
                 modifier = Modifier.fillMaxWidth(),
                 contentAlignment = Alignment.Center,
             ) {
-                Image(
-                    painter = painterResource(view.emblem),
-                    contentDescription = "${view.title} emblem",
+                ResourceArtwork(
+                    resourceId = view.emblem,
                     modifier = Modifier.size(CEREMONY_EMBLEM),
                     contentScale = ContentScale.Fit,
                 )
@@ -377,9 +375,8 @@ internal fun CongratulationDialog(
         onDismissRequest = onDismiss,
         title = "$name unlocked!",
         icon = {
-            Image(
-                painter = painterResource(CupArt.special.drawable),
-                contentDescription = "$name emblem",
+            ResourceArtwork(
+                resourceId = CupArt.special.drawable,
                 modifier = Modifier.size(DIALOG_EMBLEM),
                 contentScale = ContentScale.Fit,
             )

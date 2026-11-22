@@ -4140,29 +4140,35 @@
         {
           "start": 0,
           "sourceOffset": 0,
-          "sourceLength": 664614,
+          "sourceLength": 738461,
           "stem": "BGM_Stage_DKJungleParkway_Pre_Short"
         },
         {
-          "start": 657691,
+          "start": 738461,
+          "sourceOffset": 147692,
+          "sourceLength": 516922,
+          "stem": "BGM_Stage_DKJungleParkway_Pre_Short"
+        },
+        {
+          "start": 1248460,
           "sourceOffset": 0,
           "sourceLength": 192357,
           "stem": "BGM_Stage_DKJungleParkway_Bridge"
         },
         {
-          "start": 733191,
+          "start": 1323960,
           "sourceOffset": 0,
           "sourceLength": 3328343,
           "stem": "BGM_Stage_DKJungleParkway"
         },
         {
-          "start": 4061534,
+          "start": 4652303,
           "sourceOffset": 596038,
           "sourceLength": 2252305,
           "stem": "BGM_Stage_DKJungleParkway"
         },
         {
-          "start": 6313839,
+          "start": 6904608,
           "sourceOffset": 0,
           "sourceLength": 258462,
           "stem": "BGM_Stage_DKJungleParkway_Outro00"
@@ -4178,8 +4184,8 @@
         "BGM_Stage_DKJungleParkway",
         "BGM_Stage_DKJungleParkway_Outro00"
       ],
-      "durationMs": 136922,
-      "totalFrames": 6572301
+      "durationMs": 149230,
+      "totalFrames": 7163070
     },
     {
       "clips": [

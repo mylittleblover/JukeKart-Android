@@ -3,6 +3,7 @@ package com.mylittleblover.mkwplayer.ui.routes
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Edit
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.MusicOff
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -108,11 +110,11 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -134,6 +136,7 @@ import com.mylittleblover.mkwplayer.ui.rememberReducedMotion
 import com.mylittleblover.mkwplayer.ui.art.CupArt
 import com.mylittleblover.mkwplayer.ui.art.MapArtworkCache
 import com.mylittleblover.mkwplayer.ui.art.ArtworkSlot
+import com.mylittleblover.mkwplayer.ui.art.ResourceArtwork
 import com.mylittleblover.mkwplayer.ui.art.artworkFade
 import com.mylittleblover.mkwplayer.ui.art.rememberResourceArtwork
 import com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog
@@ -243,6 +246,7 @@ internal fun OfficialMapScreen(
                 MapCanvas(image, anchors.canvasWidth.toFloat(), pins, route, state, name, Modifier.fillMaxSize(),
                     neighbours = neighbours, onPinTap = onPinTap, draft = state.draft, editFrom = state.editFrom,
                     draftEdgeConfigs = state.draftEdgeConfigs,
+                    packDirectory = packDirectory,
                     onDraftEdgeTap = { idx ->
                         pickingOfficialLeg = false
                         pickingEdgeIndex = idx
@@ -251,12 +255,12 @@ internal fun OfficialMapScreen(
                 MkwFloatingPanel(
                     modifier = Modifier.align(Alignment.TopStart).padding(10.dp)
                         .widthIn(max = (maxWidth - if (horizontalControls) 196.dp else 72.dp).coerceIn(140.dp, 340.dp)),
-                    shape = MkwKitTokens.Shape.card,
+                    shape = MkwKitTokens.Shape.pill,
                     shadowElevation = 3.dp,
                     alpha = 0.96f,
                 ) {
                     Row(
-                        Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                        Modifier.padding(start = 14.dp, end = if (wide) 14.dp else 6.dp, top = 6.dp, bottom = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
@@ -269,7 +273,7 @@ internal fun OfficialMapScreen(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            if (!horizontalControls) {
+                            if (wide && !horizontalControls) {
                                 Text(
                                     stringResource(R.string.map_subtitle, pins.size),
                                     style = MkwKitTokens.tabular(MaterialTheme.typography.labelSmall),
@@ -402,6 +406,18 @@ internal fun OfficialMapScreen(
                                             },
                                             onDone = { stops = false },
                                         )
+                                    } else if (course == null && route != null) {
+                                        OfficialRouteCompactDock(
+                                            route = route,
+                                            languageTag = languageTag,
+                                            name = name,
+                                            officialReport = officialReport,
+                                            onPlayRoute = {
+                                                onPlayOfficialRoute(route, officialLoop, sessionOverrides.toMap(), officialRuleMode, officialSuiteMode)
+                                            },
+                                            onOpenStopsSheet = { stops = true },
+                                            onClearRoute = { state.clearSelection() },
+                                        )
                                     } else {
                                         MapSelectionPanel(
                                             route = route,
@@ -516,40 +532,121 @@ internal fun OfficialMapScreen(
         }
     }
     if (picker) {
+        val gpRoutes = remember(visibleRoutes) { visibleRoutes.filter { it.kind == OfficialRouteKind.GRAND_PRIX } }
+        val rallyRoutes = remember(visibleRoutes) { visibleRoutes.filter { it.kind == OfficialRouteKind.RALLY } }
+        var pickerKind by rememberSaveable(route?.id) {
+            mutableStateOf(route?.kind ?: OfficialRouteKind.GRAND_PRIX)
+        }
+        val activePickerRoutes = if (pickerKind == OfficialRouteKind.GRAND_PRIX) gpRoutes else rallyRoutes
         MkwBottomSheet(
             onDismissRequest = { picker = false },
             title = stringResource(R.string.map_official_routes),
+            subtitle = stringResource(R.string.map_picker_subtitle),
+            modifier = Modifier.fillMaxHeight(0.82f),
         ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp).padding(horizontal = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-                contentPadding = PaddingValues(bottom = 12.dp),
+            Surface(
+                shape = MkwKitTokens.Shape.pill,
+                color = MkwKitTokens.Palette.inset,
+                border = BorderStroke(MkwKitTokens.Stroke.hairline, MkwKitTokens.Palette.hairline),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
             ) {
-                for (kind in OfficialRouteKind.entries) {
-                    item(key = kind.name) {
-                        Text(
-                            text = stringResource(if (kind == OfficialRouteKind.GRAND_PRIX) R.string.map_grand_prix else R.string.map_rallies),
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MkwKitTokens.Palette.crimson,
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    listOf(
+                        OfficialRouteKind.GRAND_PRIX to gpRoutes.size,
+                        OfficialRouteKind.RALLY to rallyRoutes.size,
+                    ).forEach { (kind, count) ->
+                        val selectedTab = pickerKind == kind
+                        val label = stringResource(
+                            R.string.map_kind_count_fmt,
+                            stringResource(if (kind == OfficialRouteKind.GRAND_PRIX) R.string.map_grand_prix else R.string.map_rallies),
+                            count,
                         )
+                        Surface(
+                            onClick = { pickerKind = kind },
+                            shape = MkwKitTokens.Shape.pill,
+                            color = if (selectedTab) MkwKitTokens.Palette.ground else Color.Transparent,
+                            shadowElevation = if (selectedTab) 1.dp else 0.dp,
+                            border = if (selectedTab) BorderStroke(MkwKitTokens.Stroke.hairline, MkwKitTokens.Palette.crimson.copy(alpha = 0.28f)) else null,
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 40.dp)
+                                .semantics { role = Role.Tab; selected = selectedTab },
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = MkwKitTokens.tabular(MaterialTheme.typography.labelLarge),
+                                    fontWeight = if (selectedTab) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (selectedTab) MkwKitTokens.Palette.crimsonDeep else MkwKitTokens.Palette.inkSecondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
                     }
-                    items(visibleRoutes.filter { it.kind == kind }, key = { it.id }) { item ->
-                        MkwOptionRow(
-                            headline = item.displayName(languageTag),
-                            supporting = stringResource(R.string.map_route_stops, item.stops.size),
-                            selected = route?.id == item.id,
-                            leading = CupArt.routeEmblem(item.id)?.let { emblem ->
-                                { Image(painterResource(emblem), null, Modifier.size(40.dp)) }
-                            },
-                            onClick = {
-                                val points = item.stops.mapNotNull { anchors.stageTolerant(it.stageCode)?.let { p -> Offset(p.u, p.v) } }
-                                state.selectRoute(item.id, points)
-                                stops = false
-                                picker = false
-                            },
-                        )
+                }
+            }
+            MkwDivider(modifier = Modifier.padding(top = 4.dp))
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            ) {
+                items(activePickerRoutes, key = { it.id }) { item ->
+                    val isSelected = route?.id == item.id
+                    MkwCard(
+                        onClick = {
+                            val points = item.stops.mapNotNull { anchors.stageTolerant(it.stageCode)?.let { p -> Offset(p.u, p.v) } }
+                            state.selectRoute(item.id, points)
+                            stops = false
+                            picker = false
+                        },
+                        tone = if (isSelected) MkwSurfaceTone.RoseTint else MkwSurfaceTone.Porcelain,
+                        selected = isSelected,
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            CupArt.routeEmblem(item.id)?.let { emblem ->
+                                ResourceArtwork(emblem, Modifier.size(46.dp))
+                            }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(
+                                    text = item.displayName(languageTag),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                    color = if (isSelected) MkwKitTokens.Palette.crimsonDeep else MkwKitTokens.Palette.ink,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    text = "${name(item.start.stageCode)} → ${name(item.end.stageCode)} · ${stringResource(R.string.map_route_stops, item.stops.size)}",
+                                    style = MkwKitTokens.tabular(MaterialTheme.typography.bodySmall),
+                                    color = MkwKitTokens.Palette.inkSecondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Filled.Check,
+                                    contentDescription = null,
+                                    tint = MkwKitTokens.Palette.crimson,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -559,32 +656,117 @@ internal fun OfficialMapScreen(
         MkwBottomSheet(
             onDismissRequest = { stops = false },
             title = route.displayName(languageTag),
-            subtitle = stringResource(R.string.map_route_readonly),
+            subtitle = "${name(route.start.stageCode)} → ${name(route.end.stageCode)} · ${stringResource(R.string.map_route_stops, route.stops.size)}",
+            modifier = Modifier.fillMaxHeight(0.84f),
         ) {
-            Text(
-                stringResource(R.string.map_schematic),
-                Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
-                style = MaterialTheme.typography.bodySmall,
-                color = MkwKitTokens.Palette.inkSecondary,
-            )
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp),
-                contentPadding = PaddingValues(bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                if (officialReport?.canPlay == false) {
+                    Text(
+                        officialReport.blockingReason ?: stringResource(R.string.route_blocked_incomplete_pool),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MkwKitTokens.Palette.danger,
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    CupArt.routeEmblem(route.id)?.let { emblem ->
+                        ResourceArtwork(emblem, Modifier.size(40.dp))
+                    }
+                    MkwPrimaryButton(
+                        text = stringResource(R.string.route_play),
+                        onClick = {
+                            onPlayOfficialRoute(route, officialLoop, sessionOverrides.toMap(), officialRuleMode, officialSuiteMode)
+                        },
+                        enabled = officialReport?.canPlay != false,
+                        leadingIcon = Icons.Filled.PlayArrow,
+                        size = MkwButtonSize.Compact,
+                        modifier = Modifier.weight(1f),
+                    )
+                    MkwFilterPill(
+                        label = stringResource(R.string.route_loop_whole),
+                        selected = officialLoop,
+                        onClick = { officialLoop = !officialLoop },
+                    )
+                }
+                RoadMusicRuleModeSelector(
+                    selectedMode = officialRuleMode,
+                    officialKind = route.kind,
+                    onSelectMode = {
+                        officialRuleMode = it
+                        sessionOverrides.clear()
+                    },
+                )
+                RouteSuiteModeSelector(
+                    selectedMode = officialSuiteMode,
+                    onSelectMode = { officialSuiteMode = it },
+                )
+            }
+            MkwDivider(modifier = Modifier.padding(top = 4.dp))
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                item(key = "stops-schematic-note") {
+                    Text(
+                        "${stringResource(R.string.map_route_readonly)} ${stringResource(R.string.map_schematic)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MkwKitTokens.Palette.inkSecondary,
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
+                }
                 items(route.stops.size, key = { idx -> route.stops[idx].id }) { idx ->
                     val stop = route.stops[idx]
-                    MkwOptionRow(
-                        headline = stringResource(R.string.map_route_stop, stop.ordinal, name(stop.stageCode)),
-                        supporting = if (stop == route.start || stop == route.end) {
-                            stringResource(if (stop == route.start) R.string.map_start_badge else R.string.map_finish_badge)
-                        } else null,
+                    MkwCard(
                         onClick = {
                             state.selectCourse(stop.stageCode)
                             stops = false
                         },
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
+                        tone = MkwSurfaceTone.Porcelain,
+                        shape = MkwKitTokens.Shape.control,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Text(
+                                "${stop.ordinal}",
+                                style = MkwKitTokens.tabular(MaterialTheme.typography.titleSmall),
+                                fontWeight = FontWeight.Bold,
+                                color = MkwKitTokens.Palette.crimson,
+                            )
+                            StageArt.resolve(stop.stageCode)?.let { artRes ->
+                                ResourceArtwork(artRes, Modifier.size(36.dp))
+                            }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    name(stop.stageCode),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MkwKitTokens.Palette.ink,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                if (stop == route.start || stop == route.end) {
+                                    Text(
+                                        stringResource(if (stop == route.start) R.string.map_start_badge else R.string.map_finish_badge),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MkwKitTokens.Palette.crimsonDeep,
+                                    )
+                                }
+                            }
+                        }
+                    }
                     val leg = officialReport?.legs?.getOrNull(idx)
                     if (leg != null) {
                         val summary = edgeResolutionSummary(leg.resolution, languageTag)
@@ -593,10 +775,10 @@ internal fun OfficialMapScreen(
                                 pickingOfficialLeg = true
                                 pickingEdgeIndex = idx
                             },
-                            tone = MkwSurfaceTone.Porcelain,
+                            tone = MkwSurfaceTone.White,
                             shape = MkwKitTokens.Shape.thumb,
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 2.dp),
+                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 4.dp),
                         ) {
                             Row(
                                 Modifier.fillMaxWidth(),
@@ -879,6 +1061,88 @@ private fun ConnectionEditorPanel(
     }
 }
 
+@Composable
+private fun OfficialRouteCompactDock(
+    route: OfficialRoute,
+    languageTag: String,
+    name: (String) -> String,
+    officialReport: RoadJukeboxCatalog.RouteValidationReport?,
+    onPlayRoute: () -> Unit,
+    onOpenStopsSheet: () -> Unit,
+    onClearRoute: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            CupArt.routeEmblem(route.id)?.let { emblem ->
+                ResourceArtwork(emblem, Modifier.size(40.dp))
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = route.displayName(languageTag),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MkwKitTokens.Palette.ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "${name(route.start.stageCode)} → ${name(route.end.stageCode)} · ${stringResource(R.string.map_route_stops, route.stops.size)}",
+                    style = MkwKitTokens.tabular(MaterialTheme.typography.bodySmall),
+                    color = MkwKitTokens.Palette.inkSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            MkwIconButton(
+                icon = Icons.Filled.Close,
+                contentDescription = stringResource(R.string.map_clear_route),
+                onClick = onClearRoute,
+                visualSize = 36.dp,
+                iconSize = 18.dp,
+                modifier = Modifier.size(40.dp),
+            )
+        }
+        if (officialReport?.canPlay == false) {
+            Text(
+                text = officialReport.blockingReason ?: stringResource(R.string.route_blocked_incomplete_pool),
+                style = MaterialTheme.typography.bodySmall,
+                color = MkwKitTokens.Palette.danger,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            MkwPrimaryButton(
+                text = stringResource(R.string.route_play),
+                onClick = onPlayRoute,
+                enabled = officialReport?.canPlay != false,
+                leadingIcon = Icons.Filled.PlayArrow,
+                size = MkwButtonSize.Compact,
+            )
+            MkwSecondaryButton(
+                text = stringResource(R.string.map_stops_sheet_action),
+                onClick = onOpenStopsSheet,
+                leadingIcon = Icons.Filled.Tune,
+                size = MkwButtonSize.Compact,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MapSelectionPanel(
@@ -1107,6 +1371,7 @@ private fun MapCanvas(
     draft: List<Pair<String, String>> = emptyList(),
     editFrom: String? = null,
     draftEdgeConfigs: Map<Int, CustomRouteEdgeConfig> = emptyMap(),
+    packDirectory: File? = null,
     onDraftEdgeTap: (Int) -> Unit = {},
 ) {
     val density = LocalDensity.current
@@ -1117,8 +1382,8 @@ private fun MapCanvas(
     // Connections are drawn in the secondary colour so a real road never reads as an official route line.
     val connectionAccent = MaterialTheme.colorScheme.secondary.copy(alpha = .85f)
     val routeSprites = if (route != null || state.selectedCourseCode != null || draft.isNotEmpty() || editFrom != null) {
-        val sprites by produceState<MapArtworkCache.RouteSprites?>(null, context) {
-            value = MapArtworkCache.loadRouteSprites(context)
+        val sprites by produceState<MapArtworkCache.RouteSprites?>(null, context, packDirectory) {
+            value = MapArtworkCache.loadRouteSprites(context, packDirectory)
         }
         sprites
     } else null
@@ -1126,20 +1391,19 @@ private fun MapCanvas(
     val reducedMotion = rememberReducedMotion()
 
     // Non-flickering official highlight mask loading + true dual-layer crossfade
-    val highlightMaskId = route?.id?.let { CupArt.routeHighlightMask(it) }
-    val loadedMask by produceState<Pair<Int, ImageBitmap>?>(null, context, highlightMaskId) {
-        if (highlightMaskId != null) {
-            val bmp = MapArtworkCache.loadHighlightMask(context, highlightMaskId)
-            if (bmp != null) value = highlightMaskId to bmp
-        }
+    val highlightRouteId = route?.id
+    val loadedMask by produceState<Pair<String, ImageBitmap>?>(null, context, packDirectory, highlightRouteId) {
+        value = if (highlightRouteId != null) {
+            MapArtworkCache.loadHighlightMask(context, packDirectory, highlightRouteId)?.let { highlightRouteId to it }
+        } else null
     }
-    var currentMask by remember { mutableStateOf<Pair<Int, ImageBitmap>?>(null) }
-    var outgoingMask by remember { mutableStateOf<Pair<Int, ImageBitmap>?>(null) }
+    var currentMask by remember { mutableStateOf<Pair<String, ImageBitmap>?>(null) }
+    var outgoingMask by remember { mutableStateOf<Pair<String, ImageBitmap>?>(null) }
     val currentMaskAlpha = remember { Animatable(0f) }
     val outgoingMaskAlpha = remember { Animatable(0f) }
-    LaunchedEffect(highlightMaskId, loadedMask, reducedMotion) {
+    LaunchedEffect(highlightRouteId, loadedMask, reducedMotion) {
         val fadeDuration = if (reducedMotion) 0 else 360
-        if (highlightMaskId == null) {
+        if (highlightRouteId == null || loadedMask == null) {
             outgoingMask?.let {
                 launch {
                     outgoingMaskAlpha.animateTo(0f, tween(fadeDuration, easing = FastOutSlowInEasing))
@@ -1150,8 +1414,8 @@ private fun MapCanvas(
                 currentMaskAlpha.animateTo(0f, tween(if (reducedMotion) 0 else 280, easing = FastOutSlowInEasing))
                 currentMask = null
             }
-        } else if (loadedMask?.first == highlightMaskId) {
-            if (currentMask?.first != highlightMaskId) {
+        } else if (loadedMask?.first == highlightRouteId) {
+            if (currentMask?.first != highlightRouteId) {
                 val prev = currentMask
                 val prevAlpha = currentMaskAlpha.value
                 if (prev != null && prevAlpha > 0.01f && !reducedMotion) {

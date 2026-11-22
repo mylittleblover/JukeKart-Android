@@ -43,12 +43,13 @@ internal object CourseMedleyCompiler {
         medley: CourseMedleyCatalog.Medley,
         sampleRate: Int,
         bytesByStem: Map<String, ByteArray>,
+        knownDigestsHex: Map<String, String> = emptyMap(),
     ): ExtraInteractiveCompilers.CompiledLinearGraph {
         require(medley.clips.isNotEmpty()) { "Medley '${medley.id}' has no clips" }
 
         val uniqueAssets = linkedMapOf<String, Pair<G.Asset, ByteArray>>()
         val assetIndexByStem = linkedMapOf<String, Int>()
-        val md = MessageDigest.getInstance("SHA-256")
+        var md: MessageDigest? = null
 
         medley.uniqueStems.forEach { stem ->
             val bytes = bytesByStem[stem] ?: error("Missing stem '$stem' for medley '${medley.id}'")
@@ -59,12 +60,16 @@ internal object CourseMedleyCompiler {
             val frames = info.frames.toLong()
             require(frames > 0L) { "Stem '$stem' has non-positive frame count $frames" }
             val path = "$stem.bwav"
+            val shaBytes = knownDigestsHex[stem]?.let(::decodeHexSha256) ?: run {
+                val digest = md ?: MessageDigest.getInstance("SHA-256").also { md = it }
+                digest.digest(bytes)
+            }
             val spec = G.Asset(
                 path = path,
                 sampleRate = info.sampleRate,
                 channels = if (info.channels > 2) 2 else info.channels.coerceAtLeast(1),
                 frames = frames,
-                sha256 = md.digest(bytes),
+                sha256 = shaBytes,
             )
             assetIndexByStem[stem] = uniqueAssets.size
             uniqueAssets[stem] = spec to bytes
@@ -118,5 +123,24 @@ internal object CourseMedleyCompiler {
             assets = uniqueAssets.values.map { it.first.path to it.second },
             totalFrames = totalFrames,
         )
+    }
+
+    internal fun decodeHexSha256(hex: String): ByteArray? {
+        if (hex.length != 64) return null
+        val out = ByteArray(32)
+        for (i in 0 until 32) {
+            val hi = hexDigit(hex[i * 2])
+            val lo = hexDigit(hex[i * 2 + 1])
+            if (hi < 0 || lo < 0) return null
+            out[i] = ((hi shl 4) or lo).toByte()
+        }
+        return out
+    }
+
+    private fun hexDigit(c: Char): Int = when (c) {
+        in '0'..'9' -> c.code - '0'.code
+        in 'a'..'f' -> c.code - 'a'.code + 10
+        in 'A'..'F' -> c.code - 'A'.code + 10
+        else -> -1
     }
 }
