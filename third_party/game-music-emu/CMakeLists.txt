@@ -36,6 +36,7 @@ set_target_properties(gme_shared PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED YE
 set_target_properties(gme_shared PROPERTIES LINKER_LANGUAGE CXX)
 if(ANDROID)
     target_link_libraries(gme_shared PRIVATE c++_shared)
+    target_link_options(gme_shared PRIVATE "-Wl,-z,max-page-size=16384")
 endif()
 
 target_include_directories(gme_shared SYSTEM INTERFACE "${source_root}/gme")

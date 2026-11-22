@@ -13,8 +13,9 @@ import struct
 
 import numpy as np
 
-HEADERS = r"G:\Mario Kart World\MKW-Player\reports\generated\bwav-loop-headers.json"
-SEAMS = r"G:\Mario Kart World\MKW-Player\reports\generated\bwav-loop-seams.json"
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+HEADERS = os.path.join(_REPO, "reports", "generated", "bwav-loop-headers.json")
+SEAMS = os.path.join(_REPO, "reports", "generated", "bwav-loop-seams.json")
 
 
 def main() -> None:

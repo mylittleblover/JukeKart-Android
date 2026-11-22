@@ -10,8 +10,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dsp_verify import decode_file, read_wav_reference
 
-BW = r"G:\Mario Kart World\romfs\Sound\Resource\Stream"
-WAV = r"G:\Mario Kart World\readable_assets\audio\romfs\Sound\Resource\Stream"
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BW = os.environ.get("MKW_ROMFS_STREAM", os.path.join(_REPO, "romfs", "Sound", "Resource", "Stream"))
+WAV = os.environ.get("MKW_WAV_STREAM", os.path.join(_REPO, "readable_assets", "audio", "romfs", "Sound", "Resource", "Stream"))
 
 
 def window(ours, ref, start, count):
@@ -99,7 +100,7 @@ def main():
             f"{exact} exact ({100.0*exact/total:.4f}%), "
             f"maxdiff={max(r['maxdiff'] for r in results)}"
         )
-        out = r"G:\Mario Kart World\MKW-Player\reports\generated\dsp-verify.json"
+        out = os.path.join(_REPO, "reports", "generated", "dsp-verify.json")
         os.makedirs(os.path.dirname(out), exist_ok=True)
         with open(out, "w", encoding="utf-8") as f:
             json.dump(results, f, indent=2)

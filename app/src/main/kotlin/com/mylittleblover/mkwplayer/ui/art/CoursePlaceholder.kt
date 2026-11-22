@@ -1,28 +1,21 @@
 package com.mylittleblover.mkwplayer.ui.art
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import com.mylittleblover.mkwplayer.R
 import com.mylittleblover.mkwplayer.library.MapAnchors
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlin.math.abs
+import kotlin.math.sin
 
 /** Process-wide parsed `map_anchors.json` cache so composing course placeholders never performs asset I/O on Main. */
 internal object MapAnchorsCache {
@@ -47,7 +40,17 @@ internal object MapAnchorsCache {
     }
 }
 
-/** The supplied landscape covers are pending; this is an explicitly temporary map crop. */
+private val PLACEHOLDER_PALETTES = listOf(
+    Pair(Color(0xFF1E293B), Color(0xFF0F172A)),
+    Pair(Color(0xFF7C2D12), Color(0xFF431407)),
+    Pair(Color(0xFF065F46), Color(0xFF022C22)),
+    Pair(Color(0xFF1D4ED8), Color(0xFF172554)),
+    Pair(Color(0xFF6D28D9), Color(0xFF2E1065)),
+    Pair(Color(0xFF9F1239), Color(0xFF4C0519)),
+    Pair(Color(0xFF0F766E), Color(0xFF042F2E)),
+)
+
+/** Original procedural circuit card backdrop rendered when no custom pack cover is present. */
 @Composable
 internal fun CoursePlaceholder(code: String?, modifier: Modifier = Modifier, showIcon: Boolean = true) {
     ArtworkSlot(modifier) { edge ->
@@ -57,29 +60,39 @@ internal fun CoursePlaceholder(code: String?, modifier: Modifier = Modifier, sho
 
 @Composable
 internal fun CoursePlaceholderContent(code: String?, edge: Int, showIcon: Boolean = true) {
-    val context = LocalContext.current
-    val initialCatalog = remember { MapAnchorsCache.peek() }
-    val anchorsCatalog by produceState(initialValue = initialCatalog, key1 = context) {
-        if (value == null) {
-            value = withContext(Dispatchers.IO) { MapAnchorsCache.load(context) }
+    val cleanCode = code.orEmpty().trim()
+    val seed = remember(cleanCode) { abs(cleanCode.hashCode()) }
+    val (cTop, cBottom) = remember(seed) { PLACEHOLDER_PALETTES[seed % PLACEHOLDER_PALETTES.size] }
+    Canvas(Modifier.fillMaxSize()) {
+        drawRect(
+            brush = Brush.linearGradient(
+                colors = listOf(cTop, cBottom),
+                start = Offset.Zero,
+                end = Offset(size.width, size.height),
+            ),
+        )
+        val gridAlpha = 0.08f
+        val cols = 6
+        for (i in 1 until cols) {
+            val x = size.width * i / cols
+            drawLine(Color.White.copy(alpha = gridAlpha), Offset(x, 0f), Offset(x, size.height), strokeWidth = 1f)
         }
-    }
-    val anchor = remember(anchorsCatalog, code) {
-        anchorsCatalog?.stageTolerant(code.orEmpty())
-    }
-    val lookup = rememberResourceArtworkState(R.drawable.world_map.takeIf { anchor != null }, if (edge == 0) 0 else 960)
-    val image = lookup.loaded?.bitmap
-    if (image != null && anchor != null) {
-        Canvas(Modifier.fillMaxSize().then(if (!lookup.fromCache) artworkFade(image) else Modifier)) {
-            val width = (image.width * .24f).toInt().coerceAtLeast(1)
-            val height = (image.height * .18f).toInt().coerceAtLeast(1)
-            val left = (anchor.u * image.width - width / 2).toInt().coerceIn(0, image.width - width)
-            val top = (anchor.v * image.height - height / 2).toInt().coerceIn(0, image.height - height)
-            drawImage(
-                image,
-                srcOffset = IntOffset(left, top),
-                srcSize = IntSize(width, height),
-                dstSize = IntSize(size.width.toInt().coerceAtLeast(1), size.height.toInt().coerceAtLeast(1)),
+        val phase = (seed % 360) * 0.01745f
+        for (band in 0..2) {
+            val path = Path()
+            val yBase = size.height * (0.28f + band * 0.22f)
+            val amp = size.height * (0.06f + band * 0.02f)
+            val steps = 16
+            for (s in 0..steps) {
+                val t = s.toFloat() / steps
+                val px = size.width * t
+                val py = yBase + sin((t * 4.5f + phase + band).toDouble()).toFloat() * amp
+                if (s == 0) path.moveTo(px, py) else path.lineTo(px, py)
+            }
+            drawPath(
+                path = path,
+                color = Color.White.copy(alpha = 0.14f - band * 0.03f),
+                style = Stroke(width = 2.5f),
             )
         }
     }

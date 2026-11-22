@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <exclude domain="file" path="packs" />
+    <exclude domain="file" path="import_checkpoints" />
+    <exclude domain="file" path="stages" />
+    <exclude domain="file" path="artwork" />
+    <exclude domain="file" path="ceremony" />
+</full-backup-content>

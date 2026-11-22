@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -40,7 +41,9 @@ internal fun CourseCover(
     artworkName: String? = null,
 ) {
     val cover = code?.let { CourseCoverArt.resolve(it) }
-    val packArtNames = listOfNotNull(artworkName)
+    val packArtNames = remember(artworkName, code) {
+        (listOfNotNull(artworkName) + (code?.let { CourseCoverArt.packCandidates(it) }.orEmpty())).distinct()
+    }
 
     when {
         formalArt != null -> Box(modifier) {

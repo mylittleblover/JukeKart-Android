@@ -1,8 +1,11 @@
 package com.mylittleblover.mkwplayer.ui.art
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.util.LruCache
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -69,9 +72,9 @@ internal fun rememberResourceArtwork(resourceId: Int?, maxEdge: Int): PackArtwor
 
 @Composable
 internal fun rememberResourceArtworkState(resourceId: Int?, maxEdge: Int): ArtworkLookup {
-    val resources = LocalContext.current.resources
+    val context = LocalContext.current
     if (resourceId == null || maxEdge == 0) return ArtworkLookup(null, fromCache = false)
-    return key(resources, resourceId, maxEdge) {
+    return key(context, resourceId, maxEdge) {
         val cacheKey = "$resourceId@$maxEdge"
         val immediate = resourceArtworkCache.get(cacheKey)?.loaded
         if (immediate != null) {
@@ -79,7 +82,7 @@ internal fun rememberResourceArtworkState(resourceId: Int?, maxEdge: Int): Artwo
         } else {
             val image by produceState<PackArtwork.Loaded?>(null, resourceId, maxEdge) {
                 value = resourceArtworkCache.get(cacheKey)?.loaded ?: withContext(artworkDecoder) {
-                    decodeArtwork(maxEdge) { BitmapFactory.decodeResource(resources, resourceId, it) }?.also { loaded ->
+                    decodeDrawableArtwork(context, resourceId, maxEdge)?.also { loaded ->
                         val bytes = runCatching { loaded.bitmap.asAndroidBitmap().allocationByteCount }
                             .getOrDefault(loaded.bitmap.width * loaded.bitmap.height * 4)
                         resourceArtworkCache.put(cacheKey, CachedResourceArtwork(loaded, bytes))
@@ -89,6 +92,23 @@ internal fun rememberResourceArtworkState(resourceId: Int?, maxEdge: Int): Artwo
             ArtworkLookup(image, fromCache = false)
         }
     }
+}
+
+internal fun decodeDrawableArtwork(context: Context, resourceId: Int, maxEdge: Int): PackArtwork.Loaded? {
+    decodeArtwork(maxEdge) { BitmapFactory.decodeResource(context.resources, resourceId, it) }?.let { return it }
+    val drawable = ContextCompat.getDrawable(context, resourceId) ?: return null
+    val rawW = drawable.intrinsicWidth.takeIf { it > 0 } ?: maxEdge
+    val rawH = drawable.intrinsicHeight.takeIf { it > 0 } ?: maxEdge
+    val longest = maxOf(rawW, rawH).coerceAtLeast(1)
+    val targetEdge = maxEdge.coerceIn(128, 512)
+    val scale = targetEdge.toFloat() / longest.toFloat()
+    val w = (rawW * scale).toInt().coerceAtLeast(1)
+    val h = (rawH * scale).toInt().coerceAtLeast(1)
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    drawable.setBounds(0, 0, w, h)
+    drawable.draw(canvas)
+    return PackArtwork.Loaded(bitmap.asImageBitmap(), rawW.toFloat() / rawH.toFloat())
 }
 
 /** Keep the layout stable after releasing the off-screen bitmap, and reset cleanly across track skips. */

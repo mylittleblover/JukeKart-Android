@@ -186,4 +186,9 @@
     <string name="swipe_action_unfavorite">お気に入り解除</string>
     <string name="swipe_action_remove">リストから削除</string>
     <string name="playlist_drag_hint">右側のハンドルをドラッグして曲順を変更できます</string>
+    <string name="settings_open_source_licenses">オープンソースライセンス</string>
+    <string name="settings_open_source_licenses_summary">Game_Music_Emu (LGPL-2.1 共有ライブラリ)、libopenmpt (BSD-3)、Opus (BSD-3)、clHCA (ISC)、Oboe・Jetpack Compose (Apache-2.0) を含みます。</string>
+    <string name="settings_non_affiliation">非公式のファン制作ツールであり、任天堂とは一切関係なく、公式の許諾・推奨を受けたものではありません。</string>
+    <string name="settings_feedback_repo">要望・不具合報告：github.com/mylittleblover/MarioKartWorldPlayer-Android</string>
+    <string name="settings_licenses_close">閉じる</string>
 </resources>

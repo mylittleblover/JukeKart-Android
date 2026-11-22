@@ -3,34 +3,23 @@ package com.mylittleblover.mkwplayer.ui.art
 import com.mylittleblover.mkwplayer.R
 
 /**
- * Which artwork the app may show, and what it must say about where the artwork came from.
+ * Built-in original vector badges for cups, Knockout Tour rallies, and modes.
  *
- * Every image in the app is Nintendo's. The handoff pack is explicit that original game icons must not
- * be built into a published APK without a rights position, so this file exists to make the provenance
- * visible rather than implied: a build that ships these icons is a private research build, and the
- * screen has to say so instead of presenting borrowed art as the app's own.
- *
- * The alternative -- no art at all -- was rejected because the cup list is the one place where a
- * picture carries real information: the seven cup emblems are how a player recognises a cup.
+ * Public releases replace extracted game art with original JukeKart vector drawables while keeping
+ * optional support for loading user-supplied artwork from `.mkwpack` archives at runtime.
  */
 internal object CupArt {
 
-    /**
-     * How the artwork in this build is classified.
-     *
-     * Deliberately not a boolean. "Attribution shown" and "rights cleared" are different claims, and
-     * collapsing them would let a research build look like a release.
-     */
     enum class RightsStatus {
-        /** Nintendo-owned art, included for private research. Not redistributable. */
-        PRIVATE_RESEARCH,
+        /** Original JukeKart vector emblems shipped in this public build; unaffiliated with Nintendo. */
+        ORIGINAL_VECTOR,
     }
 
-    /** The statement the UI must show wherever this art appears. */
+    /** The provenance notice shown alongside cup and route artwork screens. */
     const val NOTICE: String =
-        "Cup emblems are Nintendo artwork, included for private research only. Not redistributable."
+        "Icons are original JukeKart artwork. JukeKart is an unofficial fan tool and is not affiliated with Nintendo."
 
-    val status: RightsStatus get() = RightsStatus.PRIVATE_RESEARCH
+    val status: RightsStatus get() = RightsStatus.ORIGINAL_VECTOR
 
     /** A cup the app can show. `id` matches the research export's cup naming. */
     data class Cup(val id: String, val label: String, val drawable: Int)
@@ -100,36 +89,34 @@ internal object CupArt {
         all().firstOrNull { "${it.id}_cup" == routeId }?.drawable ?: rally(routeId)?.drawable
 
     private val routeMasks: Map<String, Int> = mapOf(
-        "mushroom_cup" to R.drawable.map_light_gp00,
-        "flower_cup" to R.drawable.map_light_gp01,
-        "star_cup" to R.drawable.map_light_gp02,
-        "shell_cup" to R.drawable.map_light_gp03,
-        "banana_cup" to R.drawable.map_light_gp04,
-        "leaf_cup" to R.drawable.map_light_gp05,
-        "lightning_cup" to R.drawable.map_light_gp06,
-        "special_cup" to R.drawable.map_light_gp07,
-        "golden_rally" to R.drawable.map_light_sv00,
-        "ice_rally" to R.drawable.map_light_sv01,
-        "moon_rally" to R.drawable.map_light_sv02,
-        "spiny_rally" to R.drawable.map_light_sv03,
-        "cherry_rally" to R.drawable.map_light_sv04,
-        "acorn_rally" to R.drawable.map_light_sv05,
-        "cloud_rally" to R.drawable.map_light_sv06,
-        "heart_rally" to R.drawable.map_light_sv07,
-        "drill_rally" to R.drawable.map_light_sv08,
-        "boomerang_rally" to R.drawable.map_light_sv09,
-        "propeller_rally" to R.drawable.map_light_sv10,
-        "turnip_rally" to R.drawable.map_light_sv11,
+        "mushroom_cup" to 1,
+        "flower_cup" to 2,
+        "star_cup" to 3,
+        "shell_cup" to 4,
+        "banana_cup" to 5,
+        "leaf_cup" to 6,
+        "lightning_cup" to 7,
+        "special_cup" to 8,
+        "golden_rally" to 9,
+        "ice_rally" to 10,
+        "moon_rally" to 11,
+        "spiny_rally" to 12,
+        "cherry_rally" to 13,
+        "acorn_rally" to 14,
+        "cloud_rally" to 15,
+        "heart_rally" to 16,
+        "drill_rally" to 17,
+        "boomerang_rally" to 18,
+        "propeller_rally" to 19,
+        "turnip_rally" to 20,
     )
 
-    /** Resolves an official route id to its `Map_00` corridor highlight mask drawable. */
+    /** Resolves an official route id to its procedural spotlight corridor token (`1..20`). */
     fun routeHighlightMask(routeId: String): Int? = routeMasks[routeId]
 }
 
 /**
  * Mode emblems, shown on the route and mode pickers.
- *
- * Same provenance rule as [CupArt]: Nintendo's art, private research build, stated on screen.
  */
 internal object ModeArt {
 

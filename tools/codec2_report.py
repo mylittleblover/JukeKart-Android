@@ -47,7 +47,8 @@ import struct
 import sys
 import zlib
 
-DEFAULT_ROOT = r"G:\Mario Kart World\romfs\Sound\Resource\Stream"
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DEFAULT_ROOT = os.environ.get("MKW_ROMFS_STREAM", os.path.join(_REPO, "romfs", "Sound", "Resource", "Stream"))
 CONFIG_TAG = 0x80000001
 AUDIO_TAG = 0x80000004
 FRAME_SAMPLES = 960          # 20 ms at 48 kHz: what TOC 0xF8 selects

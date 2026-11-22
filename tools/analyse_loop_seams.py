@@ -29,10 +29,11 @@ import sys
 
 import numpy as np
 
-BWAV = r"G:\Mario Kart World\romfs\Sound\Resource\Stream"
-WAV = r"G:\Mario Kart World\readable_assets\audio\romfs\Sound\Resource\Stream"
-HEADERS = r"G:\Mario Kart World\MKW-Player\reports\generated\bwav-loop-headers.json"
-OUT = r"G:\Mario Kart World\MKW-Player\reports\generated\bwav-loop-seams.json"
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BWAV = os.environ.get("MKW_ROMFS_STREAM", os.path.join(_REPO, "romfs", "Sound", "Resource", "Stream"))
+WAV = os.environ.get("MKW_WAV_STREAM", os.path.join(_REPO, "readable_assets", "audio", "romfs", "Sound", "Resource", "Stream"))
+HEADERS = os.path.join(_REPO, "reports", "generated", "bwav-loop-headers.json")
+OUT = os.path.join(_REPO, "reports", "generated", "bwav-loop-seams.json")
 
 NO_LOOP = 0xFFFFFFFF
 # The sweep stops here: a "seam" longer than two seconds is not a loop handover, it is a different edit.

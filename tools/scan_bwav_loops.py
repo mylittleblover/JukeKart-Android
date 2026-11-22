@@ -23,8 +23,9 @@ import os
 import struct
 import sys
 
-BW = r"G:\Mario Kart World\romfs\Sound\Resource\Stream"
-OUT = r"G:\Mario Kart World\MKW-Player\reports\generated\bwav-loop-headers.json"
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BW = os.environ.get("MKW_ROMFS_STREAM", os.path.join(_REPO, "romfs", "Sound", "Resource", "Stream"))
+OUT = os.path.join(_REPO, "reports", "generated", "bwav-loop-headers.json")
 NO_LOOP = 0xFFFFFFFF
 
 

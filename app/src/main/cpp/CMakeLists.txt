@@ -34,4 +34,5 @@ target_compile_options(mkw_native PRIVATE -Wall -Wextra -Wpedantic -Werror)
 # link fails on __cxa_guard_acquire / operator new / to_string.
 if(ANDROID)
     target_link_libraries(mkw_native PRIVATE c++_shared)
+    target_link_options(mkw_native PRIVATE "-Wl,-z,max-page-size=16384")
 endif()

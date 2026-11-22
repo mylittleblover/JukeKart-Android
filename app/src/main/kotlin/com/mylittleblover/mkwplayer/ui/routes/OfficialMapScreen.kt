@@ -1172,8 +1172,8 @@ private fun MapCanvas(
         }
     }
 
-    // Dynamic spotlight shadow mask when inspecting a course or editing a custom route without an official mask
-    val spotlightActive = highlightMaskId == null && (state.selectedCourseCode != null || editFrom != null)
+    // Dynamic spotlight shadow mask when inspecting a route, course, or editing a custom route
+    val spotlightActive = loadedMask == null && (route != null || state.selectedCourseCode != null || editFrom != null)
     val spotlightAlpha by animateFloatAsState(
         targetValue = if (spotlightActive) 1f else 0f,
         animationSpec = tween(durationMillis = if (reducedMotion) 0 else 280, easing = FastOutSlowInEasing),
@@ -1392,8 +1392,9 @@ private fun MapCanvas(
                 padding,
             )
         }
-        val highlightedStages = remember(state.selectedCourseCode, neighbours, editFrom, draft) {
+        val highlightedStages = remember(route?.id, state.selectedCourseCode, neighbours, editFrom, draft) {
             buildSet {
+                route?.stops?.forEach { add(it.stageCode) }
                 state.selectedCourseCode?.let(::add)
                 addAll(neighbours)
                 editFrom?.let(::add)

@@ -20,7 +20,7 @@ frozen list of stage codes chosen once, so a pack built from a partial tree cann
 smaller cup.
 
 Usage:
-    python tools/build_pack.py --romfs "G:/Mario Kart World/romfs/Sound/Resource" --out base.mkwpack
+    python tools/build_pack.py --romfs "/path/to/romfs/Sound/Resource" --out base.mkwpack
 """
 from __future__ import annotations
 

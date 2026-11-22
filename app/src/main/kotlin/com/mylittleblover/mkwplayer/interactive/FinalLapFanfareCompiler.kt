@@ -2,7 +2,10 @@ package com.mylittleblover.mkwplayer.interactive
 
 import com.mylittleblover.mkwplayer.audio.BwavHeader
 import com.mylittleblover.mkwplayer.graph.MusicGraphBuilder as G
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.security.MessageDigest
+import kotlin.math.sin
 
 /** Ordinary courses only. Rainbow has its own independently verified fanfare graph. */
 internal object FinalLapFanfareCompiler {
@@ -10,6 +13,58 @@ internal object FinalLapFanfareCompiler {
     // Median measured from three gameplay recordings, not a MINF event. See research note.
     private const val FAST_START = 188_880L
     internal const val SHA256 = "60790cdf84a2e04c9fffca7ccee8bafa5be2bfb6ceb6dfd4f98ecfc8bdd8ce94"
+
+    /**
+     * Synthesizes a minimal valid 48 kHz stereo planar-PCM16 BWAV (codec 0) so medleys that span
+     * the FinalLapFF slot continue smoothly even when an imported partial `.mkwpack` omits it.
+     */
+    fun silentFallbackBwav(frames: Int = 268_759, sampleRate: Int = 48_000): ByteArray =
+        createPlanarPcm16Bwav(frames = frames, sampleRate = sampleRate, toneHz = 0.0)
+
+    fun createPlanarPcm16Bwav(
+        frames: Int = 48_000,
+        sampleRate: Int = 48_000,
+        channels: Int = 2,
+        toneHz: Double = 0.0,
+        amplitude: Double = 0.25,
+        looping: Boolean = false,
+    ): ByteArray {
+        val alignedFrames = if ((frames and 1) == 0) frames else frames + 1
+        val headerEnd = 16 + channels * 76
+        val channelBytes = alignedFrames * 2
+        val out = ByteArray(headerEnd + channels * channelBytes)
+        val buf = ByteBuffer.wrap(out).order(ByteOrder.LITTLE_ENDIAN)
+        out[0] = 'B'.code.toByte()
+        out[1] = 'W'.code.toByte()
+        out[2] = 'A'.code.toByte()
+        out[3] = 'V'.code.toByte()
+        buf.putShort(4, 0xFEFF.toShort())
+        buf.putShort(6, 1)
+        buf.putShort(12, 0)
+        buf.putShort(14, channels.toShort())
+        for (ch in 0 until channels) {
+            val h = 16 + ch * 76
+            val dataOffset = headerEnd + ch * channelBytes
+            buf.putShort(h, 0) // codec = 0 (planar PCM16)
+            buf.putShort(h + 2, ch.toShort())
+            buf.putInt(h + 4, sampleRate)
+            buf.putInt(h + 8, alignedFrames)
+            buf.putInt(h + 12, alignedFrames)
+            buf.putInt(h + 48, dataOffset)
+            buf.putInt(h + 52, dataOffset)
+            buf.putInt(h + 56, 1)
+            buf.putInt(h + 60, if (looping) alignedFrames else -1)
+            buf.putInt(h + 64, 0)
+            if (toneHz > 0.0) {
+                for (i in 0 until alignedFrames) {
+                    val sample = (sin(2.0 * Math.PI * toneHz * i / sampleRate) * amplitude * 32767.0)
+                        .toInt().coerceIn(-32768, 32767).toShort()
+                    buf.putShort(dataOffset + i * 2, sample)
+                }
+            }
+        }
+        return out
+    }
     @Volatile
     private var verifiedAssetBytes: ByteArray? = null
     @Volatile

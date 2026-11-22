@@ -166,7 +166,7 @@ MINF 数据里有每个资源的 BPM 与逐拍帧位置。把 174 个循环 BGM 
 
 ## 七、如何复现
 
-脚本均在 `G:\Mario Kart World\MKW-Player\tools\`：
+脚本均在 `tools/`：
 
 | 脚本 | 作用 | 输出 |
 |---|---|---|
@@ -180,7 +180,7 @@ MINF 数据里有每个资源的 BPM 与逐拍帧位置。把 174 个循环 BGM 
 运行方式：
 
 ```powershell
-$py = "C:\Users\x\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python\python.exe"
+$py = (Get-Command python -ErrorAction Stop).Source
 & $py -X utf8 tools\scan_bwav_loops.py          # ~128 s
 & $py -X utf8 tools\inspect_loop_windows.py
 & $py -X utf8 tools\inspect_loop_tails.py

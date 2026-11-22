@@ -4,6 +4,7 @@ import android.content.res.Configuration
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -19,7 +20,8 @@ class StageLocalizationDeviceTest {
     @Test fun simplifiedChineseUsesTheConfirmedStageNames() {
         compose.setContent {
             val context = LocalContext.current
-            val configuration = Configuration(context.resources.configuration).apply { setLocale(Locale.SIMPLIFIED_CHINESE) }
+            val baseConfig = LocalConfiguration.current
+            val configuration = Configuration(baseConfig).apply { setLocale(Locale.SIMPLIFIED_CHINESE) }
             val chinese = context.createConfigurationContext(configuration)
             CompositionLocalProvider(LocalContext provides chinese) {
                 Column {

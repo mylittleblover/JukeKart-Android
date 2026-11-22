@@ -1074,9 +1074,10 @@ internal class LinearPlaybackCoordinator(
         val bytes = if (file.isFile) {
             file.readBytes()
         } else if (sha256.equals(com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.SHA256, ignoreCase = true)) {
-            appContext?.assets?.open("audio/${com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.ASSET}")
-                ?.use { it.readBytes() }
-                ?: error("Missing audio file for track.")
+            runCatching {
+                appContext?.assets?.open("audio/${com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.ASSET}")
+                    ?.use { it.readBytes() }
+            }.getOrNull() ?: com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.silentFallbackBwav()
         } else {
             error("Missing audio file for track.")
         }

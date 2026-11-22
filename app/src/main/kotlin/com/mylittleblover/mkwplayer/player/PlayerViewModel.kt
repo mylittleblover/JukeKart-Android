@@ -166,6 +166,7 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val total: String = "--:--",
         val progress: Float = 0f,
         val positionMs: Long = 0L,
+        val durationMs: Long = 0L,
         val sourceFrame: Long? = null,
         val fadeRemainingFrames: Long? = null,
     )
@@ -577,14 +578,6 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
     private fun loadFinalLapFanfareBytes(): ByteArray? {
         cachedFinalLapFanfare?.let { return it }
         if (finalLapFanfareChecked && pack?.directory == null) return null
-        val assetPath = "audio/${com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.ASSET}"
-        runCatching {
-            getApplication<Application>().assets.open(assetPath).use { it.readBytes() }
-        }.getOrNull()?.let {
-            cachedFinalLapFanfare = it
-            finalLapFanfareChecked = true
-            return it
-        }
         val dir = pack?.directory
         if (dir != null) {
             val packFile = java.io.File(dir, "audio/${com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.SHA256}")
@@ -595,6 +588,14 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                     return it
                 }
             }
+        }
+        val assetPath = "audio/${com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.ASSET}"
+        runCatching {
+            getApplication<Application>().assets.open(assetPath).use { it.readBytes() }
+        }.getOrNull()?.let {
+            cachedFinalLapFanfare = it
+            finalLapFanfareChecked = true
+            return it
         }
         finalLapFanfareChecked = true
         return null
@@ -3691,7 +3692,6 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
         val digests = linkedMapOf<String, String>()
         for (stem in entry.medley.uniqueStems) {
             if (stem.equals("BGM_Seq_FinalLapFF", ignoreCase = true)) {
-                if (loadFinalLapFanfareBytes() == null) return null
                 digests[stem] = com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.SHA256
                 continue
             }
@@ -5402,6 +5402,11 @@ internal class PlayerViewModel(application: Application) : AndroidViewModel(appl
                 total = formattedTotal,
                 progress = progress,
                 positionMs = posMs,
+                durationMs = if (state.sampleRate > 0) {
+                    EngineSnapshot.framesToMillis(state.totalFrames, state.sampleRate)
+                } else {
+                    0L
+                },
                 sourceFrame = null,
                 fadeRemainingFrames = null,
             )

@@ -1,9 +1,9 @@
 package com.mylittleblover.mkwplayer
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
 import com.mylittleblover.mkwplayer.audio.AudioEngine
 import com.mylittleblover.mkwplayer.graph.GraphBuilder
+import com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -61,15 +61,21 @@ class SpeakerLayerFadeDeviceTest {
 
     @Test
     fun speakerLayerFadesSmoothlyOverOneSecondPausesAndReversesCleanly() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val audio = context.assets.open("audio/BGM_Seq_FinalLapFF.bwav").use { it.readBytes() }
+        val audio = FinalLapFanfareCompiler.createPlanarPcm16Bwav(
+            frames = 48_000,
+            sampleRate = 48_000,
+            channels = 2,
+            toneHz = 440.0,
+            amplitude = 0.3,
+            looping = true,
+        )
         val (rate, channels, frames) = readBwavFacts(audio)
         val sha256 = MessageDigest.getInstance("SHA-256").digest(audio)
 
         val packet = GraphBuilder.build(
             GraphBuilder.Spec(
                 asset = GraphBuilder.Asset(
-                    path = "BGM_Seq_FinalLapFF.bwav",
+                    path = "synthetic_speaker_440hz.bwav",
                     sampleRate = rate,
                     channels = channels,
                     frames = frames.toLong(),
@@ -86,7 +92,7 @@ class SpeakerLayerFadeDeviceTest {
         val engine = requireNotNull(AudioEngine.create()) { "AudioEngine.create() returned null" }
         try {
             assertEquals(AudioEngine.STATUS_OK, engine.loadGraph(packet))
-            assertEquals(AudioEngine.STATUS_OK, engine.bindBwav(0, audio, "BGM_Seq_FinalLapFF.bwav"))
+            assertEquals(AudioEngine.STATUS_OK, engine.bindBwav(0, audio, "synthetic_speaker_440hz.bwav"))
             assertEquals(AudioEngine.STATUS_OK, engine.setLayerGain(trackId, -96.0))
             assertEquals(AudioEngine.STATUS_OK, engine.play(segmentId))
 

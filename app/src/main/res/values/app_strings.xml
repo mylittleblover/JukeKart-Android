@@ -191,4 +191,9 @@
     <string name="swipe_action_unfavorite">Unfavorite</string>
     <string name="swipe_action_remove">Remove</string>
     <string name="playlist_drag_hint">Drag the handle on the right to reorder tracks</string>
+    <string name="settings_open_source_licenses">Open-source licenses</string>
+    <string name="settings_open_source_licenses_summary">Includes Game_Music_Emu (LGPL-2.1 shared), libopenmpt (BSD-3), Opus (BSD-3), clHCA (ISC), Oboe &amp; Jetpack Compose (Apache-2.0).</string>
+    <string name="settings_non_affiliation">Unofficial fan project. Not affiliated with, endorsed by, or licensed by Nintendo.</string>
+    <string name="settings_feedback_repo">Issues &amp; feedback: github.com/mylittleblover/MarioKartWorldPlayer-Android</string>
+    <string name="settings_licenses_close">Close</string>
 </resources>

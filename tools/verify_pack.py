@@ -17,7 +17,7 @@ Rules tested, and why each one has bitten this project at least once:
   the declared coverage matches the content
 
 Usage:
-    python tools/verify_pack.py "G:/Mario Kart World/_packs/mkw-course-test.mkwpack"
+    python tools/verify_pack.py "/path/to/pack.mkwpack"
 """
 from __future__ import annotations
 

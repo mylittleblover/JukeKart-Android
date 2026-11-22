@@ -18,9 +18,10 @@ import struct
 
 import numpy as np
 
-HEADERS = r"G:\Mario Kart World\MKW-Player\reports\generated\bwav-loop-headers.json"
-WAV = r"G:\Mario Kart World\readable_assets\audio\romfs\Sound\Resource\Stream"
-OUT = r"G:\Mario Kart World\MKW-Player\reports\generated\bwav-preroll.json"
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+HEADERS = os.path.join(_REPO, "reports", "generated", "bwav-loop-headers.json")
+WAV = os.environ.get("MKW_WAV_STREAM", os.path.join(_REPO, "readable_assets", "audio", "romfs", "Sound", "Resource", "Stream"))
+OUT = os.path.join(_REPO, "reports", "generated", "bwav-preroll.json")
 
 LAGS = [240, 480, 960, 1920, 4800, 9600, 24000]
 

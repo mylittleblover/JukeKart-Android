@@ -15,8 +15,9 @@ import struct
 import sys
 import wave
 
-BW = r"G:\Mario Kart World\romfs\Sound\Resource\Stream"
-WAV = r"G:\Mario Kart World\readable_assets\audio\romfs\Sound\Resource\Stream"
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BW = os.environ.get("MKW_ROMFS_STREAM", os.path.join(_REPO, "romfs", "Sound", "Resource", "Stream"))
+WAV = os.environ.get("MKW_WAV_STREAM", os.path.join(_REPO, "readable_assets", "audio", "romfs", "Sound", "Resource", "Stream"))
 
 COEFS = [
     (0, 0), (2048, 0), (0, 2048), (1024, 1024),

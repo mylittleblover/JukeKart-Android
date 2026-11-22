@@ -24,7 +24,7 @@
     <string name="map_browse_hint">Choose a course or explore an official route.</string>
     <string name="map_loading">Loading world map…</string>
     <string name="map_data_missing">Map data could not be loaded.</string>
-    <string name="map_art_notice">Map and course illustrations © Nintendo.</string>
+    <string name="map_art_notice">Map and course artwork are built-in JukeKart vector graphics or user-imported pack art.</string>
     <string name="map_route_stop">%1$d · %2$s</string>
     <string name="map_pin_occurrences">%1$s. Route stops: %2$s</string>
     <string name="map_stop_separator">", "</string>

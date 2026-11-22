@@ -507,11 +507,10 @@ class SettingsStatesTest {
     }
 
     @Test
-    fun theRightsNoticeNamesNintendoAndTheRestriction() {
+    fun theRightsNoticeStatesOriginalArtworkAndNonAffiliation() {
         val notice = rightsNotice()
 
-        assertTrue(notice.contains("Nintendo"), notice)
-        assertTrue(notice.contains("research", ignoreCase = true), notice)
-        assertTrue(notice.contains("Not redistributable"), notice)
+        assertTrue(notice.contains("JukeKart"), notice)
+        assertTrue(notice.contains("not affiliated", ignoreCase = true), notice)
     }
 }

@@ -1,8 +1,30 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     kotlin("android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+val releaseKeystoreProps = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.isFile) {
+        file.inputStream().use { load(it) }
+    }
+}
+fun releaseConfigValue(propKey: String, envKey: String): String? =
+    releaseKeystoreProps.getProperty(propKey)?.takeIf { it.isNotBlank() }
+        ?: System.getenv(envKey)?.takeIf { it.isNotBlank() }
+
+val releaseStorePath = releaseConfigValue("storeFile", "RELEASE_STORE_FILE")
+val releaseStorePassword = releaseConfigValue("storePassword", "RELEASE_STORE_PASSWORD")
+val releaseKeyAlias = releaseConfigValue("keyAlias", "RELEASE_KEY_ALIAS")
+val releaseKeyPassword = releaseConfigValue("keyPassword", "RELEASE_KEY_PASSWORD")
+val hasReleaseSigning = !releaseStorePath.isNullOrBlank() &&
+    !releaseStorePassword.isNullOrBlank() &&
+    !releaseKeyAlias.isNullOrBlank() &&
+    !releaseKeyPassword.isNullOrBlank() &&
+    file(releaseStorePath).isFile
 
 android {
     namespace = "com.mylittleblover.mkwplayer"
@@ -12,7 +34,7 @@ android {
         applicationId = "com.mylittleblover.mkwplayer"
         minSdk = 26
         targetSdk = 35
-        // Beta 01: Fullscreen landscape unlock ceremony video with 1s black fade-in/out, merged course & extra medleys (120 + 14), Koopa Beach speaker/suite updates, route playback suite modes, safe-area fixes, unified JukeKart branding/icons/notification/widget.
+        // Beta 01: Landscape unlock ceremony fallback canvas + external pack support, original JukeKart vector icons/atlas, 16KB ELF alignment, Lint/Android 14-16 fixes, Release R8 config.
         versionCode = 26
         versionName = "0.1.0-beta01"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -28,11 +50,30 @@ android {
             keyPassword = "android"
             storeType = "PKCS12"
         }
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseStorePath!!)
+                storePassword = releaseStorePassword!!
+                keyAlias = releaseKeyAlias!!
+                keyPassword = releaseKeyPassword!!
+            }
+        }
     }
 
     buildTypes {
         getByName("debug") {
             signingConfig = signingConfigs.getByName("fixedDebug")
+        }
+        getByName("release") {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
@@ -73,10 +114,6 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
-    }
-
-    androidResources {
-        noCompress += "webm"
     }
 }
 

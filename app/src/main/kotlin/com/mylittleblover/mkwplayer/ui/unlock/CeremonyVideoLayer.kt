@@ -13,9 +13,14 @@ import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -36,7 +41,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -48,11 +58,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.mylittleblover.mkwplayer.R
 import com.mylittleblover.mkwplayer.player.PlayerViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
+import java.io.File
+import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
@@ -63,13 +76,15 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 /**
  * Fullscreen landscape Special Cup unlock ceremony stage.
  *
- * Displays `R.raw.rainbow_appears` in fullscreen landscape with a 1-second black fade-in, zero HUD
- * chrome or extra assets, and a 1-second black fade-out synchronized to the end of the cutscene.
+ * Displays an optional user-provided external ceremony video (e.g. `.mkwpack/artwork/rainbow_appears.webm`)
+ * or renders the built-in original Prism Horizon Canvas celebration in fullscreen landscape with a
+ * 1-second black fade-in, zero HUD chrome, and a 1-second black fade-out synchronized to the end.
  */
 @Composable
 internal fun SpecialCupUnlockCeremonyStage(
     visible: Boolean,
     progressFlow: StateFlow<PlayerViewModel.ProgressUi>,
+    packDirectory: File? = null,
     isPreviewOnly: Boolean = false,
     onDismissPreview: (() -> Unit)? = null,
 ) {
@@ -195,6 +210,8 @@ internal fun SpecialCupUnlockCeremonyStage(
         ) {
             CeremonyVideoBackdrop(
                 playbackPositionMs = livePositionMs,
+                audioDurationMs = progressUi.durationMs.takeIf { it > 0 }?.coerceAtMost(Int.MAX_VALUE.toLong())?.toInt() ?: 68_000,
+                packDirectory = packDirectory,
                 onVideoStatusChanged = { ready, durationMs ->
                     videoReady = ready
                     if (durationMs > 0) videoDurationMs = durationMs
@@ -216,18 +233,54 @@ internal fun SpecialCupUnlockCeremonyStage(
     }
 }
 
+private fun resolveExternalCeremonyVideo(context: Context, packDirectory: File?): File? {
+    val dirs = listOfNotNull(
+        packDirectory?.let { File(it, "artwork") },
+        packDirectory?.let { File(it, "video") },
+        packDirectory,
+        File(context.applicationContext.filesDir, "ceremony"),
+        File(context.applicationContext.filesDir, "artwork"),
+    )
+    val names = listOf("rainbow_appears.webm", "rainbow_appears.mp4")
+    for (dir in dirs) {
+        for (name in names) {
+            val f = File(dir, name)
+            if (f.isFile) return f
+        }
+    }
+    return null
+}
+
 /**
- * Plays the bundled Special Cup unlock video (`R.raw.rainbow_appears`) silently over a [TextureView]
+ * Plays an optional external ceremony video silently over a [TextureView] if provided in the
+ * user's `.mkwpack`, or falls back cleanly to the built-in original [CeremonyPrismHorizonCanvas]
  * so the native BWAV engine remains the sole owner of ceremony audio (`Dm_RainbowAppears`).
  */
 @Composable
 internal fun CeremonyVideoBackdrop(
     playbackPositionMs: Long,
     modifier: Modifier = Modifier,
+    audioDurationMs: Int = 68_000,
+    packDirectory: File? = null,
     onVideoStatusChanged: (ready: Boolean, durationMs: Int) -> Unit = { _, _ -> },
     onVideoCompleted: () -> Unit = {},
 ) {
     val context = LocalContext.current
+    val externalVideo = remember(context, packDirectory) { resolveExternalCeremonyVideo(context, packDirectory) }
+    var useFallbackCanvas by remember(externalVideo) { mutableStateOf(externalVideo == null) }
+
+    if (useFallbackCanvas || externalVideo == null) {
+        LaunchedEffect(audioDurationMs) {
+            onVideoStatusChanged(true, audioDurationMs.coerceAtLeast(6_500))
+        }
+        CeremonyPrismHorizonCanvas(
+            playbackPositionMs = playbackPositionMs,
+            durationMs = audioDurationMs.coerceAtLeast(6_500),
+            modifier = modifier,
+        )
+        return
+    }
+
     val lifecycleOwner = LocalLifecycleOwner.current
     var aspectRatio by remember { mutableFloatStateOf(16f / 9f) }
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
@@ -303,10 +356,7 @@ internal fun CeremonyVideoBackdrop(
                             val player = MediaPlayer()
                             mediaPlayer = player
                             runCatching {
-                                val afd = context.resources.openRawResourceFd(R.raw.rainbow_appears)
-                                afd.use {
-                                    player.setDataSource(it.fileDescriptor, it.startOffset, it.length)
-                                }
+                                player.setDataSource(externalVideo.path)
                                 player.setSurface(surface)
                                 player.setVolume(0f, 0f)
                                 player.isLooping = false
@@ -334,13 +384,13 @@ internal fun CeremonyVideoBackdrop(
                                 }
                                 player.setOnErrorListener { _, _, _ ->
                                     prepared = false
-                                    onVideoStatusChanged(false, videoDurationMs)
+                                    useFallbackCanvas = true
                                     true
                                 }
                                 player.prepareAsync()
                             }.onFailure {
                                 prepared = false
-                                onVideoStatusChanged(false, videoDurationMs)
+                                useFallbackCanvas = true
                             }
                         }
 
@@ -361,5 +411,102 @@ internal fun CeremonyVideoBackdrop(
                 }
             },
         )
+    }
+}
+
+/**
+ * Original procedural cosmic aurora & prismatic rainbow road Canvas celebration when no external
+ * ceremony video is packaged inside the user's pack.
+ */
+@Composable
+private fun CeremonyPrismHorizonCanvas(
+    playbackPositionMs: Long,
+    durationMs: Int,
+    modifier: Modifier = Modifier,
+) {
+    val infinite = rememberInfiniteTransition(label = "ceremony-prism")
+    val continuousPhase by infinite.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Restart),
+        label = "ceremony-orbit",
+    )
+    val trackProgress = (playbackPositionMs.toFloat() / durationMs.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
+    val phase = ((continuousPhase + trackProgress * 2.5f) * 2.0 * PI).toFloat()
+
+    val bands = remember {
+        listOf(
+            Color(0xFFFF3B5C),
+            Color(0xFFFF8A1F),
+            Color(0xFFFFD83B),
+            Color(0xFF39D98A),
+            Color(0xFF28B5F4),
+            Color(0xFF6366F1),
+            Color(0xFFD946EF),
+        )
+    }
+
+    Canvas(modifier = modifier.fillMaxSize()) {
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFF030511),
+                    Color(0xFF0A102E),
+                    Color(0xFF161347),
+                    Color(0xFF060818),
+                ),
+            ),
+        )
+
+        val horizonX = size.width * 0.5f + cos(phase * 0.5).toFloat() * size.width * 0.04f
+        val horizonY = size.height * 0.44f
+        val glowRadius = size.maxDimension * 0.65f
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color(0x55A78BFA),
+                    Color(0x2838BDF8),
+                    Color.Transparent,
+                ),
+                center = Offset(horizonX, horizonY),
+                radius = glowRadius,
+            ),
+            radius = glowRadius,
+            center = Offset(horizonX, horizonY),
+        )
+
+        // Subtle drifting starlight particles across upper vault.
+        for (i in 0 until 42) {
+            val seed = (i * 7919) % 997
+            val sx = ((seed / 997f) + continuousPhase * (0.04f + (i % 5) * 0.015f)) % 1f * size.width
+            val sy = ((seed * 31 % 617) / 617f) * size.height * 0.85f
+            val twinkle = 0.25f + 0.65f * abs(sin((phase * 1.5f + i * 0.7f).toDouble())).toFloat()
+            val radius = (1.5f + (i % 3) * 1.1f) * density
+            drawCircle(
+                color = Color.White.copy(alpha = twinkle),
+                radius = radius,
+                center = Offset(sx, sy),
+            )
+        }
+
+        // Perspective seven-band spectral ribbon sweeping from the horizon toward foreground.
+        val bandHalf = size.width * 0.14f
+        bands.forEachIndexed { idx, color ->
+            val offsetNorm = (idx - 3) / 3.5f
+            val sway = sin((phase + idx * 0.22f).toDouble()).toFloat() * size.width * 0.06f
+            val startX = horizonX + offsetNorm * size.width * 0.025f
+            val endX = size.width * 0.5f + offsetNorm * bandHalf * 2.2f + sway
+            val ctrlX = (startX + endX) * 0.5f - sway * 0.7f
+            val ctrlY = size.height * 0.68f
+            val path = Path().apply {
+                moveTo(startX, horizonY)
+                quadraticTo(ctrlX, ctrlY, endX, size.height * 1.05f)
+            }
+            drawPath(
+                path = path,
+                color = color.copy(alpha = 0.72f),
+                style = Stroke(width = (10f + idx * 0.6f) * density, cap = StrokeCap.Round),
+            )
+        }
     }
 }

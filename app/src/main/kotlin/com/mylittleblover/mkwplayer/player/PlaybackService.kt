@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Build
@@ -16,6 +17,8 @@ import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.util.LruCache
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
+import androidx.core.content.ContextCompat
 import com.mylittleblover.mkwplayer.MainActivity
 import com.mylittleblover.mkwplayer.R
 import java.io.File
@@ -160,19 +163,17 @@ class PlaybackService : Service() {
         createChannel()
         // MediaSession/receiver initialization can involve slow Binder calls. Meet the
         // platform deadline before that work, then refresh the richer notification later.
-        startForeground(NOTIFICATION_ID, buildNotification())
+        startMediaForeground()
 
         focus = AudioFocusManager(this) { event -> handleFocusEvent(event) }
 
-        registerReceiver(
+        ContextCompat.registerReceiver(
+            this,
             noisyReceiver,
             android.content.IntentFilter(AudioFocusManager.ACTION_AUDIO_BECOMING_NOISY),
-            // EXPORTED, deliberately. A route change is a system broadcast, so it comes from
-            // outside this process: registering NOT_EXPORTED makes the receiver unreachable
-            // for the very sender it exists for, and unplugging headphones would keep
-            // playing through the loudspeaker. It is safe here because the action is a
-            // protected broadcast -- only the system can send it, other apps cannot.
-            Context.RECEIVER_EXPORTED,
+            // EXPORTED, deliberately. Route changes come from system broadcasts; guarded by
+            // ContextCompat so API 26-32 receives standard registration cleanly without InlinedApi risk.
+            ContextCompat.RECEIVER_EXPORTED,
         )
 
         mediaSession = MediaSessionCompat(this, MEDIA_SESSION_TAG).apply {
@@ -283,10 +284,19 @@ class PlaybackService : Service() {
         return focus.request()
     }
 
+    private fun startMediaForeground() {
+        val serviceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+        } else {
+            0
+        }
+        ServiceCompat.startForeground(this, NOTIFICATION_ID, buildNotification(), serviceType)
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Start foreground before anything else: the platform requires the notification
         // to exist promptly once a media service is started.
-        startForeground(NOTIFICATION_ID, buildNotification())
+        startMediaForeground()
 
         when (intent?.action) {
             ACTION_PAUSE -> {
@@ -660,10 +670,13 @@ class PlaybackService : Service() {
                 }
             }
             val cleanCourse = courseCode?.trim()?.takeIf { it.isNotEmpty() }
-            if (cleanCourse != null) {
-                val resId = com.mylittleblover.mkwplayer.ui.art.CourseCoverArt.resolve(cleanCourse)
-                if (resId != null) {
-                    decodeSampled { BitmapFactory.decodeResource(resources, resId, it) }?.let { return it }
+            if (cleanCourse != null && !packDirPath.isNullOrBlank()) {
+                val artDir = File(packDirPath, "artwork")
+                for (candidate in com.mylittleblover.mkwplayer.ui.art.CourseCoverArt.packCandidates(cleanCourse)) {
+                    val file = File(artDir, candidate)
+                    if (file.isFile) {
+                        decodeSampled { BitmapFactory.decodeFile(file.path, it) }?.let { return it }
+                    }
                 }
             }
             return null

@@ -21,7 +21,10 @@ evidence/artifacts/
 reports/generated/
 
 # 签名：只提交专门的「测试调试」密钥库（口令公开、仅用于测试安装）
-# 任何正式发布密钥必须单独离线保管，绝不入库
+# 任何正式发布密钥与凭据必须单独离线保管，绝不入库
+keystore.properties
+*.jks
+*.keystore
 config/signing/*.jks
 config/signing/*.keystore
 config/signing/release*

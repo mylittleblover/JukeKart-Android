@@ -24,7 +24,7 @@
     <string name="map_browse_hint">コースを選ぶか、公式ルートを探してみましょう。</string>
     <string name="map_loading">ワールドマップを読み込み中…</string>
     <string name="map_data_missing">マップのデータを読み込めませんでした。</string>
-    <string name="map_art_notice">マップ・コースイラスト © Nintendo。</string>
+    <string name="map_art_notice">マップとコースアイコンは JukeKart オリジナルのベクター素材、またはユーザー導入パックの画像を使用します。</string>
     <string name="map_route_stop">%1$d · %2$s</string>
     <string name="map_pin_occurrences">%1$s。ルート順：%2$s</string>
     <string name="map_stop_separator">、</string>

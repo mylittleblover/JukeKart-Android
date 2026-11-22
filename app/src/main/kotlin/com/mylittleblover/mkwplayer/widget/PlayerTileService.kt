@@ -1,5 +1,6 @@
 package com.mylittleblover.mkwplayer.widget
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
@@ -47,10 +48,15 @@ class PlayerTileService : TileService() {
                 )
                 startActivityAndCollapse(pending)
             } else {
-                @Suppress("DEPRECATION")
-                startActivityAndCollapse(launch)
+                collapseLegacy(launch)
             }
         }
+    }
+
+    @SuppressLint("StartActivityAndCollapseDeprecated")
+    @Suppress("DEPRECATION")
+    private fun collapseLegacy(launch: Intent) {
+        startActivityAndCollapse(launch)
     }
 
     private fun updateTileState() {

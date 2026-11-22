@@ -9,8 +9,9 @@ import re
 import subprocess
 import sys
 
-STREAM = r'G:\Mario Kart World\romfs\Sound\Resource\Stream'
-ADB = r'G:\Mario Kart World\_toolchain\android-sdk\platform-tools\adb.exe'
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+STREAM = os.environ.get("MKW_ROMFS_STREAM", os.path.join(_REPO, "romfs", "Sound", "Resource", "Stream"))
+ADB = os.environ.get("ADB", "adb")
 REMOTE = '/data/local/tmp/probe.bwav'
 PROBE = '/data/local/tmp/mkw_bwav_decode_probe'
 

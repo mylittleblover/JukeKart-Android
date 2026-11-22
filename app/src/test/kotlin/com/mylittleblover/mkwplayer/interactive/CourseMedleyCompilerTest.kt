@@ -62,14 +62,16 @@ class CourseMedleyCompilerTest {
             assertEquals(expected, cat.forCourse(code).map { it.normalizedSuiteVariant }, "variants mismatch for $code")
         }
 
-        val finalLapFile = File("src/main/assets/audio/BGM_Seq_FinalLapFF.bwav")
         for (medley in cat.medleys + extra.entries.map { it.medley }) {
             assertTrue(medley.clips.isNotEmpty(), "medley ${medley.id} has no clips")
             assertTrue(medley.totalFrames > 0L, "medley ${medley.id} totalFrames <= 0")
             assertTrue(medley.durationMs > 0L, "medley ${medley.id} durationMs <= 0")
             for (stem in medley.uniqueStems) {
                 if (stem == "BGM_Seq_FinalLapFF") {
-                    assertTrue(finalLapFile.isFile, "Missing bundled BGM_Seq_FinalLapFF.bwav")
+                    assertTrue(
+                        Regex("^[0-9a-f]{64}$").matches(FinalLapFanfareCompiler.SHA256),
+                        "FinalLapFanfare must have a pinned SHA-256 identity",
+                    )
                 } else {
                     val digest = ids.digestForFileName("$stem.bwav") ?: extraAudio.digestForStem(stem)
                     assertNotNull(digest, "stem '$stem.bwav' in medley '${medley.id}' missing from identities and extra_music_catalog")

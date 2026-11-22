@@ -1,83 +1,33 @@
-# MKW Player
+# JukeKart
 
-独立的《马力欧卡丁车 世界》专用互动音乐播放器（Android / Kotlin / C++ / JNI / Oboe）。
+**0.1.0-beta01** · Android 8.0（API 26）及以上
 
-## 当前状态
+JukeKart 是面向《马力欧卡丁车 世界》配乐的独立 Android 播放器。导入自己的 `.mkwpack` 后，可以切换赛道音乐的阶段和版本，播放赛道组曲，沿世界地图路线听音乐，或用点唱机管理收藏和播放列表。
 
-**0.1.0-alpha01** —— 可以在真机上播放游戏里的赛道音乐。
+- **赛道与路线**支持交互式阶段切换、组曲、官方路线和自定义路线。流程编排器可以保存自定义赛道编排。
+- **点唱机与曲库**支持多曲包合并、搜索、收藏、播放列表、后台播放和媒体控制。
+- **播放与管理**提供均衡器、速度与音高调节、A–B 循环、定时停止、桌面小组件、快捷设置磁贴和数据备份。
 
-| 能力 | 证据级别 |
-|---|---|
-| 四 ABI APK 构建 | S4 |
-| 真机播放 + 人耳确认 | **S6** |
-| 解码逐样本正确（maxdiff = 0） | L2 |
-| 后台播放 + 通知栏控制 | S6 |
-| 曲库持久化 | S5 |
-| 内置 650 条曲目目录 | S5 |
+## 安装与导入
 
-完整的门禁与任务状态见 `handoff/status.json`，一页总结见 `evidence/SUMMARY.md`。
+安装 JukeKart 的 Release APK，然后在应用内打开 **设置 → 导入 .mkwpack**。音乐、演出视频以及游戏的赛道截图和地图贴图均由用户自行提供。缺少可选的封面、地图或演出视频时，应用会使用自带图形和动画。应用图标及通知图标沿用现有样式。
 
-| 文档 | 内容 |
-|---|---|
-| `docs/USAGE.md` | 怎么装、怎么加曲目、界面各项什么意思 |
-| `docs/ARCHITECTURE.md` | 分层理由，以及每一层拒绝了什么 |
-| `CHANGELOG.md` | 版本变更 |
-| `evidence/SUMMARY.md` | 能力、限制、缺陷、测试数一页汇总 |
+详见 [Beta 使用说明](docs/USAGE.md)、[曲包格式](docs/PACK-FORMAT.md)和[版本变更](CHANGELOG.md)。
 
-## 明确不支持
+## 从源码构建
 
-| 项 | 影响 |
-|---|---|
-| **BWAV codec 2** | 253 个文件（含 227 首 JukeBox、22 首 Cutscene）无法播放。容器结构已解，包边界未找到，**故意不猜** |
-| 音频焦点 | 来电不会自动暂停 |
-| 完整原声带目录 | 只覆盖 499 个归档中的 4 个 |
-| 多曲目听音 | 仅 `BGM_Stage_Coaster` 有人耳确认 |
+准备 JDK 21、Android SDK Platform 35、NDK `27.0.12077973` 和 CMake `3.22.1`。设置 `JAVA_HOME` 和 `ANDROID_HOME`，然后在仓库根目录运行：
 
-## 硬约束
-
-- 本仓库**不包含**任何任天堂商业音频、原版 CG 或未授权图标。
-  仓库只保存清单、哈希与映射；音频由用户通过 SAF 在运行时导入。
-- 单一 Native Runtime / 单一 Transport / 单一 AudioOutput。
-- 没有真实运行时证据的行为一律标 `UNVERIFIED`；未执行的测试写 `NOT_RUN`。
-- 每个任务一个可回滚小提交。
-
-## 目录
-
-| 路径 | 用途 |
-|---|---|
-| `app/` | Android 应用（Kotlin + Compose + 原生解码器） |
-| `app/src/main/cpp/` | C++ 运行时：解码器、引擎、Oboe 输出、JNI 桥 |
-| `app/src/main/assets/catalog.json` | 650 条曲目目录（由 `tools/gen_catalog.py` 生成） |
-| `third_party/` | 按 SHA256 固定的 vendored 依赖 |
-| `mkw_tools/` | BARS / BWAV / 资产分析工具（Python） |
-| `tools/` | 证据推导脚本，见 `tools/README.md` |
-| `tests/` | Python 测试 |
-| `evidence/` | 基线、各阶段证据、`SUMMARY.md` |
-| `handoff/` | `status.json`、`decision-register.json` |
-| `config/signing/` | 固定测试签名（**不可用于发布**） |
-
-## 本地开发
-
-```bash
-# Python 测试
-python -m pytest tests -q
-
-# JVM 测试
-./gradlew :app:testDebugUnitTest
-
-# 设备测试（需要一台在线设备或模拟器）
-./gradlew :app:connectedDebugAndroidTest
+```sh
+./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 ```
 
-模拟器**不要**加 `-no-audio`，否则 `AudioOutput` 永远拿不到设备、时序面板恒为 `NO DATA`。
+Windows 上将 `./gradlew` 换成 `.\gradlew.bat`。Debug APK 位于 `app/build/outputs/apk/debug/`。
 
-## 包名
+维护者可在本地创建被 Git 忽略的 `keystore.properties`，配置 `storeFile`、`storePassword`、`keyAlias` 和 `keyPassword`。使用绝对路径指向仓库外的密钥库，再运行 `./gradlew :app:assembleRelease`。Release APK 位于 `app/build/outputs/apk/release/`。Debug APK 使用仓库提供的测试签名。
 
-`com.mylittleblover.mkwplayer`（用户授权本轮自行确定，见 `handoff/decision-register.json` D-004/D-006）。
+## 反馈与许可
 
-## 签名
+在 [GitHub Issues](https://github.com/mylittleblover/MarioKartWorldPlayer-Android/issues) 提交问题，请附上应用版本、手机型号、Android 版本和复现步骤。JukeKart 的原创源代码与内置原创矢量图形采用 [Apache-2.0](LICENSE) 许可，第三方组件及其各自许可详见 [Third-Party Notices](NOTICE-THIRD-PARTY.md)。
 
-`config/signing/mkwplayer-debug.p12`（PKCS12，store/key 口令 `android`，
-别名 `mkwplayerdebugkey`，证书 SHA-256 见 `config/signing/debug-cert.sha256`）。
-
-**这是测试身份，仅用于本地与测试 APK，绝不用于发布。**
+JukeKart 是独立的爱好者项目，与 Nintendo 无关联，亦未经 Nintendo 认可或赞助。相关名称、商标和游戏素材归各自权利人所有。

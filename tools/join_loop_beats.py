@@ -13,12 +13,14 @@ For each looping BGM file it reports:
 from __future__ import annotations
 
 import json
+import os
 import statistics
 
-MINF = r"G:\Mario Kart World\MKW-Player\app\src\main\assets\interactive_minf.json"
-HEADERS = r"G:\Mario Kart World\MKW-Player\reports\generated\bwav-loop-headers.json"
-SEAMS = r"G:\Mario Kart World\MKW-Player\reports\generated\bwav-loop-seams.json"
-OUT = r"G:\Mario Kart World\MKW-Player\reports\generated\bwav-loop-beats.json"
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MINF = os.path.join(_REPO, "app", "src", "main", "assets", "interactive_minf.json")
+HEADERS = os.path.join(_REPO, "reports", "generated", "bwav-loop-headers.json")
+SEAMS = os.path.join(_REPO, "reports", "generated", "bwav-loop-seams.json")
+OUT = os.path.join(_REPO, "reports", "generated", "bwav-loop-beats.json")
 
 
 def nearest_grid(frames: list[int], value: int) -> tuple[int, int]:

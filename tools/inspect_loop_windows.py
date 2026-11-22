@@ -11,8 +11,10 @@ anywhere. That is a finding, and it contradicts the usual assumption, so it is m
 from __future__ import annotations
 
 import json
+import os
 
-HEADERS = r"G:\Mario Kart World\MKW-Player\reports\generated\bwav-loop-headers.json"
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+HEADERS = os.path.join(_REPO, "reports", "generated", "bwav-loop-headers.json")
 
 
 def main() -> None:

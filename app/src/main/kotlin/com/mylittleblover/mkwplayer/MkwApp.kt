@@ -262,7 +262,7 @@ internal fun MkwApp(
     ) { granted -> model.onNotificationPermissionResult(granted) }
 
     LaunchedEffect(ui.needsNotificationPermission) {
-        if (ui.needsNotificationPermission) {
+        if (ui.needsNotificationPermission && android.os.Build.VERSION.SDK_INT >= 33) {
             notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
     }
@@ -1667,6 +1667,7 @@ internal fun MkwApp(
     com.mylittleblover.mkwplayer.ui.unlock.SpecialCupUnlockCeremonyStage(
         visible = ceremonyPlaying || previewUnlockVfx,
         progressFlow = model.progressUi,
+        packDirectory = model.packDirectory,
         isPreviewOnly = previewUnlockVfx && !ceremonyPlaying,
         onDismissPreview = if (previewUnlockVfx && !ceremonyPlaying) {
             { previewUnlockVfx = false }
@@ -1951,9 +1952,11 @@ private fun CoursePage(
                 tone = MkwSurfaceTone.White,
                 contentPadding = PaddingValues(0.dp),
             ) {
-                val artNames = listOfNotNull(
-                    model.extraCatalog.courseArtwork[code],
-                    model.extraCatalog.courseArtwork[code.removeSuffix("_00")],
+                val artNames = (
+                    listOfNotNull(
+                        model.extraCatalog.courseArtwork[code],
+                        model.extraCatalog.courseArtwork[code.removeSuffix("_00")],
+                    ) + com.mylittleblover.mkwplayer.ui.art.CourseCoverArt.packCandidates(code)
                 ).distinct()
                 val cover = com.mylittleblover.mkwplayer.ui.art.courseCoverDrawable(code)
                 ArtworkSlot(Modifier.fillMaxWidth()) { edge ->
@@ -1962,7 +1965,12 @@ private fun CoursePage(
                     val frame = Modifier.fillMaxWidth().aspectRatio(rememberArtworkRatio(code, art, 16f / 9f))
                     when {
                         art != null -> FadingArtwork(art.bitmap, frame)
-                        cover == null -> com.mylittleblover.mkwplayer.ui.art.CourseCover(code, frame)
+                        cover == null -> com.mylittleblover.mkwplayer.ui.art.CourseCover(
+                            code = code,
+                            modifier = frame,
+                            packDirectory = model.packDirectory,
+                            artworkName = artNames.firstOrNull(),
+                        )
                         else -> Box(frame)
                     }
                 }
@@ -2167,13 +2175,16 @@ private fun MapPage(
                 val names = model.localizedNames ?: requireNotNull(LocalizedNames.parse(
                     context.assets.open("localized_names.json").bufferedReader().use { it.readText() },
                 ))
-                val image = requireNotNull(com.mylittleblover.mkwplayer.ui.art.MapArtworkCache.load(context))
-                // The game's own connection table. Absent is allowed: the map then draws no roads rather
-                // than inventing them, and the editor is not offered.
                 val connections = model.stageConnections ?: runCatching {
                     com.mylittleblover.mkwplayer.library.StageConnections.parse(
                         context.assets.open("stage_connections.json").bufferedReader().use { it.readText() })
                 }.getOrNull()
+                val image = com.mylittleblover.mkwplayer.ui.art.MapArtworkCache.load(
+                    context = context,
+                    packDirectory = model.packDirectory,
+                    anchors = anchors,
+                    connections = connections,
+                )
                 MapResources(image, anchors, routes, names, connections)
             }
         }
@@ -2899,8 +2910,9 @@ private fun playbackArtworkNames(model: PlayerViewModel, ui: PlayerViewModel.Ui)
         listOfNotNull(ui.artworkName, model.currentStageCode?.let { model.extraCatalog.courseArtwork[it] })
     }
     val courseCode = if (track != null) track.courseCode else model.currentStageCode
+    val packCandidates = courseCode?.let { com.mylittleblover.mkwplayer.ui.art.CourseCoverArt.packCandidates(it) }.orEmpty()
     val courseCover = courseCode?.let { com.mylittleblover.mkwplayer.ui.art.courseCoverDrawable(it) }
-    return (if (courseCover == null && track == null) names + "album.webp" else names).distinct()
+    return (if (courseCover == null && track == null) names + packCandidates + "album.webp" else names + packCandidates).distinct()
 }
 
 @Composable

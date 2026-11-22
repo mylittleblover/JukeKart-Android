@@ -8,8 +8,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -732,6 +734,101 @@ internal fun AppSettingsScreen(
             }
         }
         item("about") {
+            var showLicensesDialog by rememberSaveable { mutableStateOf(false) }
+            var selectedLicenseFile by rememberSaveable { mutableStateOf<String?>(null) }
+            val licenseFiles = remember(context) {
+                runCatching { context.assets.list("licenses")?.sorted().orEmpty() }.getOrDefault(emptyList())
+            }
+            val selectedLicenseText = remember(context, selectedLicenseFile) {
+                val target = selectedLicenseFile ?: return@remember null
+                runCatching {
+                    context.assets.open("licenses/$target").bufferedReader().use { it.readText() }
+                }.getOrNull()
+            }
+
+            if (showLicensesDialog) {
+                MkwDialog(
+                    onDismissRequest = {
+                        selectedLicenseFile = null
+                        showLicensesDialog = false
+                    },
+                    title = stringResource(R.string.settings_open_source_licenses),
+                    confirmButton = {
+                        MkwPrimaryButton(
+                            text = if (selectedLicenseFile != null) {
+                                stringResource(R.string.common_back)
+                            } else {
+                                stringResource(R.string.settings_licenses_close)
+                            },
+                            onClick = {
+                                if (selectedLicenseFile != null) {
+                                    selectedLicenseFile = null
+                                } else {
+                                    showLicensesDialog = false
+                                }
+                            },
+                            size = MkwButtonSize.Compact,
+                        )
+                    },
+                    dismissButton = if (selectedLicenseFile != null) {
+                        {
+                            MkwGhostButton(
+                                text = stringResource(R.string.settings_licenses_close),
+                                onClick = {
+                                    selectedLicenseFile = null
+                                    showLicensesDialog = false
+                                },
+                            )
+                        }
+                    } else null,
+                ) {
+                    if (selectedLicenseText != null) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 360.dp)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(
+                                selectedLicenseFile.orEmpty(),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MkwKitTokens.Palette.ink,
+                            )
+                            Text(
+                                selectedLicenseText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MkwKitTokens.Palette.inkSecondary,
+                            )
+                        }
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 360.dp)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(
+                                stringResource(R.string.settings_open_source_licenses_summary),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MkwKitTokens.Palette.inkSecondary,
+                            )
+                            MkwDivider(modifier = Modifier.padding(vertical = 2.dp))
+                            licenseFiles.forEach { fileName ->
+                                MkwOptionRow(
+                                    headline = fileName.removeSuffix(".txt"),
+                                    supporting = "assets/licenses/$fileName",
+                                    selected = false,
+                                    onClick = { selectedLicenseFile = fileName },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             MkwCard(tone = MkwSurfaceTone.Porcelain, contentPadding = PaddingValues(18.dp)) {
                 Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MkwKitTokens.Palette.ink)
                 Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleSmall, color = MkwKitTokens.Palette.ink)
@@ -765,7 +862,15 @@ internal fun AppSettingsScreen(
                         }
                         .padding(vertical = 4.dp),
                 )
+                Text(stringResource(R.string.settings_non_affiliation), style = MaterialTheme.typography.bodySmall, color = MkwKitTokens.Palette.inkSecondary)
                 Text(stringResource(R.string.map_art_notice), style = MaterialTheme.typography.bodySmall, color = MkwKitTokens.Palette.inkSecondary)
+                Text(stringResource(R.string.settings_feedback_repo), style = MaterialTheme.typography.bodySmall, color = MkwKitTokens.Palette.inkSecondary)
+                Spacer(Modifier.height(4.dp))
+                MkwSecondaryButton(
+                    text = stringResource(R.string.settings_open_source_licenses),
+                    onClick = { showLicensesDialog = true },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }

@@ -10,7 +10,8 @@ import json
 import os
 import struct
 
-BW = r"G:\Mario Kart World\romfs\Sound\Resource\Stream"
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BW = os.environ.get("MKW_ROMFS_STREAM", os.path.join(_REPO, "romfs", "Sound", "Resource", "Stream"))
 
 
 def blocks_for(samples):
@@ -144,7 +145,7 @@ def main():
         for f in report["failures"]:
             print("  ", f)
 
-    out = r"G:\Mario Kart World\MKW-Player\reports\generated\bwav-layout.json"
+    out = os.path.join(_REPO, "reports", "generated", "bwav-layout.json")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)

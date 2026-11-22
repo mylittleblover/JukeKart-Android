@@ -119,18 +119,15 @@ class CupArtTest {
     // ---------------------------------------------------------------- provenance
 
     @Test
-    fun theRightsStatusIsPrivateResearchNotCleared() {
-        // 'Attribution shown' and 'rights cleared' are different claims; this build can only make the
-        // first, and the type must not let it claim the second.
-        assertEquals(CupArt.RightsStatus.PRIVATE_RESEARCH, CupArt.status)
+    fun theRightsStatusIsOriginalVectorAndUnaffiliated() {
+        assertEquals(CupArt.RightsStatus.ORIGINAL_VECTOR, CupArt.status)
     }
 
     @Test
-    fun theNoticeNamesNintendoAndTheRestriction() {
+    fun theNoticeStatesOriginalArtworkAndNonAffiliation() {
         val notice = CupArt.NOTICE
-        assertTrue(notice.contains("Nintendo"), notice)
-        assertTrue(notice.contains("research", ignoreCase = true), notice)
-        assertTrue(notice.contains("Not redistributable"), notice)
+        assertTrue(notice.contains("JukeKart"), notice)
+        assertTrue(notice.contains("not affiliated", ignoreCase = true), notice)
     }
 
     @Test
@@ -140,10 +137,9 @@ class CupArtTest {
     }
 
     @Test
-    fun theNoticeDoesNotClaimPermission() {
+    fun theNoticeDoesNotClaimNintendoLicense() {
         val notice = CupArt.NOTICE.lowercase()
-        assertFalse(notice.contains("licensed"), "this build has no licence: $notice")
-        assertFalse(notice.contains("permission"), notice)
+        assertFalse(notice.contains("licensed by nintendo"), "this build has no Nintendo licence: $notice")
     }
 
     @Test

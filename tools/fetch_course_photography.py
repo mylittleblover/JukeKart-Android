@@ -38,9 +38,10 @@ import time
 import urllib.parse
 import urllib.request
 
-ASSET_NAMES = r"G:\Mario Kart World\MKW-Player\app\src\main\assets\localized_names.json"
-OUT_DIR = r"G:\Mario Kart World\art_src"
-REPORT = r"G:\Mario Kart World\MKW-Player\reports\generated\course-photography.json"
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ASSET_NAMES = os.path.join(_REPO, "app", "src", "main", "assets", "localized_names.json")
+OUT_DIR = os.environ.get("MKW_ART_OUT", os.path.join(_REPO, "art_src"))
+REPORT = os.path.join(_REPO, "reports", "generated", "course-photography.json")
 
 API = "https://www.mariowiki.com/api.php"
 UA = "MKWPlayer-ArtFetcher/1.0 (course artwork for a personal player; contact: local build)"

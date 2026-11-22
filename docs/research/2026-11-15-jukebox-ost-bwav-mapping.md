@@ -1,6 +1,6 @@
 # Mario Kart World Official OST (120-346) <-> BGM_JukeBox_*.bwav 实际音频对照表
 
-基于 `G:\Mario Kart World\MKW`（官方 OST 348 首 `.m4a`）与 `romfs\Sound\Resource\Stream\BGM_JukeBox_*.bwav`（及 `readable_assets` 对应 48 kHz `.wav`）通过全量音频频谱与波形交叉相关实测建立的 **227 / 227 严格一对一实际对照关系**。
+基于 `..\MKW`（官方 OST 348 首 `.m4a`）与 `romfs\Sound\Resource\Stream\BGM_JukeBox_*.bwav`（及 `readable_assets` 对应 48 kHz `.wav`）通过全量音频频谱与波形交叉相关实测建立的 **227 / 227 严格一对一实际对照关系**。
 
 ## 核心验证结论
 

@@ -24,7 +24,7 @@
     <string name="map_browse_hint">选择赛道，或浏览一条官方路线。</string>
     <string name="map_loading">正在加载世界地图…</string>
     <string name="map_data_missing">无法加载地图资料。</string>
-    <string name="map_art_notice">地图与赛道插画 © Nintendo。</string>
+    <string name="map_art_notice">地图与赛道徽章使用 JukeKart 原创矢量图形，或由用户导入的曲包素材提供。</string>
     <string name="map_route_stop">%1$d · %2$s</string>
     <string name="map_pin_occurrences">%1$s。路线站点：%2$s</string>
     <string name="map_stop_separator">、</string>

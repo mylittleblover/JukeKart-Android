@@ -18,7 +18,7 @@ What this script does NOT do is decode. It establishes framing only; whether the
 audio is decided by comparing against vgmstream.
 
 Usage:
-    python tools/probe_codec2_framing.py --romfs "G:/Mario Kart World/romfs/Sound/Resource/Stream"
+    python tools/probe_codec2_framing.py --romfs "/path/to/romfs/Sound/Resource/Stream"
 """
 from __future__ import annotations
 
