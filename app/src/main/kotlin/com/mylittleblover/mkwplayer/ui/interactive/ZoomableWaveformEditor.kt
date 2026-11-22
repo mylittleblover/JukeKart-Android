@@ -23,12 +23,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOut
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -60,7 +57,12 @@ import com.mylittleblover.mkwplayer.audio.BwavWaveformExtractor
 import com.mylittleblover.mkwplayer.audio.EngineSnapshot
 import com.mylittleblover.mkwplayer.interactive.CourseFlowRecipeBuilder
 import com.mylittleblover.mkwplayer.interactive.MinfCatalog
-import com.mylittleblover.mkwplayer.ui.rememberPressScale
+import com.mylittleblover.mkwplayer.ui.kit.MkwBadge
+import com.mylittleblover.mkwplayer.ui.kit.MkwBadgeTone
+import com.mylittleblover.mkwplayer.ui.kit.MkwGhostButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwIconButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwIconButtonTone
+import com.mylittleblover.mkwplayer.ui.kit.MkwKitTokens
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
@@ -152,96 +154,59 @@ internal fun ZoomableWaveformEditor(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Surface(
-                shape = RoundedCornerShape(999.dp),
-                color = if (bridgeLocked) {
-                    MaterialTheme.colorScheme.tertiaryContainer
-                } else {
-                    MaterialTheme.colorScheme.primaryContainer
-                },
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    if (bridgeLocked) {
-                        Icon(
-                            Icons.Default.Lock,
-                            contentDescription = null,
-                            modifier = Modifier.size(13.dp),
-                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                        )
-                    }
-                    Text(
-                        text = EngineSnapshot.formatPosition(selectedExitFrame, sampleRate),
-                        style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (bridgeLocked) {
-                            MaterialTheme.colorScheme.onTertiaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        },
-                    )
-                }
-            }
+            MkwBadge(
+                text = EngineSnapshot.formatPosition(selectedExitFrame, sampleRate),
+                tone = if (bridgeLocked) MkwBadgeTone.Crimson else MkwBadgeTone.Rose,
+                leadingIcon = if (bridgeLocked) Icons.Default.Lock else null,
+                tabular = true,
+            )
             Text(
                 text = when {
                     bridgeLocked -> lockLabel ?: "Bridge_ToFull"
                     else -> stringResource(R.string.flow_editor_snap_markers, exitCandidates.size)
                 },
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MkwKitTokens.Palette.inkSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
             val zoomLabel = remember(zoom) { String.format(Locale.ROOT, "%.1f×", zoom) }
-            TextButton(
+            MkwGhostButton(
+                text = zoomLabel,
                 onClick = { applyZoom(1f, 0.5f) },
                 enabled = zoom > 1.01f,
-            ) {
-                Text(
-                    zoomLabel,
-                    style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
-                )
-            }
-            val (zoomOutScale, zoomOutSrc) = rememberPressScale()
-            FilledTonalIconButton(
+            )
+            MkwIconButton(
+                icon = Icons.Default.ZoomOut,
+                contentDescription = stringResource(R.string.flow_editor_zoom_out),
                 onClick = { applyZoom(zoom / 1.6f, 0.5f) },
                 enabled = zoom > 1.01f,
-                interactionSource = zoomOutSrc,
-                modifier = Modifier.size(34.dp).then(zoomOutScale),
-            ) {
-                Icon(
-                    Icons.Default.ZoomOut,
-                    contentDescription = stringResource(R.string.flow_editor_zoom_out),
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-            val (zoomInScale, zoomInSrc) = rememberPressScale()
-            FilledTonalIconButton(
+                tone = MkwIconButtonTone.Rose,
+                visualSize = 34.dp,
+                iconSize = 18.dp,
+                modifier = Modifier.size(36.dp),
+            )
+            MkwIconButton(
+                icon = Icons.Default.ZoomIn,
+                contentDescription = stringResource(R.string.flow_editor_zoom_in),
                 onClick = { applyZoom(zoom * 1.6f, 0.5f) },
                 enabled = zoom < 15.9f,
-                interactionSource = zoomInSrc,
-                modifier = Modifier.size(34.dp).then(zoomInScale),
-            ) {
-                Icon(
-                    Icons.Default.ZoomIn,
-                    contentDescription = stringResource(R.string.flow_editor_zoom_in),
-                    modifier = Modifier.size(18.dp),
-                )
-            }
+                tone = MkwIconButtonTone.Rose,
+                visualSize = 34.dp,
+                iconSize = 18.dp,
+                modifier = Modifier.size(36.dp),
+            )
         }
 
-        val primaryColor = MaterialTheme.colorScheme.primary
-        val activeBarColor = if (bridgeLocked) MaterialTheme.colorScheme.tertiary else primaryColor
-        val dimmedBarColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.28f)
-        val markerColor = MaterialTheme.colorScheme.secondary
-        val beatLineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-        val barLineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-        val loopBandColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f)
-        val canvasBg = MaterialTheme.colorScheme.surfaceContainerLowest
+        val primaryColor = MkwKitTokens.Palette.crimson
+        val activeBarColor = if (bridgeLocked) MkwKitTokens.Palette.crimsonDeep else primaryColor
+        val dimmedBarColor = MkwKitTokens.Palette.inkSecondary.copy(alpha = 0.25f)
+        val markerColor = MkwKitTokens.Palette.crimsonDeep
+        val beatLineColor = MkwKitTokens.Palette.hairline
+        val barLineColor = MkwKitTokens.Palette.outlineInk.copy(alpha = 0.45f)
+        val loopBandColor = MkwKitTokens.Palette.rose.copy(alpha = 0.5f)
+        val canvasBg = MkwKitTokens.Palette.inset
 
         val handleHitSlopPx = with(density) { 26.dp.toPx() }
         val dragSlopPx = viewConfigSlop()
@@ -250,9 +215,14 @@ internal fun ZoomableWaveformEditor(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(124.dp)
-                .clip(RoundedCornerShape(10.dp))
+                .clip(MkwKitTokens.Shape.thumb)
                 .background(canvasBg)
-                .pointerInput(totalFrames) {
+                .padding(horizontal = 10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(totalFrames) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         val widthPx = size.width.toFloat().coerceAtLeast(1f)
@@ -437,6 +407,7 @@ internal fun ZoomableWaveformEditor(
                         center = Offset(exitX, handleRadius + 4.dp.toPx()),
                     )
                 }
+            }
             }
         }
 

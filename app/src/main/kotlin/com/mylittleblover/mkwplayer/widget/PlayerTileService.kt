@@ -70,7 +70,7 @@ class PlayerTileService : TileService() {
         }
         tile.icon = Icon.createWithResource(
             this,
-            if (state.playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
+            if (state.playing) R.drawable.ic_widget_pause else R.drawable.ic_stat_jukekart,
         )
         tile.updateTile()
     }

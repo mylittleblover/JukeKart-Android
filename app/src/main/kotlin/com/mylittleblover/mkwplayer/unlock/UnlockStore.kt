@@ -163,6 +163,17 @@ internal class UnlockStore(private val file: File) {
         }
     }
 
+    /** Clears stored Special Cup progress for developer testing resets. */
+    fun reset(): String? = try {
+        val temp = File(file.parentFile, "${file.name}.tmp")
+        if (temp.exists()) temp.delete()
+        if (file.exists() && !file.delete()) {
+            "Special Cup progress could not be cleared."
+        } else null
+    } catch (e: Exception) {
+        "Special Cup progress could not be cleared: ${e.message}"
+    }
+
     /** Moves an unreadable file aside instead of deleting it. */
     private fun quarantine() {
         try {

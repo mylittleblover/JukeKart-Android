@@ -269,4 +269,17 @@ class UnlockStoreTest {
         assertEquals(SpecialCupUnlock.CeremonyPhase.PENDING, restored.snapshot.ceremony)
         assertTrue(restored.isPending, "the offer is still waiting")
     }
+
+    @Test
+    fun resetDeletesSavedUnlockFileAndReturnsBlankProgress() {
+        val dir = tempDir()
+        val s = store(dir)
+        assertNull(s.save(state(listened = mapOf("A" to required), completed = setOf("A"), entitled = true, congratulated = true)))
+        assertNotNull(s.load().state)
+
+        assertNull(s.reset())
+        val after = s.load()
+        assertNull(after.problem)
+        assertNull(after.state)
+    }
 }

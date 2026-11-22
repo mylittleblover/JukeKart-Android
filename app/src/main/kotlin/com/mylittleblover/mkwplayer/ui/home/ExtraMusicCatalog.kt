@@ -134,7 +134,45 @@ internal object ExtraMusicCatalog {
         val otherMusic: List<OtherMusicItem> = emptyList(),
         val shortSounds: List<SimpleTrackItem> = emptyList(),
         val nintendoMusicSpecial: List<SimpleTrackItem> = emptyList(),
-    )
+    ) {
+        fun digestForStem(stem: String): String? {
+            sfcCourses.forEach { t ->
+                if (t.main.stem.equals(stem, ignoreCase = true)) return t.main.sha256
+                if (t.fast.stem.equals(stem, ignoreCase = true)) return t.fast.sha256
+            }
+            battleTracks.forEach { t ->
+                if (t.main.stem.equals(stem, ignoreCase = true)) return t.main.sha256
+                if (t.fast.stem.equals(stem, ignoreCase = true)) return t.fast.sha256
+            }
+            koopaSpeaker?.let { ks ->
+                if (ks.normalAsset.stem.equals(stem, ignoreCase = true)) return ks.normalAsset.sha256
+                if (ks.fastAsset.stem.equals(stem, ignoreCase = true)) return ks.fastAsset.sha256
+            }
+            otherMusic.forEach { item ->
+                when (item) {
+                    is OtherMusicItem.InteractiveTitle -> {
+                        listOf(item.harmonica, item.main, item.brassCut)
+                            .firstOrNull { it.stem.equals(stem, ignoreCase = true) }
+                            ?.let { return it.sha256 }
+                        item.outros.firstOrNull { it.asset.stem.equals(stem, ignoreCase = true) }
+                            ?.let { return it.asset.sha256 }
+                    }
+                    is OtherMusicItem.ChainedSequence ->
+                        item.parts.firstOrNull { it.asset.stem.equals(stem, ignoreCase = true) }
+                            ?.let { return it.asset.sha256 }
+                    is OtherMusicItem.OverlaidOpening -> {
+                        if (item.op.stem.equals(stem, ignoreCase = true)) return item.op.sha256
+                        if (item.telop.stem.equals(stem, ignoreCase = true)) return item.telop.sha256
+                    }
+                    is OtherMusicItem.LinearAsset ->
+                        if (item.asset.stem.equals(stem, ignoreCase = true)) return item.asset.sha256
+                }
+            }
+            shortSounds.firstOrNull { it.asset.stem.equals(stem, ignoreCase = true) }?.let { return it.asset.sha256 }
+            nintendoMusicSpecial.firstOrNull { it.asset.stem.equals(stem, ignoreCase = true) }?.let { return it.asset.sha256 }
+            return null
+        }
+    }
 
     @Volatile
     private var cached: Catalog? = null

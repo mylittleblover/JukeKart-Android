@@ -81,7 +81,11 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
         updateRecent { recent.read() }
         reloadPresets()
         updateCustomRoutes { customRouteStore.read() }
-        com.mylittleblover.mkwplayer.library.PlayStatsRepository.reload(application)
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                com.mylittleblover.mkwplayer.library.PlayStatsRepository.ensureLoadedSync(application)
+            }
+        }
         viewModelScope.launch {
             while (isActive) {
                 refreshDate()
@@ -265,6 +269,8 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
         loopWholeRoute: Boolean,
         roadRuleMode: com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RoadMusicRuleMode =
             com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RoadMusicRuleMode.AUTO,
+        routeSuiteMode: com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RouteSuiteMode =
+            com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RouteSuiteMode.GAME_SUITE,
         onComplete: (Result<com.mylittleblover.mkwplayer.routes.CustomRoute>) -> Unit = {},
     ) {
         viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
@@ -275,9 +281,9 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
                             IllegalStateException("Stage connections catalog unavailable"),
                         )
                         if (routeId == null) {
-                            customRouteStore.create(name, stops, edges, conn, loopWholeRoute, roadRuleMode)
+                            customRouteStore.create(name, stops, edges, conn, loopWholeRoute, roadRuleMode, routeSuiteMode)
                         } else {
-                            customRouteStore.saveDraftOver(routeId, name, stops, edges, conn, loopWholeRoute, roadRuleMode)
+                            customRouteStore.saveDraftOver(routeId, name, stops, edges, conn, loopWholeRoute, roadRuleMode, routeSuiteMode)
                         }
                     }
                 }
@@ -314,6 +320,11 @@ internal class DiscoveryViewModel(application: Application) : AndroidViewModel(a
         id: String,
         mode: com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RoadMusicRuleMode,
     ) = updateCustomRoutes { customRouteStore.setRoadRuleMode(id, mode) }
+
+    fun setCustomRouteSuiteMode(
+        id: String,
+        mode: com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RouteSuiteMode,
+    ) = updateCustomRoutes { customRouteStore.setRouteSuiteMode(id, mode) }
 
     fun duplicatePreset(id: String, newName: String) {
         viewModelScope.launch {

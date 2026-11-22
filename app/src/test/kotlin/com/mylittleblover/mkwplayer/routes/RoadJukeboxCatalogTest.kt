@@ -354,5 +354,111 @@ class RoadJukeboxCatalogTest {
         }
         assertTrue(heavyCount > 350 && lightCount > 50, "Expected ~4:1 distribution, got heavy=$heavyCount light=$lightCount")
     }
+
+    @Test
+    fun routeSuiteModeSelectsCorrectVariantsForGrandPrixRallyCustomAndCompleteSuite() {
+        val gpStops = listOf("FirstCircuit", "WestCity", "Coaster", "DonkeyKong")
+        assertEquals(
+            listOf("c", "a", "a", "a_alt"),
+            gpStops.mapIndexed { idx, code ->
+                RoadJukeboxCatalog.resolveSuiteVariantForStop(
+                    officialKind = OfficialRouteKind.GRAND_PRIX,
+                    suiteMode = RoadJukeboxCatalog.RouteSuiteMode.GAME_SUITE,
+                    stopIndex = idx,
+                    stopCount = gpStops.size,
+                    stageCode = code,
+                )
+            },
+        )
+        // Middle DonkeyKong in GP uses A (A Alt is specifically for DonkeyKong at the GP ending)
+        assertEquals(
+            "a",
+            RoadJukeboxCatalog.resolveSuiteVariantForStop(
+                officialKind = OfficialRouteKind.GRAND_PRIX,
+                suiteMode = RoadJukeboxCatalog.RouteSuiteMode.GAME_SUITE,
+                stopIndex = 1,
+                stopCount = 4,
+                stageCode = "DonkeyKong",
+            ),
+        )
+        // Non-DonkeyKong GP ending uses A, not A Alt (even for courses with a_alt like Cinema or SnowMountain)
+        assertEquals(
+            "a",
+            RoadJukeboxCatalog.resolveSuiteVariantForStop(
+                officialKind = OfficialRouteKind.GRAND_PRIX,
+                suiteMode = RoadJukeboxCatalog.RouteSuiteMode.GAME_SUITE,
+                stopIndex = 3,
+                stopCount = 4,
+                stageCode = "Cinema",
+            ),
+        )
+        // First stop DonkeyKong still uses C
+        assertEquals(
+            "c",
+            RoadJukeboxCatalog.resolveSuiteVariantForStop(
+                officialKind = OfficialRouteKind.GRAND_PRIX,
+                suiteMode = RoadJukeboxCatalog.RouteSuiteMode.GAME_SUITE,
+                stopIndex = 0,
+                stopCount = 1,
+                stageCode = "DonkeyKong",
+            ),
+        )
+
+        val rallyStops = listOf("DesertHills", "DonkeyKong", "ChocoMountain", "MooMooFarm", "SFCMarioCircuit", "BigTree")
+        assertEquals(
+            listOf("b", "a", "a", "a", "a", "d"),
+            rallyStops.mapIndexed { idx, code ->
+                RoadJukeboxCatalog.resolveSuiteVariantForStop(
+                    officialKind = OfficialRouteKind.RALLY,
+                    suiteMode = RoadJukeboxCatalog.RouteSuiteMode.GAME_SUITE,
+                    stopIndex = idx,
+                    stopCount = rallyStops.size,
+                    stageCode = code,
+                )
+            },
+        )
+
+        // Custom route (officialKind = null) under Game Suite uses GP stop rule (0 = C, ending DonkeyKong = A Alt, others = A)
+        assertEquals(
+            listOf("c", "a", "a"),
+            listOf("PeachBeach", "DonkeyKong", "WestCity").mapIndexed { idx, code ->
+                RoadJukeboxCatalog.resolveSuiteVariantForStop(
+                    officialKind = null,
+                    suiteMode = RoadJukeboxCatalog.RouteSuiteMode.GAME_SUITE,
+                    stopIndex = idx,
+                    stopCount = 3,
+                    stageCode = code,
+                )
+            },
+        )
+        assertEquals(
+            listOf("c", "a", "a_alt"),
+            listOf("PeachBeach", "WestCity", "DonkeyKong").mapIndexed { idx, code ->
+                RoadJukeboxCatalog.resolveSuiteVariantForStop(
+                    officialKind = null,
+                    suiteMode = RoadJukeboxCatalog.RouteSuiteMode.GAME_SUITE,
+                    stopIndex = idx,
+                    stopCount = 3,
+                    stageCode = code,
+                )
+            },
+        )
+
+        // Complete Suite always resolves "a" regardless of route kind, index, or stageCode
+        for (kind in listOf(OfficialRouteKind.GRAND_PRIX, OfficialRouteKind.RALLY, null)) {
+            assertEquals(
+                listOf("a", "a", "a"),
+                listOf("FirstCircuit", "DonkeyKong", "BigTree").mapIndexed { idx, code ->
+                    RoadJukeboxCatalog.resolveSuiteVariantForStop(
+                        officialKind = kind,
+                        suiteMode = RoadJukeboxCatalog.RouteSuiteMode.COMPLETE_SUITE,
+                        stopIndex = idx,
+                        stopCount = 3,
+                        stageCode = code,
+                    )
+                },
+            )
+        }
+    }
 }
 

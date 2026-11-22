@@ -120,7 +120,8 @@ class PackImportService : Service() {
         }
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setSmallIcon(com.mylittleblover.mkwplayer.R.drawable.ic_stat_jukekart)
+            .setColor(0xFFC52D49.toInt())
             .setContentTitle(title)
             .setContentText(text)
             .setContentIntent(openApp)
@@ -140,7 +141,7 @@ class PackImportService : Service() {
                 Intent(this, PackImportService::class.java).setAction(ACTION_CANCEL_IMPORT),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
-            builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Cancel", cancelIntent)
+            builder.addAction(com.mylittleblover.mkwplayer.R.drawable.ic_notif_stop, "Cancel", cancelIntent)
         }
         return builder.build()
     }
@@ -159,7 +160,8 @@ class PackImportService : Service() {
             }
         }
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_download_done)
+            .setSmallIcon(com.mylittleblover.mkwplayer.R.drawable.ic_stat_jukekart)
+            .setColor(0xFFC52D49.toInt())
             .setContentTitle("Library updated")
             .setContentText(details)
             .setContentIntent(openApp)
@@ -176,7 +178,8 @@ class PackImportService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_notify_error)
+            .setSmallIcon(com.mylittleblover.mkwplayer.R.drawable.ic_stat_jukekart)
+            .setColor(0xFFC52D49.toInt())
             .setContentTitle("Pack import stopped")
             .setContentText(reason)
             .setStyle(NotificationCompat.BigTextStyle().bigText(reason))

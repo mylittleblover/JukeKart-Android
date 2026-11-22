@@ -63,13 +63,13 @@
     <string name="media_course_locked_progress">Heard %1$d / %2$d courses</string>
     <string name="media_course_locked_hint">Locked course · %1$s</string>
 
-    <string name="widget_label">MKW Player Controls</string>
+    <string name="widget_label">JukeKart Controls</string>
     <string name="widget_description">Shows the current track and playback controls.</string>
     <string name="widget_artwork_desc">Track artwork</string>
     <string name="widget_prev_desc">Previous</string>
     <string name="widget_play_pause_desc">Play or pause</string>
     <string name="widget_next_desc">Next</string>
-    <string name="tile_default_label">MKW Player</string>
+    <string name="tile_default_label">JukeKart</string>
     <string name="tile_playing">Playing</string>
     <string name="tile_paused">Paused</string>
     <string name="tile_idle">Tap to open</string>
@@ -109,12 +109,15 @@
 
     <string name="speed_pitch_title">Speed &amp; Pitch</string>
     <string name="speed_pitch_button">Speed / Pitch</string>
+    <string name="speed_short_label">Speed</string>
+    <string name="sleep_short_label">Sleep</string>
     <string name="speed_label">Playback Speed</string>
     <string name="pitch_label">Pitch Shift</string>
     <string name="preserve_pitch_label">Preserve pitch when changing speed</string>
     <string name="speed_pitch_reset">Reset to 1.00x / 0 st</string>
     <string name="speed_pitch_semitones_fmt">%1$+.1f st</string>
 
+    <string name="ab_loop_button">A-B Loop</string>
     <string name="ab_loop_set_a">Set A</string>
     <string name="ab_loop_set_b">Set B</string>
     <string name="ab_loop_clear">Clear A-B</string>
@@ -122,6 +125,7 @@
     <string name="ab_loop_badge_ab">A-B Loop %1$s – %2$s</string>
 
     <string name="eq_title">Equalizer &amp; Audio Effects</string>
+    <string name="eq_short_label">Equalizer</string>
     <string name="eq_enabled">Enable 5-Band Equalizer</string>
     <string name="eq_preset_label">Presets</string>
     <string name="eq_preset_flat">Flat</string>
@@ -146,7 +150,7 @@
 
     <string name="settings_backup_title">Backup &amp; Export</string>
     <string name="settings_backup_hint">Back up playlists, favorites, presets, routes, play stats, and audio settings to JSON or export playlists as M3U.</string>
-    <string name="settings_backup_export">Export Backup (.json)</string>
+    <string name="settings_backup_export">Export (.json)</string>
     <string name="settings_backup_import">Restore Backup</string>
     <string name="settings_backup_m3u">Export M3U Playlists</string>
     <string name="settings_backup_mode_title">Choose Restore Mode</string>
@@ -167,6 +171,10 @@
     <string name="sort_most_played">Most Played</string>
     <string name="sort_ost_index">OST Order</string>
     <string name="play_count_fmt">%1$d plays</string>
+    <plurals name="play_count_plurals">
+        <item quantity="one">%1$d play</item>
+        <item quantity="other">%1$d plays</item>
+    </plurals>
 
     <string name="smart_playlists_title">Smart Playlists</string>
     <string name="smart_most_played">Most Played</string>
@@ -174,7 +182,7 @@
     <string name="smart_most_played_empty">Play some courses or tracks to build your rankings.</string>
     <string name="smart_favorites_mix">Favorites Mix</string>
     <string name="smart_favorites_mix_subtitle">Play all your favorited courses and tracks</string>
-    <string name="smart_favorites_mix_empty">Star favorite courses or tracks to unlock this mix.</string>
+    <string name="smart_favorites_mix_empty">Favorite courses or tracks to unlock this mix.</string>
 
     <string name="queue_clear_upcoming">Clear Upcoming</string>
     <string name="queue_drag_reorder_hint">Drag handle to reorder</string>

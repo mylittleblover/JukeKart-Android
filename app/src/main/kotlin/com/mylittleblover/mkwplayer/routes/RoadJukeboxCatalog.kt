@@ -109,6 +109,48 @@ internal object RoadJukeboxCatalog {
         }
     }
 
+    /** Playback preset selection strategy across stops in a route playlist. */
+    enum class RouteSuiteMode {
+        GAME_SUITE,
+        COMPLETE_SUITE;
+
+        companion object {
+            fun fromStored(raw: String?): RouteSuiteMode = when (raw?.trim()?.uppercase(Locale.ROOT)) {
+                COMPLETE_SUITE.name -> COMPLETE_SUITE
+                else -> GAME_SUITE
+            }
+        }
+    }
+
+    /**
+     * Resolves the target built-in suite variant (`"a"`, `"a_alt"`, `"b"`, `"c"`, `"d"`) for stop
+     * [stopIndex] of [stopCount] under [suiteMode].
+     */
+    fun resolveSuiteVariantForStop(
+        officialKind: OfficialRouteKind?,
+        suiteMode: RouteSuiteMode,
+        stopIndex: Int,
+        stopCount: Int,
+        stageCode: String,
+    ): String {
+        if (suiteMode == RouteSuiteMode.COMPLETE_SUITE) return "a"
+        val canonical = stageCode.trim().removeSuffix("_00")
+        return when (officialKind) {
+            OfficialRouteKind.RALLY -> when {
+                stopIndex == 0 -> "b"
+                stopCount > 1 && stopIndex == stopCount - 1 -> "d"
+                else -> "a"
+            }
+            OfficialRouteKind.GRAND_PRIX, null -> when {
+                stopIndex == 0 -> "c"
+                stopCount > 1 &&
+                    stopIndex == stopCount - 1 &&
+                    canonical.equals("DonkeyKong", ignoreCase = true) -> "a_alt"
+                else -> "a"
+            }
+        }
+    }
+
     enum class RoadMusicRuleMode {
         AUTO,
         GRAND_PRIX,

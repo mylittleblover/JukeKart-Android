@@ -49,4 +49,6 @@
     <string name="interactive_next_trigger_hint">Next: %1$s · %2$s</string>
     <string name="interactive_fade_paused">Fade paused · %1$s s left (frozen)</string>
     <string name="interactive_stop_hold_hint">Tap to stop · Hold to fade</string>
+    <string name="interactive_loading_title">Loading track…</string>
+    <string name="interactive_loading_hint">Preparing interactive audio graph and sections…</string>
 </resources>

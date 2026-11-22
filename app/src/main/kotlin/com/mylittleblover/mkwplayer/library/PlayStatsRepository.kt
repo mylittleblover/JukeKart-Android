@@ -35,6 +35,12 @@ internal object PlayStatsRepository {
         return loaded
     }
 
+    /** Loads stats from disk once on caller thread; subsequent callers reuse the populated flow. */
+    fun ensureLoadedSync(context: Context): Map<String, TrackPlayStat> {
+        store?.let { return _stats.value }
+        return reload(context)
+    }
+
     fun recordPlay(context: Context, trackId: String): Result<Map<String, TrackPlayStat>> {
         if (trackId.isBlank()) return Result.success(_stats.value)
         return ensureStore(context).recordPlay(trackId).onSuccess { updated ->

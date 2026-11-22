@@ -187,12 +187,12 @@ internal object CourseFlowRecipeBuilder {
                     "Bridge" -> listOf("Main", "Fast")
                     "Main" -> when {
                         hasRegions -> listOf("Region2")
-                        hasPattern2 -> listOf("Pattern2", "Fast")
+                        hasPattern2 -> listOf("Pattern2", "Fast", "Fast_Pattern2")
                         hasSpeaker -> listOf("Main_Speaker", "Fast")
                         else -> listOf("Fast")
                     }
                     "Main_Speaker" -> listOf("Main", "Fast_Speaker", "Fast")
-                    "Pattern2" -> listOf("Main", "Fast_Pattern2")
+                    "Pattern2" -> listOf("Main", "Fast_Pattern2", "Fast")
                     "Fast" -> when {
                         hasPattern2 -> listOf("Fast_Pattern2")
                         hasSpeaker -> listOf("Fast_Speaker")
@@ -276,12 +276,15 @@ internal object CourseFlowRecipeBuilder {
         manifest: PackManifest?,
         identities: InteractiveAudioIdentities,
         packDir: File,
+        extraCatalog: com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog.Catalog? = null,
     ): SourceResolver {
         val manifestAssets = manifest?.assets?.associateBy { it.digest.sha256 }.orEmpty()
         return object : SourceResolver {
             override fun findByFileName(fileName: String): AssetHeader? {
                 val stem = fileName.removeSuffix(".bwav")
-                val digest = identities.digestForFileName(fileName) ?: return null
+                val digest = identities.digestForFileName(fileName)
+                    ?: extraCatalog?.digestForStem(stem)
+                    ?: return null
                 val audioFile = File(packDir, "audio/$digest")
                 if (!audioFile.isFile) return null
                 val header = runCatching {
@@ -322,9 +325,9 @@ internal object CourseFlowRecipeBuilder {
         resolver: SourceResolver,
     ): CourseInventory {
         val logical = courseCode.removeSuffix("_00")
-        val medleys = medleyCatalog.forCourse(logical)
+        val medleys = medleyCatalog.forCourse(logical).sortedBy { it.suiteSortOrder }
         val builtIns = medleys.map { medley ->
-            val ref = if (medley.isKnockoutVariant) PresetRefs.SYSTEM_KNOCKOUT else PresetRefs.SYSTEM_DEFAULT
+            val ref = PresetRefs.forSuiteVariant(medley.normalizedSuiteVariant)
             val handover = resolveMedleyHandoverFrame(medley, minf)
             val introPhase = resolveIncomingPhase(medley, minf)
             BuiltInPresetSummary(
@@ -590,14 +593,26 @@ internal object CourseFlowRecipeBuilder {
         }
         val targetBuiltIn = when (presetRef) {
             PresetRefs.SYSTEM_KNOCKOUT -> inventory.builtInPresets.firstOrNull { it.isKnockout }
+                ?: inventory.builtInPresets.firstOrNull { it.ref == PresetRefs.SYSTEM_DEFAULT }
                 ?: inventory.builtInPresets.firstOrNull()
-            else -> inventory.builtInPresets.firstOrNull { !it.isKnockout }
+            PresetRefs.SYSTEM_SUITE_A_ALT,
+            PresetRefs.SYSTEM_SUITE_B,
+            PresetRefs.SYSTEM_SUITE_C,
+            PresetRefs.SYSTEM_SUITE_D,
+            -> inventory.builtInPresets.firstOrNull { it.ref == presetRef }
+                ?: inventory.builtInPresets.firstOrNull { it.ref == PresetRefs.SYSTEM_DEFAULT && !it.isKnockout }
+                ?: inventory.builtInPresets.firstOrNull()
+            else -> inventory.builtInPresets.firstOrNull { it.ref == PresetRefs.SYSTEM_DEFAULT && !it.isKnockout }
                 ?: inventory.builtInPresets.firstOrNull()
         } ?: return null
 
         val medley = targetBuiltIn.medley
         val digests = linkedMapOf<String, String>()
         for (stem in medley.uniqueStems) {
+            if (stem.equals("BGM_Seq_FinalLapFF", ignoreCase = true)) {
+                digests[stem] = FinalLapFanfareCompiler.SHA256
+                continue
+            }
             val header = resolver.findByFileName("$stem.bwav") ?: return null
             digests[stem] = header.digest
         }
@@ -728,6 +743,18 @@ internal object CourseFlowRecipeBuilder {
                 .put("sourceLength", clip.sourceLength)
             if (clip.fadeIn > 0L) obj.put("fadeIn", clip.fadeIn)
             if (clip.fadeOut > 0L) obj.put("fadeOut", clip.fadeOut)
+            if (clip.volumePoints.isNotEmpty()) {
+                val vpArr = JSONArray()
+                clip.volumePoints.forEach { pt ->
+                    vpArr.put(
+                        JSONObject()
+                            .put("frame", pt.frame)
+                            .put("value", pt.value)
+                            .put("shape", pt.shape.name),
+                    )
+                }
+                obj.put("volumePoints", vpArr)
+            }
             clipsArr.put(obj)
         }
         val medleyObj = JSONObject()
@@ -783,6 +810,154 @@ internal object CourseFlowRecipeBuilder {
         return resumed.coerceIn(0L, (part.frames - 1L).coerceAtLeast(0L))
     }
 
+    private data class StepLoopExit(
+        val targetExit: Long,
+        val effectiveLoopCount: Int,
+    )
+
+    internal fun stepSourceOffsets(
+        steps: List<FlowStep>,
+        outroNumber: Int?,
+        inventory: CourseInventory,
+    ): List<Long> {
+        if (steps.isEmpty()) return emptyList()
+        val offsets = LongArray(steps.size)
+        val endingOutro = outroNumber
+            ?.takeIf { inventory.supportsOutroEnding(steps) }
+            ?.let { num -> inventory.outros.firstOrNull { it.number == num } }
+        var prevExitSourcePos = 0L
+        steps.forEachIndexed { idx, step ->
+            val part = inventory.part(step.roleKey)
+            if (part == null) {
+                offsets[idx] = 0L
+                prevExitSourcePos = 0L
+                return@forEachIndexed
+            }
+            val prevRole = steps.getOrNull(idx - 1)?.roleKey
+            val nextRole = steps.getOrNull(idx + 1)?.roleKey
+            val isFirst = idx == 0
+            val sourceOffset = when {
+                !isFirst && prevRole == "Pre_Short" && step.roleKey == "Pre" ->
+                    (part.preAfterShortOffset ?: part.phase).coerceIn(0L, (part.frames - 1L).coerceAtLeast(0L))
+                !isFirst && step.roleKey in setOf("Bridge", "Area1_Bridge") -> 0L
+                !isFirst && prevRole in setOf("Bridge", "Area1_Bridge") &&
+                    step.roleKey in setOf("Main", "Main_Speaker", "Area1", "Area1_Inst", "Pattern2") ->
+                    part.fromBridgeFrame?.coerceIn(0L, (part.frames - 1L).coerceAtLeast(0L)) ?: 0L
+                !isFirst && inventory.courseCode == "Rainbow" && prevRole == "Area3" && step.roleKey == "Final_Pre" ->
+                    part.phase.coerceIn(0L, (part.frames - 1L).coerceAtLeast(0L))
+                !isFirst && isParallelSameTimePair(inventory.courseCode, prevRole, step.roleKey) ->
+                    computeParallelResumeOffset(part, prevExitSourcePos)
+                else -> 0L
+            }
+            offsets[idx] = sourceOffset
+            val isHandoverArea2Outro = step.roleKey.startsWith("Area2_Outro") && idx < steps.lastIndex
+            val pairedNextOutro = if (step.roleKey == "Area2" && nextRole?.startsWith("Area2_Outro") == true) {
+                nextRole.removePrefix("Area2_Outro").toIntOrNull()
+                    ?.let { num -> inventory.outros.firstOrNull { it.number == num } }
+            } else null
+            val stepOutro = pairedNextOutro
+                ?: if (idx == steps.lastIndex && endingOutro != null && isOutroHostRole(step.roleKey)) endingOutro else null
+            val resolved = resolveStepLoopAndExit(
+                courseCode = inventory.courseCode,
+                step = step,
+                sourceOffset = sourceOffset,
+                part = part,
+                isHandoverArea2Outro = isHandoverArea2Outro,
+                stepOutro = stepOutro,
+            )
+            prevExitSourcePos = when {
+                part.isBridgeLocked -> 0L
+                !isHandoverArea2Outro && part.supportsLoop && resolved.effectiveLoopCount > 0 -> resolved.targetExit
+                isHandoverArea2Outro -> part.frames
+                else -> resolved.targetExit.coerceIn(sourceOffset + 1L, part.frames)
+            }
+        }
+        return offsets.toList()
+    }
+
+    internal fun reachableOutroTriggers(
+        step: FlowStep,
+        sourceOffset: Long,
+        part: StagePartInfo?,
+        outro: OutroOption?,
+    ): List<Long> {
+        val base = outro?.mainTriggerPoints.orEmpty().distinct().sorted()
+        if (base.isEmpty() || part == null) return base
+        val l0 = part.loopStart
+        return when {
+            step.loopCount > 0 && part.supportsLoop && l0 != null ->
+                base.filter { it > l0 && it <= part.frames }.ifEmpty { base }
+            sourceOffset > 0L && part.supportsLoop && l0 != null ->
+                base.filter { it > sourceOffset || (it > l0 && it <= part.frames) }.ifEmpty { base }
+            sourceOffset > 0L ->
+                base.filter { it > sourceOffset && it <= part.frames }.ifEmpty { base }
+            else -> base
+        }
+    }
+
+    private fun resolveStepLoopAndExit(
+        courseCode: String,
+        step: FlowStep,
+        sourceOffset: Long,
+        part: StagePartInfo,
+        isHandoverArea2Outro: Boolean,
+        stepOutro: OutroOption?,
+    ): StepLoopExit {
+        val hasExplicitCustomExit = step.exitFrame != null &&
+            (courseCode.startsWith("extra:") || step.exitFrame != part.defaultExitFrame)
+        val rawExit = (step.exitFrame ?: part.defaultExitFrame).coerceIn(1L, part.frames)
+        val rawTarget = if (!part.isBridgeLocked &&
+            !(courseCode.startsWith("extra:") && hasExplicitCustomExit) &&
+            stepOutro != null &&
+            stepOutro.mainTriggerPoints.isNotEmpty()
+        ) {
+            val validTriggers = reachableOutroTriggers(step, sourceOffset, part, stepOutro)
+            when {
+                validTriggers.size == 1 -> validTriggers.single()
+                step.exitFrame != null && step.exitFrame in validTriggers -> step.exitFrame
+                hasExplicitCustomExit ->
+                    validTriggers.minByOrNull { kotlin.math.abs(it - rawExit) } ?: validTriggers.last()
+                step.loopCount > 0 || sourceOffset > 0L ->
+                    validTriggers.firstOrNull { it > sourceOffset } ?: validTriggers.last()
+                else ->
+                    validTriggers.firstOrNull { it >= rawExit } ?: validTriggers.last()
+            }.coerceIn(1L, part.frames)
+        } else {
+            rawExit
+        }
+
+        val l0 = part.loopStart
+        val l1 = part.loopEnd
+        val needsLoopWrap = !part.isBridgeLocked && !isHandoverArea2Outro &&
+            part.supportsLoop && l0 != null && l1 != null &&
+            step.loopCount == 0 &&
+            (stepOutro != null || hasExplicitCustomExit) &&
+            rawTarget <= sourceOffset && rawTarget > l0
+        val effectiveLoopCount = if (needsLoopWrap) 1 else step.loopCount
+        val looping = !part.isBridgeLocked && !isHandoverArea2Outro && part.supportsLoop && effectiveLoopCount > 0
+        val exitFloor = if (looping) {
+            ((l0 ?: 0L) + 1L).coerceAtMost(part.frames)
+        } else {
+            (sourceOffset + 1L).coerceAtMost(part.frames)
+        }
+        return StepLoopExit(
+            targetExit = rawTarget.coerceIn(exitFloor, part.frames),
+            effectiveLoopCount = effectiveLoopCount,
+        )
+    }
+
+    private fun isPureOverlayToggle(courseCode: String, from: String?, to: String?): Boolean {
+        if (from == null || to == null || from == to) return false
+        return (courseCode == "KoopaTroopaBeach" &&
+            ((from == "Main" && to == "Main_Speaker") ||
+                (from == "Main_Speaker" && to == "Main") ||
+                (from == "Fast" && to == "Fast_Speaker") ||
+                (from == "Fast_Speaker" && to == "Fast"))) ||
+            (courseCode == "Rainbow" &&
+                ((from == "Area1_Inst" && to == "Area1") ||
+                    (from == "Area1" && to == "Area1_Inst")))
+    }
+
     private fun isParallelSameTimePair(courseCode: String, from: String?, to: String?): Boolean {
         if (from == null || to == null || from == to) return false
         return (courseCode in setOf("Cinema", "SnowMountain") &&
@@ -790,14 +965,7 @@ internal object CourseFlowRecipeBuilder {
                 (from == "Pattern2" && to == "Main") ||
                 (from == "Fast" && to == "Fast_Pattern2") ||
                 (from == "Fast_Pattern2" && to == "Fast"))) ||
-            (courseCode == "Rainbow" &&
-                ((from == "Area1_Inst" && to == "Area1") ||
-                    (from == "Area1" && to == "Area1_Inst"))) ||
-            (courseCode == "KoopaTroopaBeach" &&
-                ((from == "Main" && to == "Main_Speaker") ||
-                    (from == "Main_Speaker" && to == "Main") ||
-                    (from == "Fast" && to == "Fast_Speaker") ||
-                    (from == "Fast_Speaker" && to == "Fast")))
+            isPureOverlayToggle(courseCode, from, to)
     }
 
     /** Estimates exact timeline duration in frames matching [compileUserPreset] calculations. */
@@ -880,42 +1048,23 @@ internal object CourseFlowRecipeBuilder {
             }
 
             val isHandoverArea2Outro = step.roleKey.startsWith("Area2_Outro") && idx < steps.lastIndex
-            val loopingWithFinalExit = !part.isBridgeLocked && !isHandoverArea2Outro && part.supportsLoop && step.loopCount > 0
-            val exitFloor = if (loopingWithFinalExit) {
-                ((part.loopStart ?: 0L) + 1L).coerceAtMost(part.frames)
-            } else {
-                (sourceOffset + 1L).coerceAtMost(part.frames)
-            }
-            val rawExit = (step.exitFrame ?: part.defaultExitFrame).coerceIn(exitFloor, part.frames)
             val pairedNextOutro = if (step.roleKey == "Area2" && nextRole?.startsWith("Area2_Outro") == true) {
                 nextRole.removePrefix("Area2_Outro").toIntOrNull()
                     ?.let { num -> inventory.outros.firstOrNull { it.number == num } }
             } else null
             val stepOutro = pairedNextOutro
                 ?: if (idx == steps.lastIndex && endingOutro != null && isOutroHostRole(step.roleKey)) endingOutro else null
-            val hasExplicitCustomExit = step.exitFrame != null &&
-                (inventory.courseCode.startsWith("extra:") || step.exitFrame != part.defaultExitFrame)
-            val targetExit = if (!part.isBridgeLocked &&
-                !(inventory.courseCode.startsWith("extra:") && hasExplicitCustomExit) &&
-                stepOutro != null &&
-                stepOutro.mainTriggerPoints.isNotEmpty()
-            ) {
-                val baseTriggers = stepOutro.mainTriggerPoints.filter { it in exitFloor..part.frames }
-                    .ifEmpty { stepOutro.mainTriggerPoints }
-                val validTriggers = if (step.loopCount > 0) {
-                    val l0 = part.loopStart ?: 0L
-                    baseTriggers.filter { it > l0 && it <= part.frames }.ifEmpty { baseTriggers }
-                } else {
-                    baseTriggers
-                }
-                when {
-                    validTriggers.size == 1 -> validTriggers.single().coerceIn(exitFloor, part.frames)
-                    step.exitFrame != null && step.exitFrame in validTriggers -> step.exitFrame.coerceIn(exitFloor, part.frames)
-                    hasExplicitCustomExit -> (validTriggers.minByOrNull { kotlin.math.abs(it - rawExit) } ?: validTriggers.last()).coerceIn(exitFloor, part.frames)
-                    step.loopCount > 0 -> validTriggers.last().coerceIn(exitFloor, part.frames)
-                    else -> (validTriggers.firstOrNull { it >= rawExit } ?: validTriggers.last()).coerceIn(exitFloor, part.frames)
-                }
-            } else rawExit
+            val resolvedExit = resolveStepLoopAndExit(
+                courseCode = inventory.courseCode,
+                step = step,
+                sourceOffset = sourceOffset,
+                part = part,
+                isHandoverArea2Outro = isHandoverArea2Outro,
+                stepOutro = stepOutro,
+            )
+            val targetExit = resolvedExit.targetExit
+            val effectiveLoops = resolvedExit.effectiveLoopCount
+            val loopingWithFinalExit = !part.isBridgeLocked && !isHandoverArea2Outro && part.supportsLoop && effectiveLoops > 0
 
             val firstExit = when {
                 part.isBridgeLocked || isHandoverArea2Outro -> part.frames
@@ -926,8 +1075,8 @@ internal object CourseFlowRecipeBuilder {
             if (loopingWithFinalExit) {
                 val loopStart = part.loopStart!!
                 val loopEnd = part.loopEnd!!
-                repeat(step.loopCount) { loopIdx ->
-                    val isLastCycle = loopIdx == step.loopCount - 1
+                repeat(effectiveLoops) { loopIdx ->
+                    val isLastCycle = loopIdx == effectiveLoops - 1
                     val (cycleOffset, cycleEnd) = when {
                         isLastCycle && targetExit > loopStart -> loopStart to targetExit
                         isLastCycle -> 0L to targetExit
@@ -938,14 +1087,15 @@ internal object CourseFlowRecipeBuilder {
             }
             maxEnd = maxOf(maxEnd, stepEnd)
             val willSwitchAfterThisStep = idx < steps.lastIndex || (idx == steps.lastIndex && endingOutro != null)
+            val isPureOverlaySwitch = nextRole != null && isPureOverlayToggle(inventory.courseCode, step.roleKey, nextRole)
+            val isSpeakerOutroFade = stepOutro != null && part.secondaryStem != null &&
+                step.roleKey in setOf("Main_Speaker", "Fast_Speaker")
             val ruleFadeOut = if (nextRole != null && (
                     (inventory.courseCode == "Rainbow" && step.roleKey == "Area3" && nextRole == "Final_Pre") ||
-                        (inventory.courseCode in setOf("Cinema", "SnowMountain") && isParallelSameTimePair(inventory.courseCode, step.roleKey, nextRole)) ||
-                        (inventory.courseCode == "Rainbow" && step.roleKey == "Area1" && nextRole == "Area1_Inst") ||
-                        (inventory.courseCode == "KoopaTroopaBeach" && ((step.roleKey == "Main_Speaker" && nextRole == "Main") || (step.roleKey == "Fast_Speaker" && nextRole == "Fast")))
+                        (inventory.courseCode in setOf("Cinema", "SnowMountain") && isParallelSameTimePair(inventory.courseCode, step.roleKey, nextRole))
                     )
             ) sampleRate.toLong() else 0L
-            if (ruleFadeOut > 0L && willSwitchAfterThisStep && !part.isBridgeLocked && !isHandoverArea2Outro) {
+            if (ruleFadeOut > 0L && willSwitchAfterThisStep && !part.isBridgeLocked && !isHandoverArea2Outro && !isPureOverlaySwitch) {
                 if (part.supportsLoop) {
                     maxEnd = maxOf(maxEnd, stepEnd + ruleFadeOut)
                 } else {
@@ -953,6 +1103,10 @@ internal object CourseFlowRecipeBuilder {
                     val avail = (part.frames - exitSrc).coerceAtLeast(0L)
                     maxEnd = maxOf(maxEnd, stepEnd + minOf(ruleFadeOut, avail))
                 }
+            }
+            if (isSpeakerOutroFade && endingOutro != null) {
+                val spkFade = minOf(sampleRate.toLong(), endingOutro.frames)
+                maxEnd = maxOf(maxEnd, stepEnd + spkFade)
             }
 
             prevExitSourcePos = when {
@@ -1129,13 +1283,6 @@ internal object CourseFlowRecipeBuilder {
             }
 
             val isHandoverArea2Outro = step.roleKey.startsWith("Area2_Outro") && idx < preset.steps.lastIndex
-            val loopingWithFinalExit = !part.isBridgeLocked && !isHandoverArea2Outro && part.supportsLoop && step.loopCount > 0
-            val exitFloor = if (loopingWithFinalExit) {
-                ((part.loopStart ?: 0L) + 1L).coerceAtMost(part.frames)
-            } else {
-                (sourceOffset + 1L).coerceAtMost(part.frames)
-            }
-            val rawExit = (step.exitFrame ?: part.defaultExitFrame).coerceIn(exitFloor, part.frames)
             val pairedNextOutro = if (step.roleKey == "Area2" && nextRole?.startsWith("Area2_Outro") == true) {
                 nextRole.removePrefix("Area2_Outro").toIntOrNull()
                     ?.let { num -> inventory.outros.firstOrNull { it.number == num } }
@@ -1144,42 +1291,17 @@ internal object CourseFlowRecipeBuilder {
             }
             val stepOutro = pairedNextOutro
                 ?: if (idx == preset.steps.lastIndex && endingOutro != null && isOutroHostRole(step.roleKey)) endingOutro else null
-            val hasExplicitCustomExit = step.exitFrame != null &&
-                (inventory.courseCode.startsWith("extra:") || step.exitFrame != part.defaultExitFrame)
-
-            // When entering a confirmed Outro with mainTriggerPoints:
-            // - Single trigger point: strictly locked to that verified trigger.
-            // - Multiple trigger points: constrain selection strictly to those fixed trigger points.
-            // Extra tracks keep explicit custom exit frames before Outro.
-            val targetExit = if (!part.isBridgeLocked &&
-                !(inventory.courseCode.startsWith("extra:") && hasExplicitCustomExit) &&
-                stepOutro != null &&
-                stepOutro.mainTriggerPoints.isNotEmpty()
-            ) {
-                val baseTriggers = stepOutro.mainTriggerPoints.filter { it in exitFloor..part.frames }
-                    .ifEmpty { stepOutro.mainTriggerPoints }
-                val validTriggers = if (step.loopCount > 0) {
-                    val l0 = part.loopStart ?: 0L
-                    baseTriggers.filter { it > l0 && it <= part.frames }.ifEmpty { baseTriggers }
-                } else {
-                    baseTriggers
-                }
-                when {
-                    validTriggers.size == 1 -> validTriggers.single().coerceIn(exitFloor, part.frames)
-                    step.exitFrame != null && step.exitFrame in validTriggers ->
-                        step.exitFrame.coerceIn(exitFloor, part.frames)
-                    hasExplicitCustomExit ->
-                        (validTriggers.minByOrNull { kotlin.math.abs(it - rawExit) } ?: validTriggers.last())
-                            .coerceIn(exitFloor, part.frames)
-                    step.loopCount > 0 ->
-                        validTriggers.last().coerceIn(exitFloor, part.frames)
-                    else ->
-                        (validTriggers.firstOrNull { it >= rawExit } ?: validTriggers.last())
-                            .coerceIn(exitFloor, part.frames)
-                }
-            } else {
-                rawExit
-            }
+            val resolvedExit = resolveStepLoopAndExit(
+                courseCode = inventory.courseCode,
+                step = step,
+                sourceOffset = sourceOffset,
+                part = part,
+                isHandoverArea2Outro = isHandoverArea2Outro,
+                stepOutro = stepOutro,
+            )
+            val targetExit = resolvedExit.targetExit
+            val effectiveLoops = resolvedExit.effectiveLoopCount
+            val loopingWithFinalExit = !part.isBridgeLocked && !isHandoverArea2Outro && part.supportsLoop && effectiveLoops > 0
 
             // Bridge and middle Area2_Outro steps play their full tail cleanly while handover advances cursor.
             val firstExit = when {
@@ -1241,8 +1363,8 @@ internal object CourseFlowRecipeBuilder {
             if (loopingWithFinalExit) {
                 val loopStart = part.loopStart!!
                 val loopEnd = part.loopEnd!!
-                repeat(step.loopCount) { loopIdx ->
-                    val isLastCycle = loopIdx == step.loopCount - 1
+                repeat(effectiveLoops) { loopIdx ->
+                    val isLastCycle = loopIdx == effectiveLoops - 1
                     val (cycleOffset, cycleEnd) = when {
                         isLastCycle && targetExit > loopStart -> loopStart to targetExit
                         isLastCycle -> 0L to targetExit
@@ -1272,20 +1394,36 @@ internal object CourseFlowRecipeBuilder {
             // Trailing post-exit fade-out: always extends past targetExit without shifting next segment cursor.
             val willSwitchAfterThisStep = idx < preset.steps.lastIndex ||
                 (idx == preset.steps.lastIndex && endingOutro != null)
+            val isPureOverlaySwitch = nextRole != null && isPureOverlayToggle(inventory.courseCode, step.roleKey, nextRole)
             val ruleOutgoingFade = if (nextRole != null && isRuleCrossfadePair(step.roleKey, nextRole)) {
                 sampleRate.toLong()
             } else {
                 0L
             }
-            val isOverlayFadeOut = nextRole != null && (
+            val isOverlayFadeOut = (nextRole != null && (
                 (inventory.courseCode == "Rainbow" && step.roleKey == "Area1" && nextRole == "Area1_Inst") ||
                     (inventory.courseCode == "KoopaTroopaBeach" &&
                         ((step.roleKey == "Main_Speaker" && nextRole == "Main") ||
                             (step.roleKey == "Fast_Speaker" && nextRole == "Fast")))
-                )
-            val ruleSecondaryOutgoingFade = if (isOverlayFadeOut) sampleRate.toLong() else ruleOutgoingFade
-            val primaryFadeFrames = maxOf(switchFadeFrames, ruleOutgoingFade)
-            val secondaryFadeFrames = maxOf(switchFadeFrames, ruleSecondaryOutgoingFade)
+                )) || (stepOutro != null && secHeader != null && step.roleKey in setOf("Main_Speaker", "Fast_Speaker"))
+            val ruleSecondaryOutgoingFade = when {
+                isOverlayFadeOut && stepOutro != null && endingOutro != null ->
+                    minOf(sampleRate.toLong(), endingOutro.frames)
+                isOverlayFadeOut -> sampleRate.toLong()
+                else -> ruleOutgoingFade
+            }
+            val primaryFadeFrames = if (isPureOverlaySwitch || (stepOutro != null && step.roleKey in setOf("Main_Speaker", "Fast_Speaker"))) {
+                0L
+            } else {
+                maxOf(switchFadeFrames, ruleOutgoingFade)
+            }
+            val secondaryFadeFrames = if (isPureOverlaySwitch && !isOverlayFadeOut) {
+                0L
+            } else if (stepOutro != null && step.roleKey in setOf("Main_Speaker", "Fast_Speaker") && secHeader != null) {
+                ruleSecondaryOutgoingFade
+            } else {
+                maxOf(switchFadeFrames, ruleSecondaryOutgoingFade)
+            }
             if ((primaryFadeFrames > 0L || secondaryFadeFrames > 0L) && willSwitchAfterThisStep && !part.isBridgeLocked && !isHandoverArea2Outro) {
                 applyPostExitFade(
                     clips = clips,

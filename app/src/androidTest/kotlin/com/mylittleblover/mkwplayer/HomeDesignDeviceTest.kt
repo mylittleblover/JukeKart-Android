@@ -34,8 +34,9 @@ class HomeDesignDeviceTest {
         }
         compose.onNodeWithText(context.getString(R.string.discovery_home_headline)).assertIsDisplayed()
         InstalledUi().capture("alpha17-home-top.png")
-        compose.onNodeWithText(context.getString(R.string.discovery_favorites)).performScrollTo().assertIsDisplayed()
-        InstalledUi().capture("alpha17-home-favorites.png")
+        compose.onNodeWithText(context.getString(R.string.smart_playlists_title)).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.smart_favorites_mix)).assertIsDisplayed()
+        InstalledUi().capture("alpha17-home-smart.png")
         compose.onNodeWithText(context.getString(R.string.discovery_recent)).performScrollTo().assertIsDisplayed()
         InstalledUi().capture("alpha17-home-recent.png")
     }

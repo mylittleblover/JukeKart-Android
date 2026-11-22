@@ -67,6 +67,9 @@
     <string name="jukebox_subtitle">原典ゲームタイトルごとに分類し、発売年順に表示します。</string>
     <string name="jukebox_game_subtitle">公式サウンドトラック曲順で表示し、別アレンジも独立して並びます。</string>
     <string name="jukebox_tracks_count">%1$d 曲</string>
+    <plurals name="tracks_count_plurals">
+        <item quantity="other">%1$d 曲</item>
+    </plurals>
     <string name="jukebox_games_summary">%1$d 作品 &#183; %2$d 曲</string>
     <string name="jukebox_play_all">すべて再生</string>
     <string name="jukebox_shuffle_play">シャッフル再生</string>
@@ -86,12 +89,16 @@
     <string name="jukebox_repeat_single">1曲リピート</string>
     <string name="jukebox_repeat_off">リピートなし</string>
     <string name="jukebox_queue">再生キュー</string>
-    <string name="jukebox_queue_subtitle">元の再生リストは固定され、「次に再生」の曲が優先されます。</string>
+    <string name="jukebox_queue_subtitle">元の再生順を保ったまま、「次に再生」の曲を優先します。</string>
     <string name="jukebox_now_playing">再生中</string>
     <string name="jukebox_up_next_temp">次に再生（予約）</string>
     <string name="jukebox_up_next_list">再生待ちリスト</string>
     <string name="jukebox_queue_empty">次の曲はありません。</string>
-    <string name="discovery_search_all">コース、カップ、作品、曲を検索</string>
+    <string name="discovery_search_all">コース、作品、曲を検索</string>
+    <string name="discovery_search_courses">コースを検索</string>
+    <string name="discovery_search_jukebox">作品や曲を検索</string>
+    <string name="discovery_search_tracks">曲を検索</string>
+    <string name="discovery_search_playlists">リストとルートを検索</string>
     <string name="discovery_vs_standard">今作のコース</string>
     <string name="discovery_vs_sfc">SFC コース / ミッション</string>
     <string name="discovery_battle_summary">全 %1$d 曲 · 通常 / ファイナル切替対応</string>
@@ -107,7 +114,7 @@
     <string name="discovery_playlists_group_routes">マイルート</string>
     <string name="discovery_playlists_group_rallies">公式サバイバル</string>
     <string name="discovery_playlists_group_jukebox">公式 OST セレクション</string>
-    <string name="discovery_view_all_count">すべて表示 (%1$d)</string>
+    <string name="discovery_view_all_count">すべて (%1$d)</string>
     <string name="discovery_playlist_play_all">すべて再生</string>
     <string name="discovery_playlist_native_transition">ネイティブ曲間接続</string>
     <string name="discovery_playlist_native_transition_desc">検証済みアウトロから次曲プレリュードへ途切れず接続</string>
@@ -119,7 +126,11 @@
     <string name="discovery_playlist_entry_native_off">ネイティブ接続を無効</string>
     <string name="discovery_native_transition_prefix">オリジナル接続</string>
     <string name="discovery_native_transition_active">オリジナル接続 · %1$s</string>
-    <string name="preset_system_default">グランプリメドレー</string>
+    <string name="preset_system_default">メドレー A</string>
+    <string name="preset_system_suite_a_alt">メドレー A Alt</string>
+    <string name="preset_system_suite_b">メドレー B</string>
+    <string name="preset_system_suite_c">メドレー C</string>
+    <string name="preset_system_suite_d">メドレー D</string>
     <string name="preset_system_knockout">サバイバルメドレー</string>
     <string name="preset_user_title">カスタム構成プラン</string>
     <string name="preset_new">新規フローを作成</string>
@@ -127,7 +138,7 @@
     <string name="preset_duplicate">複製</string>
     <string name="preset_delete">削除</string>
     <string name="preset_delete_warning_title">プランを削除しますか？</string>
-    <string name="preset_delete_warning_body">プレイリスト（%1$s）で使用中です。削除すると標準の「グランプリメドレー」に戻ります。</string>
+    <string name="preset_delete_warning_body">プレイリスト（%1$s）で使用中です。削除すると標準の「メドレー A」に戻ります。</string>
     <string name="flow_editor_title">フローエディター</string>
     <string name="flow_editor_name_label">プラン名</string>
     <string name="flow_editor_steps_title">パート構成</string>
@@ -178,7 +189,13 @@
     <string name="route_plan_on_map">マップで計画</string>
     <string name="route_edit_on_map">マップで編集</string>
     <string name="route_stops_count">%1$d ステージ</string>
+    <plurals name="route_stops_plurals">
+        <item quantity="other">%1$d ステージ</item>
+    </plurals>
     <string name="route_legs_count">%1$d 本の連絡路</string>
+    <plurals name="route_legs_plurals">
+        <item quantity="other">%1$d 本の連絡路</item>
+    </plurals>
     <string name="route_edge_music_auto">候補プールからランダム選択</string>
     <string name="route_edge_music_pool_empty">候補曲データ未収録 · スキップ</string>
     <string name="route_edge_music_override">固定曲：%1$s</string>
@@ -255,4 +272,16 @@
     <string name="track_info_game">原作タイトル</string>
     <string name="track_info_ost">サントラ収録順</string>
     <string name="track_playlist_pick_empty">プレイリストがまだありません。下で新規作成して追加できます。</string>
+    <string name="pinned_favorites_title">お気に入り</string>
+    <string name="pinned_favorites_badge">固定</string>
+    <string name="pinned_favorites_subtitle">お気に入り登録したコースや楽曲をまとめたリスト</string>
+    <string name="pinned_favorites_empty">お気に入りはまだありません。コースや曲、再生画面のハートアイコンから追加できます。</string>
+    <string name="favorites_remove">お気に入り解除</string>
+    <string name="route_suite_mode_label">メドレー再生モード</string>
+    <string name="route_suite_mode_game">ゲームメドレー</string>
+    <string name="route_suite_mode_complete">完全メドレー</string>
+    <string name="route_suite_mode_game_desc">グランプリは第1戦がC・最終戦DKスペースポートがA Alt・他はA、サバイバルは初回B・最終D・途中A</string>
+    <string name="route_suite_mode_complete_desc">すべてのステージで標準のメドレー A を再生</string>
+    <string name="route_stop_preset_auto">ルート設定に従う</string>
+    <string name="route_stop_preset_auto_fmt">ルート設定に従う（%1$s）</string>
 </resources>

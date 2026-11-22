@@ -79,15 +79,7 @@ internal object ExtraMedleyCatalog {
             }
             val clipsJson = obj.getJSONArray("clips")
             val clips = (0 until clipsJson.length()).map { cIdx ->
-                val c = clipsJson.getJSONObject(cIdx)
-                CourseMedleyCatalog.MedleyClip(
-                    stem = c.getString("stem"),
-                    start = c.getLong("start"),
-                    sourceOffset = c.getLong("sourceOffset"),
-                    sourceLength = c.getLong("sourceLength"),
-                    fadeIn = c.optLong("fadeIn", 0L),
-                    fadeOut = c.optLong("fadeOut", 0L),
-                )
+                CourseMedleyCatalog.parseClip(clipsJson.getJSONObject(cIdx))
             }
             val namesObj = obj.optJSONObject("names")
             val names = buildMap {

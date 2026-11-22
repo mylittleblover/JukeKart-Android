@@ -194,4 +194,18 @@ class PlaybackControllerTest {
             assertTrue(reason.isNotBlank(), "status $status produced a blank reason")
         }
     }
+
+    @Test
+    fun loadGraphOnlyCarriesTrackTitleForNotificationAndSession() {
+        val engine = FakeEngine()
+        val c = controller(engine)
+        val loaded = c.loadGraphOnly(packet, title = "Rainbow Road")
+        assertTrue(loaded is PlaybackController.State.Ready, "got $loaded")
+        assertEquals("Rainbow Road", (loaded as PlaybackController.State.Ready).title)
+        engine.play(0)
+        engine.frame = 1200
+        val polled = c.poll()
+        assertTrue(polled is PlaybackController.State.Playing, "got $polled")
+        assertEquals("Rainbow Road", (polled as PlaybackController.State.Playing).title)
+    }
 }

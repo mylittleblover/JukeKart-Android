@@ -2,6 +2,7 @@ package com.mylittleblover.mkwplayer.interactive
 
 import com.mylittleblover.mkwplayer.graph.GraphProbe
 import com.mylittleblover.mkwplayer.player.LinearQueue
+import com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -17,6 +18,9 @@ class CourseMedleyCompilerTest {
 
     private fun identities(): InteractiveAudioIdentities =
         InteractiveAudioIdentities.parse(File("src/main/assets/interactive_audio_identities.json").readText())
+
+    private fun extraMusic(): ExtraMusicCatalog.Catalog =
+        ExtraMusicCatalog.parse(File("src/main/assets/extra_music_catalog.json").readText())
 
     private fun syntheticBwav(frames: Int, sampleRate: Int = 48_000, channels: Int = 2): ByteArray {
         val bytes = ByteArray(16 + channels * 76)
@@ -39,29 +43,46 @@ class CourseMedleyCompilerTest {
     }
 
     @Test
-    fun catalogCoversAll31MedleysAndEveryStemResolvesInIdentities() {
+    fun catalogCoversAll120MedleysAnd14ExtraMedleysAndEveryStemResolvesInIdentitiesOrAssets() {
         val cat = catalog()
+        val extra = ExtraMedleyCatalog.parse(File("src/main/assets/extra_medley_catalog.json").readText())
         val ids = identities()
-        assertEquals(31, cat.medleys.size)
-        assertEquals(2, cat.forCourse("DonkeyKong").size)
-        assertEquals(1, cat.forCourse("Rainbow").size)
-        assertEquals(1, cat.forCourse("Lava").size)
+        val extraAudio = extraMusic()
+        val aAltCourses = setOf("DonkeyKong", "SnowMountain", "Cinema")
+        val courseCodes = cat.medleys.map { it.courseCode }.distinct()
+        assertEquals(30, courseCodes.size)
+        assertEquals(120, cat.medleys.size)
+        assertEquals(14, extra.entries.size)
+        for (code in courseCodes) {
+            val expected = when (code) {
+                "Rainbow" -> listOf("a")
+                in aAltCourses -> listOf("a", "a_alt", "b", "c", "d")
+                else -> listOf("a", "b", "c", "d")
+            }
+            assertEquals(expected, cat.forCourse(code).map { it.normalizedSuiteVariant }, "variants mismatch for $code")
+        }
 
-        for (medley in cat.medleys) {
+        val finalLapFile = File("src/main/assets/audio/BGM_Seq_FinalLapFF.bwav")
+        for (medley in cat.medleys + extra.entries.map { it.medley }) {
             assertTrue(medley.clips.isNotEmpty(), "medley ${medley.id} has no clips")
             assertTrue(medley.totalFrames > 0L, "medley ${medley.id} totalFrames <= 0")
             assertTrue(medley.durationMs > 0L, "medley ${medley.id} durationMs <= 0")
             for (stem in medley.uniqueStems) {
-                val digest = ids.digestForFileName("$stem.bwav")
-                assertNotNull(digest, "stem '$stem.bwav' in medley '${medley.id}' missing from identities")
+                if (stem == "BGM_Seq_FinalLapFF") {
+                    assertTrue(finalLapFile.isFile, "Missing bundled BGM_Seq_FinalLapFF.bwav")
+                } else {
+                    val digest = ids.digestForFileName("$stem.bwav") ?: extraAudio.digestForStem(stem)
+                    assertNotNull(digest, "stem '$stem.bwav' in medley '${medley.id}' missing from identities and extra_music_catalog")
+                }
             }
         }
     }
 
     @Test
-    fun compileGraphProducesValidProbeablePacketsForAll31Medleys() {
+    fun compileGraphProducesValidProbeablePacketsForAll120CourseAnd14ExtraMedleys() {
         val cat = catalog()
-        for (medley in cat.medleys) {
+        val extra = ExtraMedleyCatalog.parse(File("src/main/assets/extra_medley_catalog.json").readText())
+        for (medley in cat.medleys + extra.entries.map { it.medley }) {
             val maxRequiredFrames = medley.clips.maxOf { (it.sourceOffset + it.sourceLength).toInt() } + 1000
             val bytesByStem = medley.uniqueStems.associateWith { syntheticBwav(frames = maxRequiredFrames) }
             val compiled = CourseMedleyCompiler.compileGraph(medley, cat.sampleRate, bytesByStem)
@@ -102,9 +123,11 @@ class CourseMedleyCompilerTest {
             val audioDir = File(tmpDir, "audio").apply { mkdirs() }
             val entries = cat.medleys.take(3).map { medley ->
                 for (stem in medley.uniqueStems) {
-                    val sha = ids.digestForFileName("$stem.bwav")!!
-                    val file = File(audioDir, sha)
-                    if (!file.exists()) file.writeBytes(byteArrayOf(1))
+                    if (stem != "BGM_Seq_FinalLapFF") {
+                        val sha = ids.digestForFileName("$stem.bwav")!!
+                        val file = File(audioDir, sha)
+                        if (!file.exists()) file.writeBytes(byteArrayOf(1))
+                    }
                 }
                 val resolved = CourseMedleyCompiler.resolveMedley(medley, cat.sampleRate, ids, tmpDir)!!
                 LinearQueue.Entry(
@@ -128,10 +151,9 @@ class CourseMedleyCompilerTest {
     }
 
     @Test
-    fun strictTransitionRulesAllowOnlyInteractiveFadesAndTrackEndFadeout() {
+    fun strictTransitionRulesAllowOnlyValidFadesVolumeEnvelopesAndPreservedCourses() {
         val cat = catalog()
-        assertEquals(31, cat.medleys.size)
-        val nonZeroFades = mutableListOf<String>()
+        assertEquals(120, cat.medleys.size)
         for (medley in cat.medleys) {
             assertEquals(
                 medley.clips.maxOf { it.start + it.sourceLength },
@@ -142,32 +164,38 @@ class CourseMedleyCompilerTest {
                 assertTrue(clip.start >= 0L, "negative start in ${medley.id}: ${clip.stem}")
                 assertTrue(clip.sourceOffset >= 0L, "negative sourceOffset in ${medley.id}: ${clip.stem}")
                 assertTrue(clip.sourceLength > 0L, "non-positive sourceLength in ${medley.id}: ${clip.stem}")
-                assertTrue(clip.fadeIn >= 0L && clip.fadeOut >= 0L, "negative fade in ${medley.id}: ${clip.stem}")
-                if (clip.fadeIn != 0L || clip.fadeOut != 0L) {
-                    nonZeroFades += "${medley.courseCode}:${clip.stem}:${clip.fadeIn}:${clip.fadeOut}"
+                assertTrue(clip.fadeIn in 0L..480_000L, "fadeIn out of bounds in ${medley.id}: ${clip.fadeIn}")
+                assertTrue(clip.fadeOut in 0L..480_000L, "fadeOut out of bounds in ${medley.id}: ${clip.fadeOut}")
+                for (pt in clip.volumePoints) {
+                    assertTrue(pt.frame in 0L..clip.sourceLength, "volumePoint frame out of bounds in ${medley.id}: ${pt.frame}")
+                    assertTrue(pt.value in -96.0..0.0, "volumePoint dB out of bounds in ${medley.id}: ${pt.value}")
                 }
             }
         }
+        val cinemaClips = cat.forCourse("Cinema").single { it.normalizedSuiteVariant == "a" }.clips
+        assertEquals(48_000L, cinemaClips.last { it.stem == "BGM_Stage_Cinema" }.fadeOut)
+        assertEquals(48_000L, cinemaClips.first { it.stem == "BGM_Stage_Cinema_Pattern2" }.fadeIn)
+
+        val koopaA = cat.forCourse("KoopaTroopaBeach").single { it.normalizedSuiteVariant == "a" }
+        val koopaB = cat.forCourse("KoopaTroopaBeach").single { it.normalizedSuiteVariant == "b" }
+        val koopaSpeaker = koopaA.clips.single { it.stem == "SE_Stage_KoopaTroopaBeach_Speaker_Normal" }
+        assertEquals(48_000L, koopaSpeaker.fadeIn)
+        assertEquals(48_000L, koopaSpeaker.fadeOut)
         assertEquals(
-            listOf(
-                "Cinema:BGM_Stage_Cinema:0:48000",
-                "Cinema:BGM_Stage_Cinema_Pattern2:48000:0",
-                "Rainbow:BGM_Rainbow_Area3:0:48000",
-                "Rainbow:BGM_Rainbow_Final_Pre:48000:0",
-                "Rainbow:BGM_Rainbow_Final:0:480000",
-            ),
-            nonZeroFades,
+            koopaA.clips.drop(1).map { it.copy(start = it.start - 1L) },
+            koopaB.clips.drop(2),
+            "KoopaTroopaBeach Suite B after Pre_Short must match Suite A after Pre",
         )
     }
 
     @Test
-    fun defaultMedleysStartFromPreWithoutPreShortAndPreserveChocoMountainPhase() {
+    fun suiteAMedleysStartFromZeroWithoutPreShortAndPreserveChocoMountainPhase() {
         val cat = catalog()
         val minf = MinfCatalog.parse(File("src/main/assets/interactive_minf.json").readText())
-        for (medley in cat.medleys) {
+        for (medley in cat.medleys.filter { it.normalizedSuiteVariant == "a" }) {
             assertTrue(
                 medley.clips.none { it.stem.contains("Pre_Short") },
-                "Default medley ${medley.id} must not contain Pre_Short",
+                "Suite A medley ${medley.id} must not contain Pre_Short",
             )
             val firstClip = medley.clips.first()
             assertEquals(0L, firstClip.start, "First clip of ${medley.id} must start at frame 0")
@@ -179,10 +207,40 @@ class CourseMedleyCompilerTest {
     }
 
     @Test
-    fun knockoutVariantExistsOnlyForDonkeyKong() {
+    fun mergedCatalogIncludesAll1412And1147VariantsAndDonkeyKongAAlt() {
         val cat = catalog()
-        val knockoutCourses = cat.medleys.filter { it.isKnockoutVariant }.map { it.courseCode }.distinct()
-        assertEquals(listOf("DonkeyKong"), knockoutCourses)
+        assertTrue(cat.medleys.none { it.isKnockoutVariant })
+        assertEquals(listOf("a"), cat.forCourse("Rainbow").map { it.normalizedSuiteVariant })
+        for (altCourse in listOf("DonkeyKong", "SnowMountain", "Cinema")) {
+            assertEquals(listOf("a", "a_alt", "b", "c", "d"), cat.forCourse(altCourse).map { it.normalizedSuiteVariant })
+        }
+        assertEquals(listOf("a", "b", "c", "d"), cat.forCourse("KoopaTroopaBeach").map { it.normalizedSuiteVariant })
+
+        val dkAAlt = cat.forCourse("DonkeyKong").single { it.normalizedSuiteVariant == "a_alt" }
+        assertEquals("BGM_Stage_DonkeyKong_Pre", dkAAlt.clips.first().stem, "DK A Alt must keep Pre + rocket climb intro")
+        assertTrue(dkAAlt.clips.any { it.stem == "BGM_Stage_DonkeyKong_Pattern5" }, "DK A Alt must keep rocket climb Pattern5")
+        val dkC = cat.forCourse("DonkeyKong").single { it.normalizedSuiteVariant == "c" }
+        assertEquals("BGM_Stage_DonkeyKong", dkC.clips.first().stem, "DK C from 1412 backup should start directly at Main")
+        assertTrue(dkC.clips.last().volumePoints.isNotEmpty(), "DK C from 1412 backup should end with 10s fade-out envelope")
+
+        // Verify resolveMedley resolves KoopaTroopaBeach speaker stems via extraCatalog
+        val koopaA = cat.forCourse("KoopaTroopaBeach").single { it.normalizedSuiteVariant == "a" }
+        val ids = identities()
+        val extraAudio = extraMusic()
+        val tmpDir = kotlin.io.path.createTempDirectory("koopa-resolve-test-").toFile()
+        try {
+            val audioDir = File(tmpDir, "audio").apply { mkdirs() }
+            for (stem in koopaA.uniqueStems) {
+                val sha = ids.digestForFileName("$stem.bwav") ?: extraAudio.digestForStem(stem)!!
+                File(audioDir, sha).writeBytes(byteArrayOf(1, 2, 3))
+            }
+            assertNull(CourseMedleyCompiler.resolveMedley(koopaA, cat.sampleRate, ids, tmpDir))
+            val resolved = CourseMedleyCompiler.resolveMedley(koopaA, cat.sampleRate, ids, tmpDir, extraAudio)
+            assertNotNull(resolved)
+            assertEquals(koopaA.uniqueStems.toSet(), resolved.stemDigests.keys)
+        } finally {
+            tmpDir.deleteRecursively()
+        }
     }
 }
 

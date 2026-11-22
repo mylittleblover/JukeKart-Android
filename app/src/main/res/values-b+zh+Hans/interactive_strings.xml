@@ -49,4 +49,6 @@
     <string name="interactive_next_trigger_hint">下一阶段：%1$s · %2$s</string>
     <string name="interactive_fade_paused">淡出已暂停 · 剩余 %1$s 秒（已冻结）</string>
     <string name="interactive_stop_hold_hint">轻点立即停止 · 长按选择淡出</string>
+    <string name="interactive_loading_title">正在加载曲目…</string>
+    <string name="interactive_loading_hint">正在准备互动音频图与音乐段落…</string>
 </resources>

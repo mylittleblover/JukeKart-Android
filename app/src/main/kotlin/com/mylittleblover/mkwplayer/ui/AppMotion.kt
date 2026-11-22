@@ -1,5 +1,8 @@
 package com.mylittleblover.mkwplayer.ui
 
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -9,6 +12,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
@@ -19,6 +23,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -30,6 +35,11 @@ internal object AppMotion {
     const val duration = 220
 
     val snapSpring = spring<Float>(
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = Spring.StiffnessMediumLow,
+    )
+
+    val snapDpSpring = spring<Dp>(
         dampingRatio = Spring.DampingRatioNoBouncy,
         stiffness = Spring.StiffnessMediumLow,
     )
@@ -74,19 +84,48 @@ internal object AppMotion {
     }
 }
 
-@Composable
-internal fun rememberReducedMotion(): Boolean {
-    val context = LocalContext.current
-    return remember(context) {
-        runCatching {
-            Settings.Global.getFloat(
-                context.contentResolver,
-                Settings.Global.ANIMATOR_DURATION_SCALE,
-                1f,
-            ) == 0f
-        }.getOrDefault(false)
+private object ReducedMotionTracker {
+    private val reducedState = mutableStateOf<Boolean?>(null)
+    @Volatile
+    private var registered = false
+
+    private fun readScale(context: android.content.Context): Boolean = runCatching {
+        Settings.Global.getFloat(
+            context.contentResolver,
+            Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f,
+        ) == 0f
+    }.getOrDefault(false)
+
+    @Composable
+    fun current(context: android.content.Context): Boolean {
+        val current = reducedState.value
+        if (current != null) return current
+        val appContext = context.applicationContext ?: context
+        val initial = readScale(appContext)
+        reducedState.value = initial
+        if (!registered) {
+            synchronized(this) {
+                if (!registered) {
+                    registered = true
+                    val resolver = appContext.contentResolver
+                    val uri = Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE)
+                    val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+                        override fun onChange(selfChange: Boolean) {
+                            reducedState.value = readScale(appContext)
+                        }
+                    }
+                    runCatching { resolver.registerContentObserver(uri, false, observer) }
+                }
+            }
+        }
+        return initial
     }
 }
+
+@Composable
+internal fun rememberReducedMotion(): Boolean =
+    ReducedMotionTracker.current(LocalContext.current)
 
 @Composable
 internal fun rememberPressScale(
@@ -115,11 +154,28 @@ internal fun rememberPressScale(
 @Composable
 internal fun DragHandlePill(modifier: Modifier = Modifier) {
     Surface(
-        modifier = modifier.size(width = 36.dp, height = 4.dp),
+        modifier = modifier.padding(top = 10.dp, bottom = 6.dp).size(width = 36.dp, height = 4.dp),
         shape = CircleShape,
         color = MaterialTheme.colorScheme.outlineVariant,
         content = {},
     )
+}
+
+/**
+ * Expands a horizontal scroller edge-to-edge past its parent's [horizontal] padding so chips/cards
+ * never look hard-clipped at the inner gutter while still aligning cleanly with sibling content
+ * via `contentPadding = PaddingValues(horizontal = horizontal)`.
+ */
+internal fun Modifier.unpadHorizontal(horizontal: Dp): Modifier = layout { measurable, constraints ->
+    val padPx = horizontal.roundToPx()
+    val maxW = if (constraints.hasBoundedWidth) constraints.maxWidth else return@layout measurable.measure(constraints).let { p ->
+        layout(p.width, p.height) { p.placeRelative(0, 0) }
+    }
+    val expandedWidth = maxW + padPx * 2
+    val placeable = measurable.measure(constraints.copy(minWidth = expandedWidth, maxWidth = expandedWidth))
+    layout(maxW, placeable.height) {
+        placeable.placeRelative(-padPx, 0)
+    }
 }
 
 @Composable
@@ -138,6 +194,56 @@ internal fun SmoothProgressIndicator(
         val fillWidth = (size.width * value).coerceIn(0f, size.width)
         if (fillWidth > 0.5f) {
             drawRoundRect(color = color, size = Size(fillWidth, size.height), cornerRadius = radius)
+        }
+    }
+}
+
+/**
+ * Top horizontal marquee progress bar shown while preparing interactive audio graphs.
+ */
+@Composable
+internal fun MkwLinearIndeterminateBar(
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary,
+    trackColor: Color = MaterialTheme.colorScheme.surfaceVariant,
+    barHeight: Dp = 4.dp,
+) {
+    val reduceMotion = rememberReducedMotion()
+    if (reduceMotion) {
+        Canvas(modifier = modifier.height(barHeight)) {
+            drawRoundRect(color = trackColor, size = size)
+            drawRoundRect(
+                color = color.copy(alpha = 0.72f),
+                topLeft = androidx.compose.ui.geometry.Offset(size.width * 0.2f, 0f),
+                size = Size(size.width * 0.6f, size.height),
+            )
+        }
+        return
+    }
+    val transition = rememberInfiniteTransition(label = "indeterminate-linear")
+    val phase by transition.animateFloat(
+        initialValue = -0.35f,
+        targetValue = 1.1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1150, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "indeterminate-phase",
+    )
+    Canvas(modifier = modifier.height(barHeight)) {
+        drawRect(color = trackColor, size = size)
+        val segWidth = size.width * 0.36f
+        val left = (phase * size.width).coerceAtLeast(0f)
+        val right = ((phase * size.width) + segWidth).coerceAtMost(size.width)
+        val visibleWidth = right - left
+        if (visibleWidth > 0.5f) {
+            val radius = CornerRadius(size.height / 2f, size.height / 2f)
+            drawRoundRect(
+                color = color,
+                topLeft = androidx.compose.ui.geometry.Offset(left, 0f),
+                size = Size(visibleWidth, size.height),
+                cornerRadius = radius,
+            )
         }
     }
 }

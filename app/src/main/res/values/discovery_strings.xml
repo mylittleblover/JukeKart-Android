@@ -67,6 +67,10 @@
     <string name="jukebox_subtitle">Grouped by reference game, sorted by original release date.</string>
     <string name="jukebox_game_subtitle">Ordered by official OST sequence; each arrangement is listed separately.</string>
     <string name="jukebox_tracks_count">%1$d tracks</string>
+    <plurals name="tracks_count_plurals">
+        <item quantity="one">%1$d track</item>
+        <item quantity="other">%1$d tracks</item>
+    </plurals>
     <string name="jukebox_games_summary">%1$d games &#183; %2$d tracks</string>
     <string name="jukebox_play_all">Play all</string>
     <string name="jukebox_shuffle_play">Shuffle</string>
@@ -86,12 +90,16 @@
     <string name="jukebox_repeat_single">Repeat one</string>
     <string name="jukebox_repeat_off">No repeat</string>
     <string name="jukebox_queue">Queue</string>
-    <string name="jukebox_queue_subtitle">Session list is frozen; play-next items take priority.</string>
+    <string name="jukebox_queue_subtitle">Queue order stays as started; play-next tracks go first.</string>
     <string name="jukebox_now_playing">Now playing</string>
     <string name="jukebox_up_next_temp">Up next (Play next)</string>
     <string name="jukebox_up_next_list">Up next</string>
     <string name="jukebox_queue_empty">Nothing else queued.</string>
-    <string name="discovery_search_all">Search courses, cups, games, and tracks</string>
+    <string name="discovery_search_all">Search courses, games, and tracks</string>
+    <string name="discovery_search_courses">Search courses</string>
+    <string name="discovery_search_jukebox">Search games and tracks</string>
+    <string name="discovery_search_tracks">Search tracks</string>
+    <string name="discovery_search_playlists">Search playlists and routes</string>
     <string name="discovery_vs_standard">MKW courses</string>
     <string name="discovery_vs_sfc">SFC courses &amp; missions</string>
     <string name="discovery_battle_summary">%1$d tracks · Normal &amp; Final phase interactive</string>
@@ -107,11 +115,11 @@
     <string name="discovery_playlists_group_routes">My Routes</string>
     <string name="discovery_playlists_group_rallies">Official Rallies</string>
     <string name="discovery_playlists_group_jukebox">Official OST Selections</string>
-    <string name="discovery_view_all_count">View all %1$d</string>
+    <string name="discovery_view_all_count">All (%1$d)</string>
     <string name="discovery_playlist_play_all">Play all</string>
     <string name="discovery_playlist_native_transition">Native cross-track handover</string>
     <string name="discovery_playlist_native_transition_desc">Chain verified Outros directly into the next prelude without gaps</string>
-    <string name="discovery_playlist_frozen_note">Editing only affects new playback; the running queue stays frozen until next Play.</string>
+    <string name="discovery_playlist_frozen_note">Edits apply from your next play session; the current queue continues uninterrupted.</string>
     <string name="discovery_playlist_entry_config">Track flow &amp; transition</string>
     <string name="discovery_playlist_entry_preset">Arrangement preset</string>
     <string name="discovery_playlist_entry_native_inherit">Follow playlist default</string>
@@ -119,7 +127,11 @@
     <string name="discovery_playlist_entry_native_off">Disable native handover</string>
     <string name="discovery_native_transition_prefix">Native transition</string>
     <string name="discovery_native_transition_active">Native transition · %1$s</string>
-    <string name="preset_system_default">Grand Prix Suite</string>
+    <string name="preset_system_default">Suite A</string>
+    <string name="preset_system_suite_a_alt">Suite A Alt</string>
+    <string name="preset_system_suite_b">Suite B</string>
+    <string name="preset_system_suite_c">Suite C</string>
+    <string name="preset_system_suite_d">Suite D</string>
     <string name="preset_system_knockout">Knockout Tour Suite</string>
     <string name="preset_user_title">Custom flow presets</string>
     <string name="preset_new">Create custom flow</string>
@@ -127,7 +139,7 @@
     <string name="preset_duplicate">Duplicate</string>
     <string name="preset_delete">Delete</string>
     <string name="preset_delete_warning_title">Delete preset?</string>
-    <string name="preset_delete_warning_body">Referenced by playlists: %1$s. Deleting resets those entries to Grand Prix Suite.</string>
+    <string name="preset_delete_warning_body">Referenced by playlists: %1$s. Deleting resets those entries to Suite A.</string>
     <string name="flow_editor_title">Flow Editor</string>
     <string name="flow_editor_name_label">Preset name</string>
     <string name="flow_editor_steps_title">Playback sequence</string>
@@ -178,7 +190,15 @@
     <string name="route_plan_on_map">Plan on map</string>
     <string name="route_edit_on_map">Edit on map</string>
     <string name="route_stops_count">%1$d stops</string>
+    <plurals name="route_stops_plurals">
+        <item quantity="one">%1$d stop</item>
+        <item quantity="other">%1$d stops</item>
+    </plurals>
     <string name="route_legs_count">%1$d connecting roads</string>
+    <plurals name="route_legs_plurals">
+        <item quantity="one">%1$d connecting road</item>
+        <item quantity="other">%1$d connecting roads</item>
+    </plurals>
     <string name="route_edge_music_auto">Auto pick from road pool</string>
     <string name="route_edge_music_pool_empty">No road pool data · Skip</string>
     <string name="route_edge_music_override">Pinned: %1$s</string>
@@ -255,4 +275,16 @@
     <string name="track_info_game">Source game</string>
     <string name="track_info_ost">OST index</string>
     <string name="track_playlist_pick_empty">No playlists yet. Create one below to add tracks.</string>
+    <string name="pinned_favorites_title">My Favorites</string>
+    <string name="pinned_favorites_badge">Pinned</string>
+    <string name="pinned_favorites_subtitle">All your favorited courses, jukebox gems, and tracks</string>
+    <string name="pinned_favorites_empty">No favorites yet. Tap the heart icon on any course, track, or player screen to add it here.</string>
+    <string name="favorites_remove">Remove from favorites</string>
+    <string name="route_suite_mode_label">Route suite mode</string>
+    <string name="route_suite_mode_game">Game Suite</string>
+    <string name="route_suite_mode_complete">Complete Suite</string>
+    <string name="route_suite_mode_game_desc">GP: 1st C, final DK Spaceport A Alt, others A · Knockout: 1st B, last D, middle A</string>
+    <string name="route_suite_mode_complete_desc">All stops default to Suite A</string>
+    <string name="route_stop_preset_auto">Follow route mode</string>
+    <string name="route_stop_preset_auto_fmt">Follow route mode (%1$s)</string>
 </resources>

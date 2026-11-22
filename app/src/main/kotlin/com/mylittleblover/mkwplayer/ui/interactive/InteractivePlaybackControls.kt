@@ -1,51 +1,101 @@
 package com.mylittleblover.mkwplayer.ui.interactive
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mylittleblover.mkwplayer.R
 import com.mylittleblover.mkwplayer.audio.EngineSnapshot
+import com.mylittleblover.mkwplayer.graph.MusicGraphBuilder
 import com.mylittleblover.mkwplayer.player.PlayerViewModel
+import com.mylittleblover.mkwplayer.ui.AppMotion
+import com.mylittleblover.mkwplayer.ui.SmoothProgressIndicator
+import com.mylittleblover.mkwplayer.ui.kit.MkwBadge
+import com.mylittleblover.mkwplayer.ui.kit.MkwBadgeTone
+import com.mylittleblover.mkwplayer.ui.kit.MkwBottomSheet
+import com.mylittleblover.mkwplayer.ui.kit.MkwButtonSize
+import com.mylittleblover.mkwplayer.ui.kit.MkwCard
+import com.mylittleblover.mkwplayer.ui.kit.MkwDialog
+import com.mylittleblover.mkwplayer.ui.kit.MkwDivider
+import com.mylittleblover.mkwplayer.ui.kit.MkwGhostButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwKitTokens
+import com.mylittleblover.mkwplayer.ui.kit.MkwOptionRow
+import com.mylittleblover.mkwplayer.ui.kit.MkwPrimaryButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwRadioMark
+import com.mylittleblover.mkwplayer.ui.kit.MkwRoseButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwSecondaryButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwSurfaceTone
+import com.mylittleblover.mkwplayer.ui.rememberPressScale
+import com.mylittleblover.mkwplayer.ui.rememberReducedMotion
 import java.util.Locale
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
 
 /** A read-only view of Native source/transport clocks; no seek gesture or UI timer. */
 @Composable
@@ -59,25 +109,25 @@ internal fun InteractivePlaybackTimeline(
         val frame = progressUi?.sourceFrame ?: flow.sourceFrame
         val length = flow.sourceFrames
         if (frame != null && frame >= 0 && length != null && length > 0) {
-            com.mylittleblover.mkwplayer.ui.SmoothProgressIndicator(
+            SmoothProgressIndicator(
                 progress = (frame.toDouble() / length).toFloat(),
                 modifier = Modifier.fillMaxWidth(),
                 barHeight = 5.dp,
             )
         }
-        val numStyle = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum")
+        val numStyle = MkwKitTokens.tabular(MaterialTheme.typography.labelMedium)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(
                 if (frame != null && frame >= 0) EngineSnapshot.formatPosition(frame, flow.transportRate)
                 else (progressUi?.position ?: position),
                 style = numStyle,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MkwKitTokens.Palette.inkSecondary,
             )
             if (length != null && length > 0) {
                 Text(
                     EngineSnapshot.formatPosition(length, flow.transportRate),
                     style = numStyle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MkwKitTokens.Palette.inkSecondary,
                 )
             }
         }
@@ -89,8 +139,8 @@ internal fun InteractivePlaybackTimeline(
                     R.string.interactive_fade_remaining,
                     String.format(Locale.ROOT, "%.1f", remaining.toDouble() / flow.transportRate),
                 ),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
+                style = MkwKitTokens.tabular(MaterialTheme.typography.labelLarge),
+                color = MkwKitTokens.Palette.crimson,
             )
         }
     }
@@ -109,84 +159,64 @@ internal fun InteractiveStageBanner(
     } else {
         stageText(flow.stageKey ?: flow.performanceStage)
     }
-    val containerColor by animateColorAsState(
-        targetValue = if (pending != null) {
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-        } else {
-            MaterialTheme.colorScheme.surfaceContainerLow
-        },
-        animationSpec = tween(180, easing = com.mylittleblover.mkwplayer.ui.AppMotion.easeOut),
-        label = "stage-banner-bg",
-    )
-    Surface(
-        modifier = modifier.fillMaxWidth().animateContentSize(tween(200, easing = com.mylittleblover.mkwplayer.ui.AppMotion.easeOut)),
-        shape = RoundedCornerShape(16.dp),
-        color = containerColor,
-        border = BorderStroke(
-            1.dp,
-            if (pending != null) MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
-            else MaterialTheme.colorScheme.outlineVariant,
-        ),
+
+    MkwCard(
+        modifier = modifier.fillMaxWidth().animateContentSize(tween(200, easing = AppMotion.easeOut)),
+        selected = pending != null,
+        shape = MkwKitTokens.Shape.card,
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
     ) {
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Box(
-                    Modifier.size(8.dp).background(
-                        color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                        shape = CircleShape,
-                    ),
-                )
-                Text(
-                    stringResource(R.string.interactive_current_stage_label),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.weight(1f))
-                Text(
-                    currentLabel,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            AnimatedVisibility(
-                visible = pending != null,
-                enter = fadeIn(tween(160)) + expandVertically(tween(180, easing = com.mylittleblover.mkwplayer.ui.AppMotion.easeOut)),
-                exit = fadeOut(tween(120)) + shrinkVertically(tween(160)),
-            ) {
-                pending?.let { nextStage ->
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text(
-                            stringResource(R.string.interactive_pending_next_cue, stageText(nextStage)),
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.weight(1f),
+            Box(
+                Modifier.size(8.dp).background(
+                    color = if (active) MkwKitTokens.Palette.crimson else MkwKitTokens.Palette.outlineInk,
+                    shape = CircleShape,
+                ),
+            )
+            Text(
+                stringResource(R.string.interactive_current_stage_label),
+                style = MaterialTheme.typography.labelMedium,
+                color = MkwKitTokens.Palette.inkSecondary,
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                currentLabel,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MkwKitTokens.Palette.ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        AnimatedVisibility(
+            visible = pending != null,
+            enter = fadeIn(tween(160)) + expandVertically(tween(180, easing = AppMotion.easeOut)),
+            exit = fadeOut(tween(120)) + shrinkVertically(tween(160)),
+        ) {
+            pending?.let { nextStage ->
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.interactive_pending_next_cue, stageText(nextStage)),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MkwKitTokens.Palette.crimsonDeep,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (flow.canCancelPending) {
+                        MkwRoseButton(
+                            text = stringResource(R.string.interactive_action_cancel),
+                            onClick = onCancel,
+                            size = MkwButtonSize.Compact,
+                            leadingIcon = Icons.AutoMirrored.Filled.Undo,
                         )
-                        if (flow.canCancelPending) {
-                            FilledTonalButton(
-                                onClick = onCancel,
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                modifier = Modifier.heightIn(min = 36.dp),
-                            ) {
-                                Icon(Icons.AutoMirrored.Filled.Undo, null, Modifier.size(16.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text(stringResource(R.string.interactive_action_cancel), style = MaterialTheme.typography.labelMedium)
-                            }
-                        }
                     }
                 }
             }
@@ -194,6 +224,10 @@ internal fun InteractiveStageBanner(
     }
 }
 
+/**
+ * Sticky bottom transport & long-press-to-fade dock built on unified `ui.kit` porcelain surfaces.
+ * Keeping [leadingTransport] optional lets [ConsolePage] anchor Pause/Play beside Stop in one zone.
+ */
 @Composable
 internal fun InteractiveStopBar(
     canStop: Boolean,
@@ -205,13 +239,14 @@ internal fun InteractiveStopBar(
     fadeRemainingFrames: Long? = null,
     transportRate: Int = 48000,
     progressFlow: StateFlow<PlayerViewModel.ProgressUi>? = null,
+    leadingTransport: (@Composable () -> Unit)? = null,
 ) {
     var showFade by rememberSaveable { mutableStateOf(false) }
-    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-    val holdProgress = remember { androidx.compose.animation.core.Animatable(0f) }
-    val longPressTimeoutMs = androidx.compose.ui.platform.LocalViewConfiguration.current.longPressTimeoutMillis.toInt().coerceAtLeast(300)
-    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
-    val reduceMotion = com.mylittleblover.mkwplayer.ui.rememberReducedMotion()
+    val interactionSource = remember { MutableInteractionSource() }
+    val holdProgress = remember { Animatable(0f) }
+    val longPressTimeoutMs = LocalViewConfiguration.current.longPressTimeoutMillis.toInt().coerceAtLeast(300)
+    val haptic = LocalHapticFeedback.current
+    val reduceMotion = rememberReducedMotion()
 
     LaunchedEffect(interactionSource, canFade, fading) {
         if (!canFade || fading) {
@@ -220,23 +255,23 @@ internal fun InteractiveStopBar(
         }
         interactionSource.interactions.collect { interaction ->
             when (interaction) {
-                is androidx.compose.foundation.interaction.PressInteraction.Press -> {
+                is PressInteraction.Press -> {
                     holdProgress.snapTo(0f)
                     holdProgress.animateTo(
                         targetValue = 1f,
                         animationSpec = tween(
                             durationMillis = if (reduceMotion) 0 else longPressTimeoutMs,
-                            easing = androidx.compose.animation.core.LinearEasing,
+                            easing = LinearEasing,
                         ),
                     )
                 }
-                is androidx.compose.foundation.interaction.PressInteraction.Release,
-                is androidx.compose.foundation.interaction.PressInteraction.Cancel -> {
+                is PressInteraction.Release,
+                is PressInteraction.Cancel -> {
                     holdProgress.animateTo(
                         targetValue = 0f,
                         animationSpec = tween(
                             durationMillis = if (reduceMotion) 0 else 140,
-                            easing = com.mylittleblover.mkwplayer.ui.AppMotion.easeOut,
+                            easing = AppMotion.easeOut,
                         ),
                     )
                 }
@@ -251,89 +286,129 @@ internal fun InteractiveStopBar(
     }
     val remainText = liveFadeRemaining?.let { frames ->
         val rate = transportRate.coerceAtLeast(1)
-        String.format(java.util.Locale.ROOT, "%.1f", frames.toDouble() / rate.toDouble())
+        String.format(Locale.ROOT, "%.1f", frames.toDouble() / rate.toDouble())
     }
-    val holdFillColor = MaterialTheme.colorScheme.error.copy(alpha = 0.16f)
+    val holdFillColor = MkwKitTokens.Palette.danger.copy(alpha = 0.16f)
+
     Surface(
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp,
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
+        color = MkwKitTokens.Palette.ground,
+        tonalElevation = 0.dp,
     ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp).heightIn(min = 48.dp)
-                .combinedClickable(
-                    interactionSource = interactionSource,
-                    indication = androidx.compose.foundation.LocalIndication.current,
-                    enabled = canStop,
-                    role = Role.Button,
-                    onClick = onStop,
-                    onLongClickLabel = stringResource(R.string.interactive_fade_choose),
-                    onLongClick = if (canFade && !fading) ({
-                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                        showFade = true
-                    }) else null,
-                ),
-            shape = RoundedCornerShape(14.dp),
-            color = if (canStop) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = if (canStop) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-            border = if (canStop) BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant) else null,
-        ) {
-            androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth()) {
-                val fillFraction = holdProgress.value.coerceIn(0f, 1f)
-                if (fillFraction > 0.005f) {
-                    Surface(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .graphicsLayer {
-                                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
-                                scaleX = fillFraction
-                            },
-                        color = holdFillColor,
-                        content = {},
-                    )
+        Column(modifier = Modifier.fillMaxWidth()) {
+            MkwDivider()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                if (leadingTransport != null) {
+                    leadingTransport()
                 }
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = MkwKitTokens.Size.buttonHero)
+                        .combinedClickable(
+                            interactionSource = interactionSource,
+                            indication = androidx.compose.foundation.LocalIndication.current,
+                            enabled = canStop,
+                            role = Role.Button,
+                            onClick = onStop,
+                            onLongClickLabel = stringResource(R.string.interactive_fade_choose),
+                            onLongClick = if (canFade && !fading) ({
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                showFade = true
+                            }) else null,
+                        ),
+                    shape = MkwKitTokens.Shape.pill,
+                    color = if (canStop) MkwKitTokens.Palette.card else MkwKitTokens.Palette.trackStrong,
+                    contentColor = if (canStop) MkwKitTokens.Palette.ink else MkwKitTokens.Palette.inkSecondary,
+                    border = BorderStroke(MkwKitTokens.Stroke.border, MkwKitTokens.Palette.hairline),
                 ) {
-                    Icon(
-                        Icons.Filled.Stop,
-                        contentDescription = null,
-                        tint = if (canStop) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    val stopLabel = when {
-                        fading && paused && remainText != null -> stringResource(R.string.interactive_fade_paused, remainText)
-                        fading && remainText != null -> stringResource(R.string.interactive_fade_remaining, remainText)
-                        fading -> stringResource(R.string.interactive_fading)
-                        else -> stringResource(R.string.interactive_stop)
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        val fillFraction = holdProgress.value.coerceIn(0f, 1f)
+                        if (fillFraction > 0.005f) {
+                            Surface(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .graphicsLayer {
+                                        transformOrigin = TransformOrigin(0f, 0.5f)
+                                        scaleX = fillFraction
+                                    },
+                                color = holdFillColor,
+                                content = {},
+                            )
+                        }
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Icons.Filled.Stop,
+                                contentDescription = null,
+                                tint = if (canStop) MkwKitTokens.Palette.danger else MkwKitTokens.Palette.inkSecondary,
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            val stopLabel = when {
+                                fading && paused && remainText != null -> stringResource(R.string.interactive_fade_paused, remainText)
+                                fading && remainText != null -> stringResource(R.string.interactive_fade_remaining, remainText)
+                                fading -> stringResource(R.string.interactive_fading)
+                                else -> stringResource(R.string.interactive_stop)
+                            }
+                            Text(
+                                text = stopLabel,
+                                style = MkwKitTokens.tabular(MaterialTheme.typography.labelLarge),
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (canStop) MkwKitTokens.Palette.ink else MkwKitTokens.Palette.inkSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
-                    Text(
-                        stopLabel,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                }
+            }
+        }
+    }
+
+    if (showFade) {
+        MkwDialog(
+            onDismissRequest = { showFade = false },
+            title = stringResource(R.string.interactive_fade_choose),
+            confirmButton = {
+                MkwGhostButton(
+                    text = stringResource(R.string.interactive_close),
+                    onClick = { showFade = false },
+                )
+            },
+        ) {
+            Text(
+                stringResource(R.string.interactive_fade_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MkwKitTokens.Palette.inkSecondary,
+            )
+            Spacer(Modifier.height(4.dp))
+            Column(
+                modifier = Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                for (seconds in listOf(1, 3, 5, 10)) {
+                    MkwSecondaryButton(
+                        text = stringResource(R.string.interactive_fade_seconds, seconds),
+                        onClick = {
+                            showFade = false
+                            onFade(seconds)
+                        },
+                        enabled = canStop && !fading,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
         }
     }
-    if (showFade) AlertDialog(onDismissRequest = { showFade = false },
-        title = { Text(stringResource(R.string.interactive_fade_choose)) },
-        text = {
-            Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.interactive_fade_hint))
-                for (seconds in listOf(1, 3, 5, 10)) {
-                    OutlinedButton(onClick = { showFade = false; onFade(seconds) }, modifier = Modifier.fillMaxWidth(), enabled = canStop && !fading) {
-                        Text(stringResource(R.string.interactive_fade_seconds, seconds))
-                    }
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = { showFade = false }) { Text(stringResource(R.string.interactive_close)) } },
-    )
 }
 
 private data class SelectorOption<T>(
@@ -357,106 +432,104 @@ private fun <T> InteractiveSelectorBar(
 ) {
     if (options.isEmpty()) return
     var showSheet by rememberSaveable(sheetTitle) { mutableStateOf(false) }
-    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val scope = rememberCoroutineScope()
     LaunchedEffect(enabled) { if (!enabled) showSheet = false }
+    val (pressMod, src) = rememberPressScale(pressedScale = 0.985f)
 
-    Row(
-        Modifier.fillMaxWidth().heightIn(min = 48.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+    Surface(
+        onClick = { if (enabled) showSheet = true },
+        enabled = enabled,
+        interactionSource = src,
+        shape = MkwKitTokens.Shape.control,
+        color = MkwKitTokens.Palette.ground,
+        border = BorderStroke(MkwKitTokens.Stroke.border, MkwKitTokens.Palette.hairline),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .then(if (enabled) pressMod else Modifier),
     ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f).padding(end = 12.dp),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        OutlinedButton(
-            onClick = { showSheet = true },
-            enabled = enabled,
-            shape = RoundedCornerShape(14.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.primary,
-            ),
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-            modifier = Modifier.heightIn(min = 40.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(buttonText, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.width(4.dp))
-            Icon(Icons.Filled.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = MkwKitTokens.Palette.inkSecondary,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Surface(
+                shape = MkwKitTokens.Shape.pill,
+                color = if (enabled) MkwKitTokens.Palette.rose else MkwKitTokens.Palette.trackStrong,
+                border = if (enabled) {
+                    BorderStroke(MkwKitTokens.Stroke.hairline, MkwKitTokens.Palette.crimson.copy(alpha = 0.25f))
+                } else null,
+            ) {
+                Row(
+                    modifier = Modifier.padding(start = 12.dp, end = 6.dp, top = 5.dp, bottom = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        text = buttonText,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (enabled) MkwKitTokens.Palette.crimsonDeep else MkwKitTokens.Palette.inkSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Icon(
+                        imageVector = Icons.Filled.ArrowDropDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = if (enabled) MkwKitTokens.Palette.crimsonDeep else MkwKitTokens.Palette.inkSecondary,
+                    )
+                }
+            }
         }
     }
 
     if (showSheet && enabled) {
-        ModalBottomSheet(sheetState = sheet, onDismissRequest = { showSheet = false }) {
-            val listModifier = Modifier
+        MkwBottomSheet(
+            onDismissRequest = { showSheet = false },
+            title = sheetTitle,
+            subtitle = sheetSubtitle,
+        ) {
+            val listMod = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 480.dp)
+                .heightIn(max = 420.dp)
                 .verticalScroll(rememberScrollState())
                 .let { if (showSelectionRadio) it.selectableGroup() else it }
-                .padding(bottom = 24.dp)
-            Column(listModifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    sheetTitle,
-                    Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-                sheetSubtitle?.let { hint ->
-                    Text(
-                        hint,
-                        Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                .padding(horizontal = 12.dp)
+            Column(listMod, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 options.forEach { option ->
-                    val itemModifier = if (showSelectionRadio) {
-                        Modifier.selectable(
-                            selected = option.selected,
-                            enabled = option.enabled,
-                            role = Role.RadioButton,
-                            onClick = {
-                                if (!option.selected) onSelect(option.value)
-                                scope.launch { sheet.hide(); showSheet = false }
-                            },
-                        )
-                    } else {
-                        Modifier.clickable(
-                            enabled = option.enabled,
-                            role = Role.Button,
-                            onClick = {
-                                onSelect(option.value)
-                                scope.launch { sheet.hide(); showSheet = false }
-                            },
-                        )
-                    }
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                option.label,
-                                color = if (option.enabled) MaterialTheme.colorScheme.onSurface
-                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                            )
+                    MkwOptionRow(
+                        headline = option.label,
+                        selected = option.selected,
+                        enabled = option.enabled,
+                        role = if (showSelectionRadio) Role.RadioButton else Role.Button,
+                        onClick = {
+                            if (!showSelectionRadio || !option.selected) onSelect(option.value)
+                            showSheet = false
                         },
-                        trailingContent = if (showSelectionRadio) {
-                            { RadioButton(selected = option.selected, enabled = option.enabled, onClick = null) }
-                        } else {
-                            {
+                        trailing = {
+                            if (showSelectionRadio) {
+                                if (option.selected) {
+                                    Icon(Icons.Filled.Check, contentDescription = null, tint = MkwKitTokens.Palette.crimson)
+                                } else {
+                                    MkwRadioMark(selected = false, enabled = option.enabled)
+                                }
+                            } else {
                                 Icon(
                                     Icons.Filled.Flag,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
+                                    tint = MkwKitTokens.Palette.crimson,
                                     modifier = Modifier.size(18.dp),
                                 )
                             }
                         },
-                        modifier = itemModifier.heightIn(min = 54.dp),
                     )
                 }
             }
@@ -536,8 +609,8 @@ internal fun InteractiveVersionChooser(
     )
 }
 
-/** A read-only inventory of this graph's actual stages, without implying an invented sequence. */
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+/** A read-only inventory of this graph's actual stages, rendered as unified MKW badges. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun InteractiveStructure(flow: PlayerViewModel.FlowUi) {
     if (flow.availableStageKeys.isEmpty()) return
@@ -548,22 +621,17 @@ internal fun InteractiveStructure(flow: PlayerViewModel.FlowUi) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             names.forEach { name ->
                 val active = current == name
-                val background by animateColorAsState(
-                    if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                    animationSpec = tween(180), label = "stage-background")
-                val foreground by animateColorAsState(
-                    if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                    animationSpec = tween(180), label = "stage-text")
-                Surface(modifier = Modifier.semantics { selected = active }, shape = MaterialTheme.shapes.extraLarge,
-                    color = background, contentColor = foreground) {
-                    Text(name, Modifier.padding(horizontal = 12.dp, vertical = 7.dp), style = MaterialTheme.typography.labelMedium)
-                }
+                MkwBadge(
+                    text = name,
+                    tone = if (active) MkwBadgeTone.Rose else MkwBadgeTone.Neutral,
+                    tabular = false,
+                )
             }
         }
     }
 }
 
-/** Only currently available events occupy space; primary advancement leads secondary options cleanly. */
+/** Only currently available events occupy space; primary advancement leads secondary pill actions cleanly. */
 @Composable
 internal fun InteractiveActionBar(
     flow: PlayerViewModel.FlowUi,
@@ -580,19 +648,13 @@ internal fun InteractiveActionBar(
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (showNext) {
-            Button(
+            MkwPrimaryButton(
+                text = stringResource(R.string.interactive_action_next),
                 onClick = onAdvance,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp),
-                shape = RoundedCornerShape(14.dp),
-            ) {
-                Icon(Icons.Filled.SkipNext, null, Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    stringResource(R.string.interactive_action_next),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
+                size = MkwButtonSize.Hero,
+                leadingIcon = Icons.Filled.SkipNext,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
         val secondaryActions = listOf(
             Triple(Icons.Filled.Speed, if (flow.isBattleTrack) R.string.stage_battle_fast else R.string.interactive_action_fast, onFast) to showFast,
@@ -605,22 +667,32 @@ internal fun InteractiveActionBar(
                     key(actionInfo.second) {
                         val weight by animateFloatAsState(
                             if (visible) 1f else 0f,
-                            tween(180, easing = com.mylittleblover.mkwplayer.ui.AppMotion.easeOut),
+                            tween(180, easing = AppMotion.easeOut),
                             label = "interactive-action",
                         )
                         if (visible || weight > .001f) {
-                            val (icon, label, action) = actionInfo
-                            FilledTonalButton(
-                                onClick = action,
-                                enabled = visible,
-                                shape = RoundedCornerShape(14.dp),
-                                modifier = Modifier.weight(weight.coerceAtLeast(.001f)).fillMaxHeight().heightIn(min = 48.dp)
-                                    .graphicsLayer { alpha = weight; clip = true },
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
-                            ) {
-                                Icon(icon, null, Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text(stringResource(label), style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            val (icon, labelRes, action) = actionInfo
+                            val isFast = labelRes == R.string.interactive_action_fast || labelRes == R.string.stage_battle_fast
+                            val mod = Modifier
+                                .weight(weight.coerceAtLeast(.001f))
+                                .fillMaxHeight()
+                                .graphicsLayer { alpha = weight; clip = true }
+                            if (isFast) {
+                                MkwRoseButton(
+                                    text = stringResource(labelRes),
+                                    onClick = action,
+                                    enabled = visible,
+                                    leadingIcon = icon,
+                                    modifier = mod,
+                                )
+                            } else {
+                                MkwSecondaryButton(
+                                    text = stringResource(labelRes),
+                                    onClick = action,
+                                    enabled = visible,
+                                    leadingIcon = icon,
+                                    modifier = mod,
+                                )
                             }
                         }
                     }
@@ -631,20 +703,20 @@ internal fun InteractiveActionBar(
 }
 
 @Composable
-internal fun syncPointText(sync: com.mylittleblover.mkwplayer.graph.MusicGraphBuilder.SyncPoint?): String? = when (sync) {
-    com.mylittleblover.mkwplayer.graph.MusicGraphBuilder.SyncPoint.Immediate -> stringResource(R.string.interactive_sync_immediate)
-    com.mylittleblover.mkwplayer.graph.MusicGraphBuilder.SyncPoint.NextBeat -> stringResource(R.string.interactive_sync_next_beat)
-    com.mylittleblover.mkwplayer.graph.MusicGraphBuilder.SyncPoint.NextBar -> stringResource(R.string.interactive_sync_next_bar)
-    com.mylittleblover.mkwplayer.graph.MusicGraphBuilder.SyncPoint.NextGrid -> stringResource(R.string.interactive_sync_next_grid)
-    com.mylittleblover.mkwplayer.graph.MusicGraphBuilder.SyncPoint.ExitCue -> stringResource(R.string.interactive_sync_exit_cue)
-    com.mylittleblover.mkwplayer.graph.MusicGraphBuilder.SyncPoint.NextCue -> stringResource(R.string.interactive_sync_next_cue)
-    com.mylittleblover.mkwplayer.graph.MusicGraphBuilder.SyncPoint.NextCustomCue -> stringResource(R.string.interactive_sync_custom_cue)
+internal fun syncPointText(sync: MusicGraphBuilder.SyncPoint?): String? = when (sync) {
+    MusicGraphBuilder.SyncPoint.Immediate -> stringResource(R.string.interactive_sync_immediate)
+    MusicGraphBuilder.SyncPoint.NextBeat -> stringResource(R.string.interactive_sync_next_beat)
+    MusicGraphBuilder.SyncPoint.NextBar -> stringResource(R.string.interactive_sync_next_bar)
+    MusicGraphBuilder.SyncPoint.NextGrid -> stringResource(R.string.interactive_sync_next_grid)
+    MusicGraphBuilder.SyncPoint.ExitCue -> stringResource(R.string.interactive_sync_exit_cue)
+    MusicGraphBuilder.SyncPoint.NextCue -> stringResource(R.string.interactive_sync_next_cue)
+    MusicGraphBuilder.SyncPoint.NextCustomCue -> stringResource(R.string.interactive_sync_custom_cue)
     null -> null
 }
 
 /**
- * Unified first-screen performance control zone grouping current section, queued target with
- * its real musical sync point, immediate cancel button, and primary transition actions together.
+ * Focused live stage performance control zone grouping current section badge, queued transition
+ * sync target + cancel trigger, active fade status, and transition actions cleanly together.
  */
 @Composable
 internal fun InteractivePhaseControlZone(
@@ -656,23 +728,35 @@ internal fun InteractivePhaseControlZone(
     onEnd: () -> Unit,
     progressFlow: StateFlow<PlayerViewModel.ProgressUi>? = null,
 ) {
+    val active = flow.performing && flow.voiceCount > 0 && flow.sourceFrame != null
     val currentTitle = when {
         flow.performing && flow.voiceCount > 0 && flow.sourceFrame == null -> stringResource(R.string.stage_transitioning)
         else -> stageText(flow.stageKey ?: flow.performanceStage)
     }
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                Modifier.size(8.dp).background(
+                    color = if (active) MkwKitTokens.Palette.crimson else MkwKitTokens.Palette.outlineInk,
+                    shape = CircleShape,
+                ),
+            )
             Text(
                 stringResource(R.string.interactive_current_stage_label),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelLarge,
+                color = MkwKitTokens.Palette.inkSecondary,
             )
+            Spacer(Modifier.weight(1f))
             Text(
                 currentTitle,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MkwKitTokens.Palette.ink,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -686,45 +770,38 @@ internal fun InteractivePhaseControlZone(
             } else {
                 stringResource(R.string.interactive_pending_next_cue, pendingName)
             }
-            Surface(
-                Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+            MkwCard(
+                tone = MkwSurfaceTone.RoseTint,
+                selected = true,
+                shape = MkwKitTokens.Shape.control,
+                contentPadding = PaddingValues(start = 12.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
             ) {
                 Row(
-                    Modifier.fillMaxWidth().padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                    Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Icon(
                         Icons.Filled.SkipNext,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        tint = MkwKitTokens.Palette.crimsonDeep,
                         modifier = Modifier.size(18.dp),
                     )
                     Text(
                         waitText,
                         style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = MkwKitTokens.Palette.crimsonDeep,
                         modifier = Modifier.weight(1f),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                     if (flow.canCancelPending) {
-                        FilledTonalButton(
+                        MkwSecondaryButton(
+                            text = stringResource(R.string.interactive_action_cancel),
                             onClick = onCancel,
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                            modifier = Modifier.heightIn(min = 38.dp),
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.Undo, null, Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text(
-                                stringResource(R.string.interactive_action_cancel),
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
+                            size = MkwButtonSize.Compact,
+                            leadingIcon = Icons.AutoMirrored.Filled.Undo,
+                        )
                     }
                 }
             }
@@ -734,31 +811,29 @@ internal fun InteractivePhaseControlZone(
             val liveFade = progressFlow?.collectAsState()?.value?.fadeRemainingFrames ?: flow.fadeRemainingFrames
             val remainText = liveFade?.let { frames ->
                 val rate = flow.transportRate.coerceAtLeast(1)
-                String.format(java.util.Locale.ROOT, "%.1f", frames.toDouble() / rate.toDouble())
+                String.format(Locale.ROOT, "%.1f", frames.toDouble() / rate.toDouble())
             }
             val fadeLabel = when {
                 paused && remainText != null -> stringResource(R.string.interactive_fade_paused, remainText)
                 remainText != null -> stringResource(R.string.interactive_fade_remaining, remainText)
                 else -> stringResource(R.string.interactive_fading)
             }
-            Surface(
-                Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
+            MkwCard(
+                error = true,
+                shape = MkwKitTokens.Shape.control,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
             ) {
-                Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        fadeLabel,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                    )
-                    Text(
-                        stringResource(R.string.interactive_fade_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f),
-                    )
-                }
+                Text(
+                    fadeLabel,
+                    style = MkwKitTokens.tabular(MaterialTheme.typography.labelLarge),
+                    fontWeight = FontWeight.SemiBold,
+                    color = MkwKitTokens.Palette.danger,
+                )
+                Text(
+                    stringResource(R.string.interactive_fade_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MkwKitTokens.Palette.inkSecondary,
+                )
             }
         }
 

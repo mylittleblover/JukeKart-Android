@@ -14,7 +14,7 @@ package com.mylittleblover.mkwplayer.registry
 internal data class AudioAssetId(val sha256: String) {
 
     init {
-        require(sha256.length == 64 && sha256.all { it in "0123456789abcdef" }) {
+        require(isHex64(sha256)) {
             "asset digest must be 64 lowercase hex characters, got ${sha256.length}"
         }
     }
@@ -23,19 +23,31 @@ internal data class AudioAssetId(val sha256: String) {
     fun short(): String = sha256.take(12)
 
     companion object {
+        private fun isHex64(value: String): Boolean {
+            if (value.length != 64) return false
+            for (i in 0 until 64) {
+                val c = value[i]
+                if ((c < '0' || c > '9') && (c < 'a' || c > 'f')) return false
+            }
+            return true
+        }
+
         /** Builds an id from raw digest bytes, which is what the hashing code produces. */
         fun of(digest: ByteArray): AudioAssetId {
             require(digest.size == 32) { "digest must be 32 bytes, got ${digest.size}" }
-            return AudioAssetId(digest.joinToString("") { "%02x".format(it) })
+            val chars = CharArray(64)
+            val hex = "0123456789abcdef"
+            for (i in 0 until 32) {
+                val b = digest[i].toInt() and 0xFF
+                chars[i * 2] = hex[b ushr 4]
+                chars[i * 2 + 1] = hex[b and 0x0F]
+            }
+            return AudioAssetId(String(chars))
         }
 
         /** Parses the stored form, rejecting anything that is not a digest. */
         fun parse(value: String): AudioAssetId? =
-            if (value.length == 64 && value.all { it in "0123456789abcdef" }) {
-                AudioAssetId(value)
-            } else {
-                null
-            }
+            if (isHex64(value)) AudioAssetId(value) else null
     }
 }
 

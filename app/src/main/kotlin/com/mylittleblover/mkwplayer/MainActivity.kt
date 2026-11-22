@@ -125,7 +125,7 @@ private fun LegacyPlayerScreen(modifier: Modifier = Modifier) {
     ) {
         item {
             Column {
-                Text("MKW Player", style = MaterialTheme.typography.headlineMedium)
+                Text("JukeKart", style = MaterialTheme.typography.headlineMedium)
                 Text("v${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodySmall)
             }
         }

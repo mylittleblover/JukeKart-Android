@@ -1,22 +1,16 @@
 package com.mylittleblover.mkwplayer.ui.routes
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
@@ -24,20 +18,10 @@ import androidx.compose.material.icons.filled.MusicOff
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.outlined.MusicNote
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +40,18 @@ import com.mylittleblover.mkwplayer.routes.OfficialRouteKind
 import com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog
 import com.mylittleblover.mkwplayer.ui.art.PackArtwork
 import com.mylittleblover.mkwplayer.ui.home.JukeboxCatalog
+import com.mylittleblover.mkwplayer.ui.kit.MkwBadge
+import com.mylittleblover.mkwplayer.ui.kit.MkwBadgeTone
+import com.mylittleblover.mkwplayer.ui.kit.MkwBottomSheet
+import com.mylittleblover.mkwplayer.ui.kit.MkwButtonSize
+import com.mylittleblover.mkwplayer.ui.kit.MkwCard
+import com.mylittleblover.mkwplayer.ui.kit.MkwDivider
+import com.mylittleblover.mkwplayer.ui.kit.MkwIconButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwKitTokens
+import com.mylittleblover.mkwplayer.ui.kit.MkwOptionRow
+import com.mylittleblover.mkwplayer.ui.kit.MkwSecondaryButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwSurfaceTone
+import com.mylittleblover.mkwplayer.ui.kit.MkwTextField
 import java.io.File
 import java.util.Locale
 
@@ -158,6 +154,50 @@ internal fun RoadMusicRuleModeSelector(
     )
 }
 
+@Composable
+internal fun RouteSuiteModeSelector(
+    selectedMode: RoadJukeboxCatalog.RouteSuiteMode,
+    onSelectMode: (RoadJukeboxCatalog.RouteSuiteMode) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val options = listOf(
+        com.mylittleblover.mkwplayer.ui.interactive.DrawerOption(
+            value = RoadJukeboxCatalog.RouteSuiteMode.GAME_SUITE,
+            label = stringResource(R.string.route_suite_mode_game),
+            subtitle = stringResource(R.string.route_suite_mode_game_desc),
+        ),
+        com.mylittleblover.mkwplayer.ui.interactive.DrawerOption(
+            value = RoadJukeboxCatalog.RouteSuiteMode.COMPLETE_SUITE,
+            label = stringResource(R.string.route_suite_mode_complete),
+            subtitle = stringResource(R.string.route_suite_mode_complete_desc),
+        ),
+    )
+    val selectedLabel = options.firstOrNull { it.value == selectedMode }?.label
+        ?: stringResource(R.string.route_suite_mode_game)
+    com.mylittleblover.mkwplayer.ui.interactive.SelectionDrawerRow(
+        label = stringResource(R.string.route_suite_mode_label),
+        selectedLabel = selectedLabel,
+        sheetTitle = stringResource(R.string.route_suite_mode_label),
+        options = options,
+        selectedValue = selectedMode,
+        onSelect = onSelectMode,
+        modifier = modifier,
+        compact = true,
+    )
+}
+
+/** Shared string resource lookup for built-in suite variants (`"a"`..`"d"`, `"knockout"`) and `PresetRefs`. */
+@androidx.annotation.StringRes
+internal fun builtInSuiteLabelRes(variantOrRef: String?): Int = when (variantOrRef?.trim()?.lowercase(java.util.Locale.ROOT)) {
+    "", "medley", "a", com.mylittleblover.mkwplayer.library.PresetRefs.SYSTEM_DEFAULT -> R.string.preset_system_default
+    "a_alt", "a alt", "alt", com.mylittleblover.mkwplayer.library.PresetRefs.SYSTEM_SUITE_A_ALT -> R.string.preset_system_suite_a_alt
+    "b", com.mylittleblover.mkwplayer.library.PresetRefs.SYSTEM_SUITE_B -> R.string.preset_system_suite_b
+    "c", com.mylittleblover.mkwplayer.library.PresetRefs.SYSTEM_SUITE_C -> R.string.preset_system_suite_c
+    "d", com.mylittleblover.mkwplayer.library.PresetRefs.SYSTEM_SUITE_D -> R.string.preset_system_suite_d
+    "knockout", com.mylittleblover.mkwplayer.library.PresetRefs.SYSTEM_KNOCKOUT -> R.string.preset_system_knockout
+    else -> R.string.preset_system_default
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun RouteEdgeMusicPickerSheet(
@@ -176,7 +216,6 @@ internal fun RouteEdgeMusicPickerSheet(
     onSelectTrackKey: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var query by rememberSaveable(leg.index, legTitle) { mutableStateOf("") }
     val hasKnownPool = leg.resolution.hasKnownPool()
     val isSpecialApproach = leg.resolution is RoadJukeboxCatalog.EdgeMusicResolution.SpecialRoadApproach
@@ -213,44 +252,37 @@ internal fun RouteEdgeMusicPickerSheet(
         }
     }
 
-    ModalBottomSheet(sheetState = sheetState, onDismissRequest = onDismiss) {
+    MkwBottomSheet(
+        onDismissRequest = onDismiss,
+        title = stringResource(R.string.route_pick_edge_track),
+        subtitle = legTitle,
+    ) {
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(
-                stringResource(R.string.route_pick_edge_track),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                legTitle,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
             if (sessionHint) {
                 Text(
                     stringResource(R.string.route_pick_edge_session_hint),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MkwKitTokens.Palette.inkSecondary,
                 )
             }
             if (showAllInstalledFallback) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+                MkwCard(
+                    tone = MkwSurfaceTone.RoseTint,
+                    selected = true,
+                    shape = MkwKitTokens.Shape.control,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 ) {
                     Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                        Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        AssistChip(
-                            onClick = {},
-                            label = { Text(substituteTag) },
-                        )
+                        MkwBadge(text = substituteTag, tone = MkwBadgeTone.Rose, tabular = false)
                         Text(
                             if (isSpecialApproach) {
                                 stringResource(R.string.route_edge_music_to_rainbow)
@@ -258,7 +290,7 @@ internal fun RouteEdgeMusicPickerSheet(
                                 stringResource(R.string.route_edge_music_pool_empty)
                             },
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            color = MkwKitTokens.Palette.crimsonDeep,
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -266,37 +298,39 @@ internal fun RouteEdgeMusicPickerSheet(
             }
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
+                MkwSecondaryButton(
+                    text = stringResource(R.string.route_clear_override),
                     onClick = { onSelectAuto(); onDismiss() },
+                    leadingIcon = Icons.Filled.Shuffle,
+                    size = MkwButtonSize.Compact,
                     modifier = Modifier.weight(1f),
-                ) {
-                    Icon(Icons.Filled.Shuffle, null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.route_clear_override), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
+                )
                 if (allowMute) {
-                    OutlinedButton(
+                    MkwSecondaryButton(
+                        text = stringResource(R.string.route_skip_edge),
                         onClick = { onSelectMuted(); onDismiss() },
+                        leadingIcon = Icons.Filled.MusicOff,
+                        size = MkwButtonSize.Compact,
                         modifier = Modifier.weight(1f),
-                    ) {
-                        Icon(Icons.Filled.MusicOff, null, Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.route_skip_edge), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
+                    )
                 }
             }
 
             if (selectableTracks.size > 6 || query.isNotEmpty() || showAllInstalledFallback) {
-                OutlinedTextField(
+                MkwTextField(
                     value = query,
                     onValueChange = { query = it },
-                    placeholder = { Text(stringResource(R.string.discovery_search)) },
-                    leadingIcon = { Icon(Icons.Filled.Search, null) },
+                    placeholder = stringResource(R.string.discovery_search),
+                    leadingIcon = { Icon(Icons.Filled.Search, null, tint = MkwKitTokens.Palette.inkSecondary) },
                     trailingIcon = if (query.isNotEmpty()) {
                         {
-                            IconButton(onClick = { query = "" }) {
-                                Icon(Icons.Filled.Clear, null)
-                            }
+                            MkwIconButton(
+                                icon = Icons.Filled.Clear,
+                                contentDescription = stringResource(R.string.discovery_cancel),
+                                onClick = { query = "" },
+                                visualSize = 32.dp,
+                                iconSize = 18.dp,
+                            )
                         }
                     } else null,
                     singleLine = true,
@@ -304,11 +338,12 @@ internal fun RouteEdgeMusicPickerSheet(
                 )
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            MkwDivider()
 
             LazyColumn(
                 Modifier.fillMaxWidth().heightIn(max = 380.dp),
-                contentPadding = PaddingValues(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                contentPadding = PaddingValues(bottom = 12.dp),
             ) {
                 if (selectableTracks.isEmpty()) {
                     item {
@@ -320,7 +355,7 @@ internal fun RouteEdgeMusicPickerSheet(
                                 else -> stringResource(R.string.route_edge_music_pool_empty)
                             },
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MkwKitTokens.Palette.inkSecondary,
                             modifier = Modifier.padding(vertical = 16.dp),
                         )
                     }
@@ -339,35 +374,27 @@ internal fun RouteEdgeMusicPickerSheet(
                         item.localizedArrangement(language)?.takeIf { it.isNotBlank() }?.let(::add)
                         if (showAllInstalledFallback) add(substituteTag)
                     }.joinToString(" · ")
-                    ListItem(
-                        leadingContent = {
-                            PackArtwork.Thumbnail(
-                                packDirectory,
-                                listOfNotNull(artworkName),
-                                Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                            ) {
-                                Icon(Icons.Outlined.MusicNote, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        },
-                        headlineContent = {
-                            Text(
-                                item.localizedDisplayName(language),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            )
-                        },
-                        supportingContent = if (sub.isNotBlank()) {
-                            { Text(sub, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                        } else null,
-                        trailingContent = if (isSelected) {
-                            { Icon(Icons.Filled.Check, null, tint = MaterialTheme.colorScheme.primary) }
-                        } else null,
-                        modifier = Modifier.fillMaxWidth().clickable {
+                    MkwOptionRow(
+                        headline = item.localizedDisplayName(language),
+                        supporting = sub.takeIf { it.isNotBlank() },
+                        selected = isSelected,
+                        onClick = {
                             onSelectTrackKey(item.key)
                             onDismiss()
                         },
+                        leading = {
+                            PackArtwork.Thumbnail(
+                                packDirectory,
+                                listOfNotNull(artworkName),
+                                Modifier.size(44.dp).clip(MkwKitTokens.Shape.thumb)
+                                    .background(MkwKitTokens.Palette.track),
+                            ) {
+                                Icon(Icons.Outlined.MusicNote, null, tint = MkwKitTokens.Palette.inkSecondary)
+                            }
+                        },
+                        trailing = if (isSelected) {
+                            { Icon(Icons.Filled.Check, null, tint = MkwKitTokens.Palette.crimson) }
+                        } else null,
                     )
                 }
             }

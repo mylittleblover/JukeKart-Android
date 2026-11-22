@@ -30,6 +30,15 @@ class UnlockTestStoreTest {
         UnlockTestStore(file).write(UnlockTestMode.NORMAL).getOrThrow()
         assertEquals("natural-progress", progress.readText())
     }
+    @Test fun resetClearsOverrideAndRestoresNormalMode() = withFile { file ->
+        val store = UnlockTestStore(file)
+        store.write(UnlockTestMode.FORCE_UNLOCKED).getOrThrow()
+        assertEquals(UnlockTestMode.FORCE_UNLOCKED, store.read().getOrThrow())
+
+        store.reset().getOrThrow()
+        assertFalse(file.exists())
+        assertEquals(UnlockTestMode.NORMAL, store.read().getOrThrow())
+    }
     private fun withFile(block: (File) -> Unit) {
         val root = createTempDirectory("unlock-test-").toFile()
         try { block(File(root, "unlock-test.json")) } finally { root.deleteRecursively() }

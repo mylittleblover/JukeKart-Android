@@ -5,7 +5,7 @@ import kotlin.test.*
 class NavSnapshotTest {
     @Test fun destinationsAndDetailIdentitySurviveRecreation() {
         for (tab in Tab.ordered()) {
-            for (detail in listOf(null, NavState.Detail.Course("FirstCircuit"), NavState.Detail.Flow, NavState.Detail.Track, NavState.Detail.Settings)) {
+            for (detail in listOf(null, NavState.Detail.Course("FirstCircuit"), NavState.Detail.Flow, NavState.Detail.Track, NavState.Detail.Settings, NavState.Detail.FavoritesPlaylist)) {
                 val state = NavState(tab, detail)
                 val restored = NavState.restore(state.snapshot())
                 assertEquals(tab, restored.tab)

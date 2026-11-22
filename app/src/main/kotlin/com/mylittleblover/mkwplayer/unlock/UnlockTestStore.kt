@@ -26,4 +26,12 @@ internal class UnlockTestStore(private val file: File) {
             MetadataFile.write(file, root.toString())
         }
     }
+
+    fun reset(): Result<Unit> = synchronized(MetadataFile.lock(file)) {
+        runCatching {
+            if (file.exists() && !file.delete()) {
+                error("Could not delete unlock test setting")
+            }
+        }
+    }
 }

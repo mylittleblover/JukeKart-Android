@@ -30,7 +30,12 @@ import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-internal val artworkDecoder = Dispatchers.IO.limitedParallelism(3)
+internal val artworkDecoder = Dispatchers.IO.limitedParallelism(4)
+
+internal data class ArtworkLookup(
+    val loaded: PackArtwork.Loaded?,
+    val fromCache: Boolean,
+)
 
 private data class CachedResourceArtwork(
     val loaded: PackArtwork.Loaded,
@@ -59,14 +64,18 @@ internal fun ArtworkSlot(modifier: Modifier, content: @Composable (maxEdge: Int)
 }
 
 @Composable
-internal fun rememberResourceArtwork(resourceId: Int?, maxEdge: Int): PackArtwork.Loaded? {
+internal fun rememberResourceArtwork(resourceId: Int?, maxEdge: Int): PackArtwork.Loaded? =
+    rememberResourceArtworkState(resourceId, maxEdge).loaded
+
+@Composable
+internal fun rememberResourceArtworkState(resourceId: Int?, maxEdge: Int): ArtworkLookup {
     val resources = LocalContext.current.resources
-    if (resourceId == null || maxEdge == 0) return null
+    if (resourceId == null || maxEdge == 0) return ArtworkLookup(null, fromCache = false)
     return key(resources, resourceId, maxEdge) {
         val cacheKey = "$resourceId@$maxEdge"
         val immediate = resourceArtworkCache.get(cacheKey)?.loaded
         if (immediate != null) {
-            immediate
+            ArtworkLookup(immediate, fromCache = true)
         } else {
             val image by produceState<PackArtwork.Loaded?>(null, resourceId, maxEdge) {
                 value = resourceArtworkCache.get(cacheKey)?.loaded ?: withContext(artworkDecoder) {
@@ -77,7 +86,7 @@ internal fun rememberResourceArtwork(resourceId: Int?, maxEdge: Int): PackArtwor
                     }
                 }
             }
-            image
+            ArtworkLookup(image, fromCache = false)
         }
     }
 }
@@ -123,11 +132,13 @@ internal fun FadingArtwork(
     bitmap: ImageBitmap,
     modifier: Modifier,
     contentScale: ContentScale = ContentScale.Fit,
+    animate: Boolean = true,
 ) {
+    val finalModifier = if (animate) modifier.then(artworkFade(bitmap)) else modifier
     Image(
         bitmap,
         null,
-        modifier.then(artworkFade(bitmap)),
+        finalModifier,
         contentScale = contentScale,
         filterQuality = FilterQuality.High,
     )
@@ -140,8 +151,9 @@ internal fun ResourceArtwork(
     contentScale: ContentScale = ContentScale.Fit,
 ) {
     ArtworkSlot(modifier) { edge ->
-        rememberResourceArtwork(resourceId, edge)?.let {
-            FadingArtwork(it.bitmap, Modifier.fillMaxSize(), contentScale)
+        val lookup = rememberResourceArtworkState(resourceId, edge)
+        lookup.loaded?.let {
+            FadingArtwork(it.bitmap, Modifier.fillMaxSize(), contentScale, animate = !lookup.fromCache)
         }
     }
 }

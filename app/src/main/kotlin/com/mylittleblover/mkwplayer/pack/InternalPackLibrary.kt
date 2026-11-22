@@ -41,12 +41,47 @@ internal class InternalPackLibrary(private val libraryRoot: File) {
      */
     fun loadOrMaterialize(): MergedLibrary? {
         recoverInterruptedSwap()
+        val manifestFile = File(internalDir, PackManifest.MEMBER_NAME)
+        val metaFile = File(internalDir, MERGE_STATE_FILE)
+        val registryEntries = PackRegistry(libraryRoot).load()
+        // Fast path: when distinct packIds match `.merge-state` and every internal audio file exists,
+        // skip re-parsing every contributor pack's manifest.json on cold startup.
+        if (registryEntries.isNotEmpty() &&
+            registryEntries.map { it.packId }.toSet().size == registryEntries.size &&
+            manifestFile.isFile &&
+            metaFile.isFile
+        ) {
+            val recorded = runCatching { metaFile.readText().lines().filter { it.isNotBlank() } }.getOrNull()
+            val entryFingerprints = registryEntries.map { "${it.packId}:${it.packVersion}" }
+            if (recorded != null && recorded.toSet() == entryFingerprints.toSet() &&
+                registryEntries.all { File(it.directory, PackManifest.MEMBER_NAME).isFile }
+            ) {
+                val parsed = runCatching {
+                    PackManifest.parse(manifestFile.readText()).manifestOrNull()
+                }.getOrNull()
+                val allPresent = parsed != null && parsed.assets.all { asset ->
+                    val f = File(internalDir, "audio/${asset.digest.sha256}")
+                    f.isFile && f.length() == asset.byteSize
+                }
+                if (allPresent) {
+                    val byFingerprint = registryEntries.associateBy { "${it.packId}:${it.packVersion}" }
+                    val orderedContributors = recorded.mapNotNull { byFingerprint[it] }
+                    if (orderedContributors.size == registryEntries.size) {
+                        return MergedLibrary(
+                            manifest = parsed!!,
+                            directory = internalDir,
+                            activePackFingerprints = recorded,
+                            contributors = orderedContributors,
+                        )
+                    }
+                }
+            }
+        }
+
         val contributors = orderContributors(resolveActivePacks())
         if (contributors.isEmpty()) return null
 
-        val manifestFile = File(internalDir, PackManifest.MEMBER_NAME)
         val expectedFingerprints = contributors.map { "${it.entry.packId}:${it.entry.packVersion}" }
-        val metaFile = File(internalDir, MERGE_STATE_FILE)
         val cachedManifest = if (manifestFile.isFile && metaFile.isFile) {
             val recorded = runCatching { metaFile.readText().lines().filter { it.isNotBlank() } }.getOrNull()
             if (recorded == expectedFingerprints) {

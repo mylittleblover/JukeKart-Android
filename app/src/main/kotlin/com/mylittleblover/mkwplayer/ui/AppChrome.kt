@@ -21,17 +21,30 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mylittleblover.mkwplayer.R
+import com.mylittleblover.mkwplayer.ui.kit.MkwDivider
+import com.mylittleblover.mkwplayer.ui.kit.MkwFilterPill
+import com.mylittleblover.mkwplayer.ui.kit.MkwIconButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwKitTokens
 import kotlin.math.cos
 import kotlin.math.sin
+
+internal val LocalMiniPlayerOverlayPadding = androidx.compose.runtime.compositionLocalOf { 0.dp }
+
+@Composable
+internal fun rememberMiniPlayerBottomClearance(base: Dp = 16.dp): Dp =
+    base + LocalMiniPlayerOverlayPadding.current
 
 @Composable
 internal fun tabTitle(tab: Tab): String = stringResource(when (tab) {
@@ -54,7 +67,7 @@ internal fun AppHeader(
 ) {
     val settingsLabel = stringResource(R.string.settings_title)
     val sleepLabel = stringResource(R.string.sleep_timer_title)
-    Surface(color = MaterialTheme.colorScheme.surface) {
+    Surface(color = MkwKitTokens.Palette.ground) {
         Column {
             Row(
                 Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars.only(WindowInsetsSides.Top))
@@ -64,59 +77,61 @@ internal fun AppHeader(
             ) {
                 if (canBack) {
                     val backLabel = stringResource(R.string.common_back)
-                    IconButton(onClick = onBack, modifier = Modifier.size(48.dp).semantics { contentDescription = backLabel }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                }
-                else if (LocalDensity.current.fontScale <= 1.3f) {
+                    MkwIconButton(
+                        icon = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = backLabel,
+                        onClick = onBack,
+                    )
+                } else if (LocalDensity.current.fontScale <= 1.3f) {
                     Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    Text("/", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("/", color = MkwKitTokens.Palette.inkSecondary)
                 }
                 Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (onSleepTimer != null) {
                     val timerActive = sleepAfterCurrentTrack || (sleepTimerRemainingMs != null && sleepTimerRemainingMs > 0L)
                     if (timerActive) {
-                        FilterChip(
+                        val countdownText = if (sleepAfterCurrentTrack) {
+                            "1♪"
+                        } else {
+                            com.mylittleblover.mkwplayer.ui.components.formatCountdownMs(sleepTimerRemainingMs ?: 0L)
+                        }
+                        MkwFilterPill(
+                            label = countdownText,
                             selected = true,
                             onClick = onSleepTimer,
-                            leadingIcon = { Icon(Icons.Filled.Bedtime, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                            label = {
-                                Text(
-                                    text = if (sleepAfterCurrentTrack) {
-                                        "1♪"
-                                    } else {
-                                        com.mylittleblover.mkwplayer.ui.components.formatCountdownMs(sleepTimerRemainingMs ?: 0L)
-                                    },
-                                    maxLines = 1,
-                                    style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
-                                )
-                            },
+                            leadingIcon = Icons.Filled.Bedtime,
+                            role = Role.Button,
                         )
                     } else {
-                        IconButton(onClick = onSleepTimer, modifier = Modifier.size(44.dp).semantics { contentDescription = sleepLabel }) {
-                            Icon(Icons.Outlined.Bedtime, contentDescription = null)
-                        }
+                        MkwIconButton(
+                            icon = Icons.Outlined.Bedtime,
+                            contentDescription = sleepLabel,
+                            onClick = onSleepTimer,
+                        )
                     }
                 }
                 if (showSettings) {
-                    IconButton(onClick = onSettings, modifier = Modifier.size(48.dp).semantics { contentDescription = settingsLabel }) {
-                        Icon(Icons.Outlined.Settings, contentDescription = null)
-                    }
+                    MkwIconButton(
+                        icon = Icons.Outlined.Settings,
+                        contentDescription = settingsLabel,
+                        onClick = onSettings,
+                    )
                 }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            MkwDivider()
         }
     }
+}
+
+internal fun tabIconVector(tab: Tab, selected: Boolean): ImageVector = when (tab) {
+    Tab.HOME -> if (selected) Icons.Filled.Home else Icons.Outlined.Home
+    Tab.MEDIA -> if (selected) Icons.Filled.LibraryMusic else Icons.Outlined.LibraryMusic
+    Tab.WORLD_MAP -> if (selected) Icons.Filled.Map else Icons.Outlined.Map
+    Tab.PLAYLISTS -> if (selected) Icons.AutoMirrored.Filled.QueueMusic else Icons.AutoMirrored.Outlined.QueueMusic
 }
 
 /** Filled and outlined variants make selection visible without relying on color. */
 @Composable
 internal fun TabIcon(tab: Tab, selected: Boolean) {
-    val icon = when (tab) {
-        Tab.HOME -> if (selected) Icons.Filled.Home else Icons.Outlined.Home
-        Tab.MEDIA -> if (selected) Icons.Filled.LibraryMusic else Icons.Outlined.LibraryMusic
-        Tab.WORLD_MAP -> if (selected) Icons.Filled.Map else Icons.Outlined.Map
-        Tab.PLAYLISTS -> if (selected) Icons.AutoMirrored.Filled.QueueMusic else Icons.AutoMirrored.Outlined.QueueMusic
-    }
-    Icon(icon, contentDescription = null)
+    Icon(tabIconVector(tab, selected), contentDescription = null)
 }

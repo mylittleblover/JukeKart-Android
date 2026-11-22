@@ -59,13 +59,13 @@
     <string name="media_course_locked_progress">視聴済み %1$d / %2$d コース</string>
     <string name="media_course_locked_hint">未解放コース · %1$s</string>
 
-    <string name="widget_label">MKW プレイヤーコントロール</string>
+    <string name="widget_label">JukeKart コントロール</string>
     <string name="widget_description">再生中のトラックと操作ボタンを表示します。</string>
     <string name="widget_artwork_desc">アートワーク</string>
     <string name="widget_prev_desc">前へ</string>
     <string name="widget_play_pause_desc">再生または一時停止</string>
     <string name="widget_next_desc">次へ</string>
-    <string name="tile_default_label">MKW プレイヤー</string>
+    <string name="tile_default_label">JukeKart</string>
     <string name="tile_playing">再生中</string>
     <string name="tile_paused">一時停止</string>
     <string name="tile_idle">タップして開く</string>
@@ -105,12 +105,15 @@
 
     <string name="speed_pitch_title">再生速度とピッチ</string>
     <string name="speed_pitch_button">速度 / ピッチ</string>
+    <string name="speed_short_label">速度</string>
+    <string name="sleep_short_label">スリープ</string>
     <string name="speed_label">再生速度</string>
     <string name="pitch_label">ピッチ変更</string>
     <string name="preserve_pitch_label">速度変更時にピッチを維持</string>
     <string name="speed_pitch_reset">1.00x / 0 半音にリセット</string>
     <string name="speed_pitch_semitones_fmt">%1$+.1f 半音</string>
 
+    <string name="ab_loop_button">A-B リピート</string>
     <string name="ab_loop_set_a">A 点設定</string>
     <string name="ab_loop_set_b">B 点設定</string>
     <string name="ab_loop_clear">A-B 解除</string>
@@ -118,6 +121,7 @@
     <string name="ab_loop_badge_ab">A-B ループ %1$s – %2$s</string>
 
     <string name="eq_title">イコライザーと音響効果</string>
+    <string name="eq_short_label">イコライザー</string>
     <string name="eq_enabled">5 バンド EQ を有効化</string>
     <string name="eq_preset_label">プリセット</string>
     <string name="eq_preset_flat">フラット</string>
@@ -142,7 +146,7 @@
 
     <string name="settings_backup_title">バックアップとエクスポート</string>
     <string name="settings_backup_hint">プレイリスト、お気に入り、プリセット、ルート、再生回数、設定を JSON で保存・復元したり、M3U 形式で書き出せます。</string>
-    <string name="settings_backup_export">バックアップ書き出し (.json)</string>
+    <string name="settings_backup_export">書き出し (.json)</string>
     <string name="settings_backup_import">バックアップ復元</string>
     <string name="settings_backup_m3u">M3U 書き出し</string>
     <string name="settings_backup_mode_title">復元モードを選択</string>
@@ -163,6 +167,9 @@
     <string name="sort_most_played">再生回数順</string>
     <string name="sort_ost_index">サントラ順</string>
     <string name="play_count_fmt">%1$d 回再生</string>
+    <plurals name="play_count_plurals">
+        <item quantity="other">%1$d 回再生</item>
+    </plurals>
 
     <string name="smart_playlists_title">スマートプレイリスト</string>
     <string name="smart_most_played">よく再生する曲</string>

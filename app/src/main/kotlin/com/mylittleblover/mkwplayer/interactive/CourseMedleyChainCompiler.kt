@@ -68,6 +68,7 @@ internal object CourseMedleyChainCompiler {
 
         val segments = mutableListOf<G.Segment>()
         val tracks = mutableListOf<G.Track>()
+        val clipEnvelopes = mutableListOf<G.TimelineEnvelope>()
         val transitions = mutableListOf<G.Transition>()
         val autoAdvance = linkedMapOf<Int, Int>()
         val windows = mutableListOf<SegmentWindow>()
@@ -105,12 +106,20 @@ internal object CourseMedleyChainCompiler {
                 val start = clip.start.coerceAtLeast(0L)
                 val fadeIn = clip.fadeIn.coerceIn(0L, length)
                 val fadeOut = clip.fadeOut.coerceIn(0L, length - fadeIn)
+                val clipId = nextClipId++
+                if (clip.volumePoints.isNotEmpty()) {
+                    clipEnvelopes += G.TimelineEnvelope(
+                        targetIndex = clipId,
+                        target = G.EnvelopeTarget.VolumeDb,
+                        points = clip.volumePoints,
+                    )
+                }
                 tracks += G.Track(
                     index = nextTrackId++,
                     segment = segId,
                     clips = listOf(
                         G.Clip(
-                            index = nextClipId++,
+                            index = clipId,
                             asset = assetIdx,
                             start = start,
                             sourceOffset = offset,
@@ -159,6 +168,7 @@ internal object CourseMedleyChainCompiler {
             tracks = tracks,
             transitions = transitions,
             transportSampleRate = baseRate,
+            clipEnvelopes = clipEnvelopes,
         )
         return CompiledChain(
             packet = G.build(spec),

@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.layout.ContentScale
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 internal object PackArtwork {
     data class Loaded(
@@ -35,10 +36,37 @@ internal object PackArtwork {
     }
 
     private val resolvedNameCache = LruCache<String, String>(256)
+    private val artworkIndexCache = ConcurrentHashMap<String, Set<String>>()
 
     fun evictAll() {
         resolvedNameCache.evictAll()
         bitmapCache.evictAll()
+        artworkIndexCache.clear()
+    }
+
+    /** Indexes available artwork filenames once on I/O so missing files skip unnecessary disk reads & fallback flashes. */
+    fun warmArtworkIndex(packDirectory: File?): Set<String>? {
+        packDirectory ?: return null
+        val key = packDirectory.path
+        artworkIndexCache[key]?.let { return it }
+        val artDir = File(packDirectory, "artwork")
+        val names = if (artDir.isDirectory) artDir.list()?.toHashSet().orEmpty() else emptySet()
+        artworkIndexCache[key] = names
+        return names
+    }
+
+    fun hasAnyCandidate(packDirectory: File?, artworkNames: List<String>): Boolean {
+        if (packDirectory == null || artworkNames.isEmpty()) return false
+        val indexed = artworkIndexCache[packDirectory.path] ?: return true
+        return artworkNames.any { it in indexed }
+    }
+
+    fun warmThumbnails(packDirectory: File?, artworkNames: List<String>, maxEdge: Int = 512) {
+        packDirectory ?: return
+        warmArtworkIndex(packDirectory)
+        artworkNames.forEach { name ->
+            load(packDirectory, name, maxEdge)
+        }
     }
 
     private fun fileKey(packDirectory: File, artworkName: String, maxEdge: Int): String =
@@ -65,6 +93,8 @@ internal object PackArtwork {
     private fun load(packDirectory: File, artworkName: String, maxEdge: Int): Loaded? {
         val fKey = fileKey(packDirectory, artworkName, maxEdge)
         bitmapCache.get(fKey)?.loaded?.let { return it }
+        val indexed = artworkIndexCache[packDirectory.path]
+        if (indexed != null && artworkName !in indexed) return null
         val file = File(packDirectory, "artwork/$artworkName")
         if (!file.isFile) return null
         val loaded = decodeArtwork(maxEdge) { BitmapFactory.decodeFile(file.path, it) } ?: return null
@@ -75,15 +105,24 @@ internal object PackArtwork {
     }
 
     @Composable
-    fun rememberArtwork(packDirectory: File?, artworkNames: List<String>, maxEdge: Int): Loaded? {
-        if (maxEdge == 0 || packDirectory == null || artworkNames.isEmpty()) return null
+    fun rememberArtwork(packDirectory: File?, artworkNames: List<String>, maxEdge: Int): Loaded? =
+        rememberArtworkState(packDirectory, artworkNames, maxEdge).loaded
+
+    @Composable
+    internal fun rememberArtworkState(packDirectory: File?, artworkNames: List<String>, maxEdge: Int): ArtworkLookup {
+        if (maxEdge == 0 || packDirectory == null || artworkNames.isEmpty()) {
+            return ArtworkLookup(null, fromCache = false)
+        }
         return key(packDirectory, artworkNames, maxEdge) {
             val immediate = lookupCached(packDirectory, artworkNames, maxEdge)
             if (immediate != null) {
-                immediate
+                ArtworkLookup(immediate, fromCache = true)
+            } else if (!hasAnyCandidate(packDirectory, artworkNames)) {
+                ArtworkLookup(null, fromCache = true)
             } else {
                 val state by produceState<Loaded?>(null, packDirectory, artworkNames, maxEdge) {
                     value = lookupCached(packDirectory, artworkNames, maxEdge) ?: withContext(artworkDecoder) {
+                        warmArtworkIndex(packDirectory)
                         val reqKey = requestKey(packDirectory, artworkNames, maxEdge)
                         artworkNames.firstNotNullOfOrNull { name ->
                             load(packDirectory, name, maxEdge)?.also {
@@ -92,7 +131,7 @@ internal object PackArtwork {
                         }
                     }
                 }
-                state
+                ArtworkLookup(state, fromCache = false)
             }
         }
     }
@@ -100,9 +139,9 @@ internal object PackArtwork {
     @Composable
     fun Thumbnail(packDirectory: File?, artworkNames: List<String>, modifier: Modifier, fallback: @Composable () -> Unit) {
         ArtworkSlot(modifier) { edge ->
-            val artwork = rememberArtwork(packDirectory, artworkNames, edge)
-            if (artwork != null) {
-                FadingArtwork(artwork.bitmap, Modifier.fillMaxSize(), ContentScale.Crop)
+            val lookup = rememberArtworkState(packDirectory, artworkNames, edge)
+            if (lookup.loaded != null) {
+                FadingArtwork(lookup.loaded.bitmap, Modifier.fillMaxSize(), ContentScale.Crop, animate = !lookup.fromCache)
             } else {
                 fallback()
             }

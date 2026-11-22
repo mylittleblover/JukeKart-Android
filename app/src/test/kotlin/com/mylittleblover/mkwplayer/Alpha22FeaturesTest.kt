@@ -136,10 +136,26 @@ class Alpha22FeaturesTest {
 
     @Test
     fun extraMedleyCatalogParsesScaffoldAndPopulatedMedleys() {
-        val scaffold = ExtraMedleyCatalog.parse(File("src/main/assets/extra_medley_catalog.json").readText())
-        assertEquals(1, scaffold.schemaVersion)
-        assertEquals(48_000, scaffold.sampleRate)
-        assertTrue(scaffold.entries.isEmpty())
+        val bundled = ExtraMedleyCatalog.parse(File("src/main/assets/extra_medley_catalog.json").readText())
+        assertEquals(1, bundled.schemaVersion)
+        assertEquals(48_000, bundled.sampleRate)
+        assertEquals(14, bundled.entries.size)
+        assertEquals(5, bundled.entries.count { it.targetType == ExtraMedleyCatalog.TargetType.TWO_STATE_COURSE })
+        assertEquals(8, bundled.entries.count { it.targetType == ExtraMedleyCatalog.TargetType.BATTLE })
+        val title = bundled.forTarget("title_theme").single()
+        assertEquals(ExtraMedleyCatalog.TargetType.TITLE, title.targetType)
+        assertEquals(86_666L, title.medley.durationMs)
+        assertEquals(listOf("BGM_Seq_Title"), title.medley.uniqueStems)
+        for (entry in bundled.entries.filter { it.targetType != ExtraMedleyCatalog.TargetType.TITLE }) {
+            assertTrue(
+                entry.medley.clips.any { it.stem == "BGM_Seq_FinalLapFF" },
+                "Missing BGM_Seq_FinalLapFF in ${entry.medley.id}",
+            )
+            assertEquals(480_000L, entry.medley.clips.last().fadeOut, "Expected 10s fadeOut in ${entry.medley.id}")
+        }
+
+        val emptyScaffold = ExtraMedleyCatalog.parse("""{"schemaVersion":1,"sampleRate":48000,"medleys":[]}""")
+        assertTrue(emptyScaffold.entries.isEmpty())
 
         val populatedJson = """
             {

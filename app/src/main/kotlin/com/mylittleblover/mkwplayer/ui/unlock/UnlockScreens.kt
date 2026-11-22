@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -15,21 +16,26 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import com.mylittleblover.mkwplayer.ui.Tokens
 import com.mylittleblover.mkwplayer.ui.art.CupArt
+import com.mylittleblover.mkwplayer.ui.kit.MkwButtonSize
+import com.mylittleblover.mkwplayer.ui.kit.MkwDialog
+import com.mylittleblover.mkwplayer.ui.kit.MkwGhostButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwInkButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwKitTokens
 import com.mylittleblover.mkwplayer.unlock.UnlockPresentation
 
 /*
@@ -147,28 +153,39 @@ internal fun UnlockNotice(
             horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Button(
+            Surface(
                 onClick = onAction,
-                modifier = Modifier.heightIn(min = Tokens.Component.touchTargetMin),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Tokens.Palette.yellow500,
-                    contentColor = Tokens.Palette.navy900,
-                ),
+                shape = MkwKitTokens.Shape.pill,
+                color = Tokens.Palette.yellow500,
+                contentColor = Tokens.Palette.navy900,
+                modifier = Modifier.heightIn(min = Tokens.Component.touchTargetMin).semantics { role = Role.Button },
             ) {
-                Text(
-                    text = view.actionLabel,
-                    fontSize = Tokens.Type.body,
-                    fontWeight = FontWeight.Bold,
-                )
+                Box(
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = view.actionLabel,
+                        fontSize = Tokens.Type.body,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
             }
 
             if (view.dismissible) {
-                TextButton(
+                Surface(
                     onClick = onDismiss,
-                    modifier = Modifier.heightIn(min = Tokens.Component.touchTargetMin),
-                    colors = ButtonDefaults.textButtonColors(contentColor = Tokens.Palette.cream100),
+                    shape = MkwKitTokens.Shape.pill,
+                    color = androidx.compose.ui.graphics.Color.Transparent,
+                    contentColor = Tokens.Palette.cream100,
+                    modifier = Modifier.heightIn(min = Tokens.Component.touchTargetMin).semantics { role = Role.Button },
                 ) {
-                    Text(text = "Close", fontSize = Tokens.Type.secondary)
+                    Box(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(text = "Close", fontSize = Tokens.Type.secondary)
+                    }
                 }
             }
         }
@@ -305,21 +322,26 @@ internal fun CeremonyScreen(
             )
         }
 
-        Button(
+        Surface(
             onClick = onExit,
+            shape = MkwKitTokens.Shape.pill,
+            color = Tokens.Palette.yellow500,
+            contentColor = Tokens.Palette.navy900,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = Tokens.Component.touchTargetMin),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Tokens.Palette.yellow500,
-                contentColor = Tokens.Palette.navy900,
-            ),
+                .heightIn(min = Tokens.Component.touchTargetMin)
+                .semantics { role = Role.Button },
         ) {
-            Text(
-                text = "Leave the ceremony",
-                fontSize = Tokens.Type.body,
-                fontWeight = FontWeight.Bold,
-            )
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "Leave the ceremony",
+                    fontSize = Tokens.Type.body,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
     }
 }
@@ -351,28 +373,9 @@ internal fun CongratulationDialog(
 
     val name = cupName.trim().ifEmpty { CupArt.special.label }
 
-    AlertDialog(
+    MkwDialog(
         onDismissRequest = onDismiss,
-        confirmButton = {
-            Button(
-                onClick = onEnterCup,
-                modifier = Modifier.heightIn(min = Tokens.Component.touchTargetMin),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Tokens.Palette.navy700,
-                    contentColor = Tokens.Palette.white,
-                ),
-            ) {
-                Text(text = "Enter the cup", fontSize = Tokens.Type.body)
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                modifier = Modifier.heightIn(min = Tokens.Component.touchTargetMin),
-            ) {
-                Text(text = "Back to the library", fontSize = Tokens.Type.secondary)
-            }
-        },
+        title = "$name unlocked!",
         icon = {
             Image(
                 painter = painterResource(CupArt.special.drawable),
@@ -381,31 +384,32 @@ internal fun CongratulationDialog(
                 contentScale = ContentScale.Fit,
             )
         },
-        title = {
-            Text(
-                text = "$name unlocked!",
-                color = Tokens.Palette.ink900,
-                fontSize = Tokens.Type.sectionTitle,
-                fontWeight = FontWeight.Bold,
+        confirmButton = {
+            MkwInkButton(
+                text = "Enter the cup",
+                onClick = onEnterCup,
+                size = MkwButtonSize.Regular,
             )
         },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(Tokens.Spacing.xs)) {
-                Text(
-                    text = "Every stage you had music for has been heard, and the ceremony played " +
-                        "to the end. The cup is open from now on, and this message appears once.",
-                    color = Tokens.Palette.ink900,
-                    fontSize = Tokens.Type.secondary,
-                )
-                Text(
-                    text = CupArt.NOTICE,
-                    color = Tokens.Palette.navy700,
-                    fontSize = Tokens.Type.caption,
-                )
-            }
+        dismissButton = {
+            MkwGhostButton(
+                text = "Back to the library",
+                onClick = onDismiss,
+                size = MkwButtonSize.Regular,
+            )
         },
-        containerColor = Tokens.Palette.cream100,
-        titleContentColor = Tokens.Palette.ink900,
-        textContentColor = Tokens.Palette.ink900,
-    )
+    ) {
+        Text(
+            text = "Every stage you had music for has been heard, and the ceremony played " +
+                "to the end. The cup is open from now on, and this message appears once.",
+            color = Tokens.Palette.ink900,
+            fontSize = Tokens.Type.secondary,
+        )
+        Spacer(Modifier.size(Tokens.Spacing.xs))
+        Text(
+            text = CupArt.NOTICE,
+            color = Tokens.Palette.navy700,
+            fontSize = Tokens.Type.caption,
+        )
+    }
 }

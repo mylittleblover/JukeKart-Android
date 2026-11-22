@@ -34,6 +34,28 @@ internal object CourseMedleyCatalog {
         val uniqueStems: List<String>,
     ) {
         val isKnockoutVariant: Boolean get() = variant.equals("knockout", ignoreCase = true)
+
+        val normalizedSuiteVariant: String
+            get() = when (variant.trim().lowercase(Locale.ROOT)) {
+                "", "medley", "a" -> "a"
+                "a_alt", "a alt", "alt" -> "a_alt"
+                "b" -> "b"
+                "c" -> "c"
+                "d" -> "d"
+                "knockout" -> "knockout"
+                else -> variant.trim().lowercase(Locale.ROOT)
+            }
+
+        val suiteSortOrder: Int
+            get() = when (normalizedSuiteVariant) {
+                "a" -> 0
+                "a_alt" -> 1
+                "b" -> 2
+                "c" -> 3
+                "d" -> 4
+                "knockout" -> 5
+                else -> 6
+            }
     }
 
     data class Catalog(
@@ -43,7 +65,9 @@ internal object CourseMedleyCatalog {
     ) {
         fun forCourse(code: String): List<Medley> {
             val logical = code.removeSuffix("_00")
-            return medleys.filter { it.courseCode.equals(logical, ignoreCase = true) }
+            return medleys
+                .filter { it.courseCode.equals(logical, ignoreCase = true) }
+                .sortedBy { it.suiteSortOrder }
         }
 
         fun byId(id: String): Medley? = medleys.firstOrNull { it.id == id }
@@ -67,15 +91,7 @@ internal object CourseMedleyCatalog {
             }
             val clipsJson = obj.getJSONArray("clips")
             val clips = (0 until clipsJson.length()).map { cIdx ->
-                val c = clipsJson.getJSONObject(cIdx)
-                MedleyClip(
-                    stem = c.getString("stem"),
-                    start = c.getLong("start"),
-                    sourceOffset = c.getLong("sourceOffset"),
-                    sourceLength = c.getLong("sourceLength"),
-                    fadeIn = c.optLong("fadeIn", 0L),
-                    fadeOut = c.optLong("fadeOut", 0L),
-                )
+                parseClip(clipsJson.getJSONObject(cIdx))
             }
             val stems = clips.map { it.stem }.distinct()
             Medley(
@@ -90,5 +106,34 @@ internal object CourseMedleyCatalog {
             )
         }
         return Catalog(schemaVersion = version, sampleRate = sampleRate, medleys = medleys)
+    }
+
+    internal fun parseClip(c: JSONObject): MedleyClip {
+        val vpArr = c.optJSONArray("volumePoints")
+        val vPoints = if (vpArr == null) {
+            emptyList()
+        } else {
+            (0 until vpArr.length()).map { pIdx ->
+                val p = vpArr.getJSONObject(pIdx)
+                val shapeRaw = p.optString("shape", "Linear")
+                val shape = MusicGraphBuilder.Shape.entries
+                    .firstOrNull { it.name.equals(shapeRaw, ignoreCase = true) }
+                    ?: MusicGraphBuilder.Shape.Linear
+                MusicGraphBuilder.EnvelopePoint(
+                    frame = p.getLong("frame"),
+                    value = p.getDouble("value"),
+                    shape = shape,
+                )
+            }
+        }
+        return MedleyClip(
+            stem = c.getString("stem"),
+            start = c.getLong("start"),
+            sourceOffset = c.getLong("sourceOffset"),
+            sourceLength = c.getLong("sourceLength"),
+            fadeIn = c.optLong("fadeIn", 0L),
+            fadeOut = c.optLong("fadeOut", 0L),
+            volumePoints = vPoints,
+        )
     }
 }

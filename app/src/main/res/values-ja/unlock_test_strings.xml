@@ -23,4 +23,9 @@
     <string name="unlock_congrats_body">対象となるすべてのコースを再生しました。スペシャルカップ、レインボーロード、および関連楽曲が利用可能になりました。</string>
     <string name="unlock_congrats_enter">スペシャルカップへ</string>
     <string name="unlock_congrats_close">閉じる</string>
+    <string name="settings_unlock_reset_btn">解放進捗をリセット</string>
+    <string name="settings_unlock_reset_confirm_title">解放進捗をリセットしますか？</string>
+    <string name="settings_unlock_reset_confirm_body">これまでのコース再生進捗を消去し、レインボーロードとスペシャルカップを再度ロック状態に戻します（テストモードも通常に戻ります）。</string>
+    <string name="settings_unlock_reset_confirm_action">リセットする</string>
+    <string name="settings_unlock_reset_done">解放進捗をリセットしました</string>
 </resources>

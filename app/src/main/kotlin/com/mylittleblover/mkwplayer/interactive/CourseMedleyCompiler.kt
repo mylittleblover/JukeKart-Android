@@ -2,6 +2,7 @@ package com.mylittleblover.mkwplayer.interactive
 
 import com.mylittleblover.mkwplayer.audio.BwavHeader
 import com.mylittleblover.mkwplayer.graph.MusicGraphBuilder as G
+import com.mylittleblover.mkwplayer.ui.home.ExtraMusicCatalog
 import java.io.File
 import java.security.MessageDigest
 
@@ -20,11 +21,18 @@ internal object CourseMedleyCompiler {
         sampleRate: Int,
         identities: InteractiveAudioIdentities,
         packDir: File,
+        extraCatalog: ExtraMusicCatalog.Catalog? = null,
     ): ResolvedMedley? {
         if (medley.clips.isEmpty()) return null
         val digests = linkedMapOf<String, String>()
         for (stem in medley.uniqueStems) {
-            val sha = identities.digestForFileName("$stem.bwav") ?: return null
+            if (stem.equals("BGM_Seq_FinalLapFF", ignoreCase = true)) {
+                digests[stem] = FinalLapFanfareCompiler.SHA256
+                continue
+            }
+            val sha = identities.digestForFileName("$stem.bwav")
+                ?: extraCatalog?.digestForStem(stem)
+                ?: return null
             if (!File(packDir, "audio/$sha").isFile) return null
             digests[stem] = sha
         }

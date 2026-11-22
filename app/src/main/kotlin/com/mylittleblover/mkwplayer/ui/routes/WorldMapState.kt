@@ -44,6 +44,7 @@ internal class WorldMapState(
     var editingRouteName by mutableStateOf("")
     var draftLoopWholeRoute by mutableStateOf(false)
     var draftRoadRuleMode by mutableStateOf(com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RoadMusicRuleMode.AUTO)
+    var draftRouteSuiteMode by mutableStateOf(com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RouteSuiteMode.GAME_SUITE)
     var draftStopPresets by mutableStateOf<Map<Int, String?>>(emptyMap())
         private set
     var draftEdgeConfigs by mutableStateOf<Map<Int, com.mylittleblover.mkwplayer.routes.CustomRouteEdgeConfig>>(emptyMap())
@@ -64,6 +65,7 @@ internal class WorldMapState(
         editingRouteName = ""
         draftLoopWholeRoute = false
         draftRoadRuleMode = com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RoadMusicRuleMode.AUTO
+        draftRouteSuiteMode = com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RouteSuiteMode.GAME_SUITE
         draftStopPresets = emptyMap()
         draftEdgeConfigs = emptyMap()
         editFrom = null
@@ -78,6 +80,7 @@ internal class WorldMapState(
         editingRouteName = ""
         draftLoopWholeRoute = false
         draftRoadRuleMode = com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RoadMusicRuleMode.AUTO
+        draftRouteSuiteMode = com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RouteSuiteMode.GAME_SUITE
         draftStopPresets = emptyMap()
         draftEdgeConfigs = emptyMap()
         editFrom = null
@@ -95,6 +98,7 @@ internal class WorldMapState(
         editingRouteName = route.name
         draftLoopWholeRoute = route.loopWholeRoute
         draftRoadRuleMode = route.roadRuleMode
+        draftRouteSuiteMode = route.routeSuiteMode
         draft = pairs
         editFrom = route.stops.lastOrNull()?.stageCode?.removeSuffix("_00")
         draftStopPresets = route.stops.mapIndexed { idx, s -> idx to s.presetId }.toMap()
@@ -160,6 +164,7 @@ internal class WorldMapState(
         editingRouteId = null
         draft = emptyList()
         draftRoadRuleMode = com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RoadMusicRuleMode.AUTO
+        draftRouteSuiteMode = com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RouteSuiteMode.GAME_SUITE
         draftEdgeConfigs = emptyMap()
         draftStopPresets = emptyMap()
         editFrom = null

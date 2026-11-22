@@ -42,6 +42,7 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -74,20 +75,57 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import com.mylittleblover.mkwplayer.ui.unpadHorizontal
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.zIndex
+import com.mylittleblover.mkwplayer.ui.kit.MkwBadge
+import com.mylittleblover.mkwplayer.ui.kit.MkwBadgeTone
+import com.mylittleblover.mkwplayer.ui.kit.MkwBottomSheet
+import com.mylittleblover.mkwplayer.ui.kit.MkwButtonSize
+import com.mylittleblover.mkwplayer.ui.kit.MkwCard
+import com.mylittleblover.mkwplayer.ui.kit.MkwCheckboxMark
+import com.mylittleblover.mkwplayer.ui.kit.MkwDangerButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwDialog
+import com.mylittleblover.mkwplayer.ui.kit.MkwDivider
+import com.mylittleblover.mkwplayer.ui.kit.MkwDropdownItem
+import com.mylittleblover.mkwplayer.ui.kit.MkwDropdownMenu
+import com.mylittleblover.mkwplayer.ui.kit.MkwFilterPill
+import com.mylittleblover.mkwplayer.ui.kit.MkwFloatingPanel
+import com.mylittleblover.mkwplayer.ui.kit.MkwGhostButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwIconButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwIconButtonTone
+import com.mylittleblover.mkwplayer.ui.kit.MkwInsetBox
+import com.mylittleblover.mkwplayer.ui.kit.MkwKitTokens
+import com.mylittleblover.mkwplayer.ui.kit.MkwOptionRow
+import com.mylittleblover.mkwplayer.ui.kit.MkwPrimaryButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwRadioMark
+import com.mylittleblover.mkwplayer.ui.kit.MkwRoseButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwSecondaryButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwSurfaceTone
+import com.mylittleblover.mkwplayer.ui.kit.MkwSwitch
+import com.mylittleblover.mkwplayer.ui.kit.MkwTextField
 import kotlinx.coroutines.launch
 import com.mylittleblover.mkwplayer.R
 import com.mylittleblover.mkwplayer.library.BrowseCatalog
@@ -137,20 +175,16 @@ private fun CourseTile(
                 packDirectory = packDirectory,
                 artworkName = artworkName,
             )
-            FilledIconButton(
+            MkwIconButton(
+                icon = if (favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                contentDescription = stringResource(if (favorite) R.string.discovery_favorite_remove else R.string.discovery_favorite_add),
                 onClick = onFavorite,
-                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(44.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = .94f),
-                    contentColor = if (favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-            ) {
-                Icon(
-                    if (favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                    stringResource(if (favorite) R.string.discovery_favorite_remove else R.string.discovery_favorite_add),
-                    Modifier.size(20.dp),
-                )
-            }
+                tone = MkwIconButtonTone.Bordered,
+                visualSize = 34.dp,
+                iconSize = 18.dp,
+                tintOverride = if (favorite) MkwKitTokens.Palette.crimson else MkwKitTokens.Palette.inkSecondary,
+                modifier = Modifier.align(Alignment.TopEnd).padding(2.dp).size(38.dp),
+            )
         }
         Column(
             Modifier.fillMaxWidth().clickable(
@@ -348,7 +382,19 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
             }
             .distinctBy { it.rawRef }
     }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+    val recent = remember(state.recentIds, visibleCourseSet) {
+        state.recentIds.filter { it in visibleCourseSet }.take(10)
+    }
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = 18.dp,
+            top = 14.dp,
+            end = 18.dp,
+            bottom = com.mylittleblover.mkwplayer.ui.rememberMiniPlayerBottomClearance(14.dp),
+        ),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(stringResource(R.string.discovery_home_headline), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
@@ -358,7 +404,19 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
         if (state.favoritesError != null || state.dailyError != null || state.recentError != null) item {
             Text(stringResource(R.string.discovery_save_failed), color = MaterialTheme.colorScheme.error)
         }
-        if (catalog == null || visibleDaily.isEmpty()) item { Text(stringResource(R.string.discovery_empty)) }
+        if (catalog == null || visibleDaily.isEmpty()) {
+            if (!session.libraryReady) {
+                item {
+                    com.mylittleblover.mkwplayer.ui.MkwLinearIndeterminateBar(
+                        modifier = Modifier.fillMaxWidth().clip(CircleShape),
+                        color = MkwKitTokens.Palette.crimson,
+                        trackColor = MkwKitTokens.Palette.rose,
+                    )
+                }
+            } else {
+                item { Text(stringResource(R.string.discovery_empty)) }
+            }
+        }
         else item {
             val pager = rememberPagerState(pageCount = { visibleDaily.size })
             val scope = rememberCoroutineScope()
@@ -399,119 +457,160 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
                             ResourceArtwork(it, Modifier.align(Alignment.TopEnd).padding(top = 24.dp, end = 12.dp).size(88.dp))
                         }
                         Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.SpaceBetween) {
-                            Text(
-                                "${stringResource(R.string.discovery_home_today)} · ${index + 1} / ${visibleDaily.size}",
-                                color = Color.White.copy(alpha = .92f),
-                                style = MaterialTheme.typography.labelMedium,
+                            MkwBadge(
+                                text = "${stringResource(R.string.discovery_home_today)} · ${index + 1} / ${visibleDaily.size}",
+                                tone = MkwBadgeTone.Scrim,
+                                tabular = true,
                             )
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(card.title, color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 Text(card.subtitle, color = Color.White.copy(alpha = .8f), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 240.dp))
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    androidx.compose.material3.FilledTonalButton(onClick = { onOpen(id) }) { Text(stringResource(R.string.discovery_home_open)) }
-                                    FilledIconButton(
+                                    MkwRoseButton(
+                                        text = stringResource(R.string.discovery_home_open),
+                                        onClick = { onOpen(id) },
+                                        size = MkwButtonSize.Compact,
+                                    )
+                                    MkwIconButton(
+                                        icon = Icons.Filled.PlayArrow,
+                                        contentDescription = stringResource(R.string.discovery_start),
                                         onClick = { onQuickPlay(id) },
+                                        tone = MkwIconButtonTone.Scrim,
+                                        visualSize = 40.dp,
+                                        iconSize = 20.dp,
                                         modifier = Modifier.size(40.dp),
-                                        colors = IconButtonDefaults.filledIconButtonColors(
-                                            containerColor = Color.White.copy(alpha = 0.22f),
-                                            contentColor = Color.White,
-                                        ),
-                                    ) {
-                                        Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.discovery_start))
-                                    }
+                                    )
                                 }
                             }
                         }
-                        Row(Modifier.align(Alignment.BottomEnd).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            Modifier.align(Alignment.BottomEnd).padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
                             val previousLabel = stringResource(R.string.discovery_previous_recommendation)
                             val nextLabel = stringResource(R.string.discovery_next_recommendation)
-                            IconButton(onClick = { scope.launch { pager.animateScrollToPage((index - 1 + visibleDaily.size) % visibleDaily.size) } },
-                                modifier = Modifier.semantics { contentDescription = previousLabel }) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = Color.White) }
-                            IconButton(onClick = { scope.launch { pager.animateScrollToPage((index + 1) % visibleDaily.size) } },
-                                modifier = Modifier.semantics { contentDescription = nextLabel }) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = Color.White) }
+                            MkwIconButton(
+                                icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                                contentDescription = previousLabel,
+                                onClick = { scope.launch { pager.animateScrollToPage((index - 1 + visibleDaily.size) % visibleDaily.size) } },
+                                tone = MkwIconButtonTone.Scrim,
+                                visualSize = 36.dp,
+                                iconSize = 20.dp,
+                                modifier = Modifier.size(36.dp),
+                            )
+                            MkwIconButton(
+                                icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = nextLabel,
+                                onClick = { scope.launch { pager.animateScrollToPage((index + 1) % visibleDaily.size) } },
+                                tone = MkwIconButtonTone.Scrim,
+                                visualSize = 36.dp,
+                                iconSize = 20.dp,
+                                modifier = Modifier.size(36.dp),
+                            )
                         }
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                     repeat(visibleDaily.size) { index ->
-                        Box(Modifier.padding(horizontal = 2.dp).width(if (index == pager.currentPage) 18.dp else 6.dp).height(5.dp)
-                            .clip(RoundedCornerShape(50)).background(if (index == pager.currentPage) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant))
+                        Box(
+                            Modifier.padding(horizontal = 2.dp).width(if (index == pager.currentPage) 18.dp else 6.dp).height(5.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(if (index == pager.currentPage) MkwKitTokens.Palette.crimson else MkwKitTokens.Palette.trackStrong),
+                        )
                     }
                 }
             }
         }
-        if (visibleDaily.isEmpty()) item { OutlinedButton(onClick = onImport, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.discovery_import)) } }
+        if (session.libraryReady && visibleDaily.isEmpty()) item {
+            MkwSecondaryButton(
+                text = stringResource(R.string.discovery_import),
+                onClick = onImport,
+                size = MkwButtonSize.Hero,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         if (!session.canStop && session.continueListening != null) {
             val saved = session.continueListening
-            item { Text(stringResource(R.string.discovery_continue_listening), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+            item { Text(stringResource(R.string.discovery_continue_listening), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MkwKitTokens.Palette.ink) }
             item {
-                Card(
+                MkwCard(
                     onClick = onResumeSaved,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    tone = MkwSurfaceTone.Porcelain,
+                    contentPadding = PaddingValues(14.dp),
                 ) {
-                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         PackArtwork.Thumbnail(
                             packDirectory,
                             listOfNotNull(saved.artworkName),
-                            Modifier.size(72.dp).clip(RoundedCornerShape(16.dp)),
+                            Modifier.size(72.dp).clip(MkwKitTokens.Shape.card),
                         ) {
                             Box(
-                                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.primaryContainer),
+                                modifier = Modifier.fillMaxSize().background(MkwKitTokens.Palette.rose),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Icon(Icons.Outlined.MusicNote, null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(30.dp))
+                                Icon(Icons.Outlined.MusicNote, null, tint = MkwKitTokens.Palette.crimsonDeep, modifier = Modifier.size(30.dp))
                             }
                         }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                            Text(saved.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(saved.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MkwKitTokens.Palette.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             val meta = listOfNotNull(
                                 saved.subtitle.takeIf { it.isNotBlank() },
                                 "${stringResource(R.string.discovery_continue_paused)} · ${saved.positionText} / ${saved.totalText}",
                             ).joinToString(" · ")
-                            Text(meta, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(meta, style = MkwKitTokens.tabular(MaterialTheme.typography.bodySmall), color = MkwKitTokens.Palette.inkSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             com.mylittleblover.mkwplayer.ui.SmoothProgressIndicator(saved.progress.coerceIn(0f, 1f), modifier = Modifier.fillMaxWidth())
                         }
-                        FilledIconButton(
+                        MkwIconButton(
+                            icon = Icons.Filled.PlayArrow,
+                            contentDescription = stringResource(R.string.discovery_continue_resume),
                             onClick = onResumeSaved,
-                            modifier = Modifier.semantics { contentDescription = "" },
-                        ) {
-                            Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.discovery_continue_resume))
-                        }
-                        IconButton(onClick = onDismissSaved) {
-                            Icon(Icons.Filled.Clear, contentDescription = stringResource(R.string.discovery_continue_dismiss))
-                        }
+                            tone = MkwIconButtonTone.Ink,
+                            visualSize = 42.dp,
+                            iconSize = 22.dp,
+                        )
+                        MkwIconButton(
+                            icon = Icons.Filled.Clear,
+                            contentDescription = stringResource(R.string.discovery_continue_dismiss),
+                            onClick = onDismissSaved,
+                            visualSize = 36.dp,
+                            iconSize = 18.dp,
+                            tintOverride = MkwKitTokens.Palette.inkSecondary,
+                        )
                     }
                 }
             }
         } else if (session.canStop) {
-            item { Text(stringResource(R.string.discovery_continue), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+            item { Text(stringResource(R.string.discovery_continue), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MkwKitTokens.Palette.ink) }
             item {
-                Card(onClick = onPlayer, modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        PackArtwork.Thumbnail(packDirectory, artworkNames, Modifier.size(72.dp).clip(RoundedCornerShape(16.dp))) {
+                MkwCard(
+                    onClick = onPlayer,
+                    tone = MkwSurfaceTone.Porcelain,
+                    contentPadding = PaddingValues(14.dp),
+                ) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        PackArtwork.Thumbnail(packDirectory, artworkNames, Modifier.size(72.dp).clip(MkwKitTokens.Shape.card)) {
                             if (currentCode != null) {
                                 com.mylittleblover.mkwplayer.ui.art.CourseCover(currentCode, Modifier.fillMaxSize(), showIcon = false)
                             } else {
                                 Box(
                                     modifier = Modifier.fillMaxSize()
-                                        .background(MaterialTheme.colorScheme.primaryContainer),
+                                        .background(MkwKitTokens.Palette.rose),
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    Icon(Icons.Outlined.MusicNote, null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(30.dp))
+                                    Icon(Icons.Outlined.MusicNote, null, tint = MkwKitTokens.Palette.crimsonDeep, modifier = Modifier.size(30.dp))
                                 }
                             }
                         }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(currentCode?.let { catalog?.displayName(it, language) } ?: session.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(currentCode?.let { catalog?.displayName(it, language) } ?: session.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MkwKitTokens.Palette.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             val flow = session.flow
                             val subtitle = flow?.let { com.mylittleblover.mkwplayer.ui.interactive.performanceStageText(it) }
                                 ?: session.linearTrack?.subtitle?.takeIf { it.isNotBlank() }?.let { sub ->
                                     "$sub · ${stringResource(if (session.canResume) R.string.discovery_paused else R.string.discovery_playing)}"
                                 }
                                 ?: stringResource(if (session.canResume) R.string.discovery_paused else R.string.discovery_playing)
-                            Text(subtitle, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MkwKitTokens.Palette.inkSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             DiscoveryHomeProgressBar(
                                 flow = flow,
                                 fallbackProgress = session.progress,
@@ -519,20 +618,27 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
                             )
                         }
                         val label = stringResource(if (session.canPause) R.string.interactive_pause else R.string.interactive_resume)
-                        FilledIconButton(onClick = onToggle, enabled = session.canPause || session.canResume,
-                            modifier = Modifier.semantics { contentDescription = label }) {
-                            Icon(if (session.canPause) Icons.Filled.Pause else Icons.Filled.PlayArrow, null)
-                        }
+                        MkwIconButton(
+                            icon = if (session.canPause) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = label,
+                            onClick = onToggle,
+                            enabled = session.canPause || session.canResume,
+                            tone = MkwIconButtonTone.Ink,
+                            visualSize = 44.dp,
+                            iconSize = 22.dp,
+                        )
                     }
                 }
             }
         }
-        val favorites = state.favorites.filter { it in catalog?.courses(unlocked).orEmpty() }
-        val recent = state.recentIds.filter { it in catalog?.courses(unlocked).orEmpty() }.take(10)
-        if (favorites.isEmpty() && recent.isNotEmpty()) {
-            item { Text(stringResource(R.string.discovery_recent), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+        if (recent.isNotEmpty()) {
+            item { Text(stringResource(R.string.discovery_recent), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MkwKitTokens.Palette.ink) }
             item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                LazyRow(
+                    modifier = Modifier.unpadHorizontal(18.dp),
+                    contentPadding = PaddingValues(horizontal = 18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                     items(recent, key = { "recent:$it" }) { id ->
                         CourseTile(
                             code = id,
@@ -543,61 +649,6 @@ internal fun DiscoveryHome(catalog: BrowseCatalog?, state: DiscoveryViewModel.St
                             packDirectory = packDirectory,
                             artworkName = courseArtwork[id] ?: courseArtwork[id.removeSuffix("_00")],
                         )
-                    }
-                }
-            }
-            item { Text(stringResource(R.string.discovery_favorites), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
-            item {
-                Card(onClick = onMedia, modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Icon(Icons.Outlined.FavoriteBorder, null)
-                        Text(stringResource(R.string.discovery_favorites_empty), modifier = Modifier.weight(1f))
-                        Text(stringResource(R.string.discovery_media), color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-            }
-        } else {
-            item { Text(stringResource(R.string.discovery_favorites), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
-            if (favorites.isNotEmpty()) {
-                item { LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(favorites, key = { it }) { id ->
-                        CourseTile(
-                            code = id,
-                            name = catalog?.displayName(id, language) ?: id,
-                            favorite = true,
-                            onOpen = { onOpen(id) },
-                            onFavorite = { onFavorite(id) },
-                            packDirectory = packDirectory,
-                            artworkName = courseArtwork[id] ?: courseArtwork[id.removeSuffix("_00")],
-                        )
-                    }
-                } }
-            } else item {
-                Card(onClick = onMedia, modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Icon(Icons.Outlined.FavoriteBorder, null)
-                        Text(stringResource(R.string.discovery_favorites_empty), modifier = Modifier.weight(1f))
-                        Text(stringResource(R.string.discovery_media), color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-            }
-            if (recent.isNotEmpty()) {
-                item { Text(stringResource(R.string.discovery_recent), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
-                item {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        items(recent, key = { "recent:$it" }) { id ->
-                            CourseTile(
-                                code = id,
-                                name = catalog?.displayName(id, language) ?: id,
-                                favorite = id in state.favorites,
-                                onOpen = { onOpen(id) },
-                                onFavorite = { onFavorite(id) },
-                                packDirectory = packDirectory,
-                                artworkName = courseArtwork[id] ?: courseArtwork[id.removeSuffix("_00")],
-                            )
-                        }
                     }
                 }
             }
@@ -967,26 +1018,30 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                OutlinedTextField(
+                val searchHintRes = when (category) {
+                    0 -> R.string.discovery_search_courses
+                    2 -> R.string.discovery_search_jukebox
+                    1, 3, 4, 5 -> R.string.discovery_search_tracks
+                    else -> R.string.discovery_search_all
+                }
+                MkwTextField(
                     value = query,
                     onValueChange = onQuery,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = {
-                        Text(
-                            stringResource(if (category < 0) R.string.discovery_search_all else R.string.discovery_search),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    placeholder = stringResource(searchHintRes),
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = MkwKitTokens.Palette.inkSecondary) },
                     trailingIcon = if (query.isNotBlank()) {
                         {
-                            IconButton(onClick = { onQuery("") }) {
-                                Icon(Icons.Filled.Clear, contentDescription = stringResource(R.string.discovery_cancel))
-                            }
+                            MkwIconButton(
+                                icon = Icons.Filled.Clear,
+                                contentDescription = stringResource(R.string.discovery_cancel),
+                                onClick = { onQuery("") },
+                                visualSize = 32.dp,
+                                iconSize = 18.dp,
+                            )
                         }
                     } else null,
                     singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
             if ((category >= 0 && category != 2) || query.isNotBlank()) {
@@ -994,17 +1049,22 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                     selected = sortOrder,
                     includeOstOrder = false,
                     onSelect = { sortOrder = it },
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
+                    modifier = Modifier.padding(vertical = 4.dp),
                 )
             }
             if (category >= 0) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+                MkwDivider()
             }
-            val categoryHeight = 124.dp * LocalDensity.current.fontScale.coerceIn(1f, 1.5f)
+            val categoryHeight = 132.dp * LocalDensity.current.fontScale.coerceIn(1f, 1.5f)
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    top = 12.dp,
+                    end = 16.dp,
+                    bottom = com.mylittleblover.mkwplayer.ui.rememberMiniPlayerBottomClearance(12.dp),
+                ),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 if (category < 0 && query.isBlank()) {
@@ -1015,37 +1075,29 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                         ) {
                             for (column in 0..1) {
                                 val index = row * 2 + column
-                                val catInteraction = remember { MutableInteractionSource() }
-                                val catScale = com.mylittleblover.mkwplayer.ui.rememberPressScale(catInteraction, pressedScale = 0.97f)
-                                Card(
+                                MkwCard(
                                     onClick = { onCategory(index) },
-                                    interactionSource = catInteraction,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight()
-                                        .graphicsLayer { scaleX = catScale; scaleY = catScale },
-                                    shape = RoundedCornerShape(18.dp),
+                                    tone = MkwSurfaceTone.Porcelain,
+                                    contentPadding = PaddingValues(12.dp),
+                                    modifier = Modifier.weight(1f).fillMaxHeight(),
                                 ) {
-                                    Column(
-                                        Modifier.fillMaxSize().padding(12.dp),
-                                        verticalArrangement = Arrangement.SpaceBetween,
-                                    ) {
+                                    Box(Modifier.fillMaxWidth().weight(1f)) {
                                         when (index) {
-                                            0 -> ResourceArtwork(R.drawable.mode_vs, Modifier.align(Alignment.End).size(40.dp))
-                                            1 -> ResourceArtwork(R.drawable.mode_balloon, Modifier.align(Alignment.End).size(40.dp))
+                                            0 -> ResourceArtwork(R.drawable.mode_vs, Modifier.align(Alignment.TopEnd).size(40.dp))
+                                            1 -> ResourceArtwork(R.drawable.mode_balloon, Modifier.align(Alignment.TopEnd).size(40.dp))
                                             2 -> Surface(
-                                                shape = RoundedCornerShape(12.dp),
-                                                color = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.align(Alignment.End).size(40.dp),
+                                                shape = MkwKitTokens.Shape.thumb,
+                                                color = MkwKitTokens.Palette.crimson,
+                                                modifier = Modifier.align(Alignment.TopEnd).size(40.dp),
                                             ) {
                                                 ResourceArtwork(R.drawable.media_free_roam, Modifier.fillMaxSize().padding(7.dp))
                                             }
-                                            3 -> ResourceArtwork(R.drawable.media_other_music, Modifier.align(Alignment.End).size(40.dp))
-                                            4 -> ResourceArtwork(R.drawable.media_short_sfx, Modifier.align(Alignment.End).size(40.dp))
-                                            else -> ResourceArtwork(R.drawable.media_nintendo_music, Modifier.align(Alignment.End).size(40.dp))
+                                            3 -> ResourceArtwork(R.drawable.media_other_music, Modifier.align(Alignment.TopEnd).size(40.dp))
+                                            4 -> ResourceArtwork(R.drawable.media_short_sfx, Modifier.align(Alignment.TopEnd).size(40.dp))
+                                            else -> ResourceArtwork(R.drawable.media_nintendo_music, Modifier.align(Alignment.TopEnd).size(40.dp))
                                         }
                                         Box(
-                                            Modifier.fillMaxWidth().weight(1f),
+                                            Modifier.fillMaxSize(),
                                             contentAlignment = Alignment.BottomStart,
                                         ) {
                                             val categoryRes = categories[index]
@@ -1063,6 +1115,7 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                                                 style = MaterialTheme.typography.titleSmall,
                                                 lineHeight = 19.sp,
                                                 fontWeight = FontWeight.Bold,
+                                                color = MkwKitTokens.Palette.ink,
                                                 minLines = 2,
                                                 maxLines = 2,
                                                 overflow = TextOverflow.Ellipsis,
@@ -1091,7 +1144,7 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                     val selKey = "course:$code"
                     val plays = playStats[code.removeSuffix("_00")]?.playCount ?: 0
                     val subWithPlays = if (plays > 0) {
-                        "$interactiveSubtitle · ${stringResource(R.string.play_count_fmt, plays)}"
+                        "$interactiveSubtitle · ${pluralStringResource(R.plurals.play_count_plurals, plays, plays)}"
                     } else {
                         interactiveSubtitle
                     }
@@ -1158,31 +1211,29 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                         } else {
                             stringResource(R.string.media_course_locked_hint, localizedProgress)
                         }
-                        Surface(
+                        MkwCard(
                             onClick = {
                                 android.widget.Toast.makeText(toastContext, lockedHint, android.widget.Toast.LENGTH_SHORT).show()
                             },
-                            color = MaterialTheme.colorScheme.surface,
-                            shape = RoundedCornerShape(16.dp),
-                            tonalElevation = 1.dp,
-                            modifier = Modifier.fillMaxWidth(),
+                            tone = MkwSurfaceTone.Porcelain,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
                         ) {
                             Row(
-                                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                                Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
                                 Box(
                                     modifier = Modifier
                                         .size(56.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                                        .clip(MkwKitTokens.Shape.thumb)
+                                        .background(MkwKitTokens.Palette.track),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Lock,
                                         contentDescription = lockedBadge,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        tint = MkwKitTokens.Palette.inkSecondary,
                                     )
                                 }
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -1194,39 +1245,29 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                                             text = lockedName,
                                             style = MaterialTheme.typography.titleMedium,
                                             fontWeight = FontWeight.SemiBold,
+                                            color = MkwKitTokens.Palette.ink,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.weight(1f, fill = false),
                                         )
-                                        Surface(
-                                            shape = RoundedCornerShape(999.dp),
-                                            color = MaterialTheme.colorScheme.secondaryContainer,
-                                        ) {
-                                            Text(
-                                                text = lockedBadge,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                            )
-                                        }
+                                        MkwBadge(text = lockedBadge, tone = MkwBadgeTone.Neutral, tabular = false)
                                     }
                                     if (!localizedProgress.isNullOrBlank()) {
                                         Text(
                                             text = localizedProgress,
-                                            style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            style = MkwKitTokens.tabular(MaterialTheme.typography.bodySmall),
+                                            color = MkwKitTokens.Palette.inkSecondary,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                         )
                                     }
                                     if (unlockTotal > 0) {
-                                        androidx.compose.material3.LinearProgressIndicator(
-                                            progress = { (unlockCompleted.toFloat() / unlockTotal.coerceAtLeast(1)).coerceIn(0f, 1f) },
+                                        com.mylittleblover.mkwplayer.ui.SmoothProgressIndicator(
+                                            progress = (unlockCompleted.toFloat() / unlockTotal.coerceAtLeast(1)).coerceIn(0f, 1f),
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(top = 2.dp)
-                                                .height(6.dp)
-                                                .clip(RoundedCornerShape(999.dp)),
+                                                .padding(top = 2.dp),
+                                            barHeight = 6.dp,
                                         )
                                     }
                                 }
@@ -1252,7 +1293,7 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                     val refRaw = PlaylistItemRef.SfcTrack(track.id).raw
                     val plays = playStats[refRaw]?.playCount ?: 0
                     val subWithPlays = if (plays > 0) {
-                        "$interactiveSubtitle · ${stringResource(R.string.play_count_fmt, plays)}"
+                        "$interactiveSubtitle · ${pluralStringResource(R.plurals.play_count_plurals, plays, plays)}"
                     } else {
                         interactiveSubtitle
                     }
@@ -1315,7 +1356,7 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                     val refRaw = PlaylistItemRef.BattleTrack(track.id).raw
                     val plays = playStats[refRaw]?.playCount ?: 0
                     val subWithPlays = if (plays > 0) {
-                        "$interactiveSubtitle · ${stringResource(R.string.play_count_fmt, plays)}"
+                        "$interactiveSubtitle · ${pluralStringResource(R.plurals.play_count_plurals, plays, plays)}"
                     } else {
                         interactiveSubtitle
                     }
@@ -1397,7 +1438,7 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                             }.joinToString(" · ")
                         }
                         val sub = if (plays > 0) {
-                            listOfNotNull(baseSub.takeIf { it.isNotBlank() }, stringResource(R.string.play_count_fmt, plays)).joinToString(" · ")
+                            listOfNotNull(baseSub.takeIf { it.isNotBlank() }, pluralStringResource(R.plurals.play_count_plurals, plays, plays)).joinToString(" · ")
                         } else {
                             baseSub
                         }
@@ -1518,7 +1559,7 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                         val refRaw = PlaylistItemRef.ExtraTrack(item.id).raw
                         val plays = playStats[refRaw]?.playCount ?: 0
                         val sub = if (plays > 0) {
-                            listOfNotNull(baseSub.takeIf { it.isNotBlank() }, stringResource(R.string.play_count_fmt, plays)).joinToString(" · ")
+                            listOfNotNull(baseSub.takeIf { it.isNotBlank() }, pluralStringResource(R.plurals.play_count_plurals, plays, plays)).joinToString(" · ")
                         } else {
                             baseSub
                         }
@@ -1595,7 +1636,7 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                     val refRaw = PlaylistItemRef.ExtraTrack(item.id).raw
                     val plays = playStats[refRaw]?.playCount ?: 0
                     val sub = if (plays > 0) {
-                        listOfNotNull(baseSub.takeIf { it.isNotBlank() }, stringResource(R.string.play_count_fmt, plays)).joinToString(" · ")
+                        listOfNotNull(baseSub.takeIf { it.isNotBlank() }, pluralStringResource(R.plurals.play_count_plurals, plays, plays)).joinToString(" · ")
                     } else {
                         baseSub
                     }
@@ -1664,16 +1705,20 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
-                                FilledTonalButton(onClick = { onPlayAllJukebox(false) }, modifier = Modifier.weight(1f)) {
-                                    Icon(Icons.Filled.PlayArrow, null, Modifier.size(18.dp))
-                                    Spacer(Modifier.width(4.dp))
-                                    Text(stringResource(R.string.jukebox_play_all), maxLines = 1)
-                                }
-                                OutlinedButton(onClick = { onPlayAllJukebox(true) }, modifier = Modifier.weight(1f)) {
-                                    Icon(Icons.Filled.Shuffle, null, Modifier.size(18.dp))
-                                    Spacer(Modifier.width(4.dp))
-                                    Text(stringResource(R.string.jukebox_shuffle), maxLines = 1)
-                                }
+                                MkwRoseButton(
+                                    text = stringResource(R.string.jukebox_play_all),
+                                    onClick = { onPlayAllJukebox(false) },
+                                    leadingIcon = Icons.Filled.PlayArrow,
+                                    size = MkwButtonSize.Compact,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                MkwSecondaryButton(
+                                    text = stringResource(R.string.jukebox_shuffle),
+                                    onClick = { onPlayAllJukebox(true) },
+                                    leadingIcon = Icons.Filled.Shuffle,
+                                    size = MkwButtonSize.Compact,
+                                    modifier = Modifier.weight(1f),
+                                )
                             }
                         }
                     }
@@ -1683,21 +1728,25 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                     val activeDecade = selectedJukeboxDecade?.takeIf { it in decades }
                     if (decades.size > 1) {
                         item(key = "jukebox-chronology-index") {
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            LazyRow(
+                                modifier = Modifier.unpadHorizontal(16.dp),
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
                                 item(key = "era-all") {
-                                    FilterChip(
+                                    MkwFilterPill(
+                                        label = stringResource(R.string.jukebox_all_eras),
                                         selected = activeDecade == null,
                                         onClick = { selectedJukeboxDecade = null },
-                                        label = { Text(stringResource(R.string.jukebox_all_eras)) },
                                     )
                                 }
                                 items(decades, key = { "era:$it" }) { decade ->
-                                    FilterChip(
+                                    MkwFilterPill(
+                                        label = stringResource(R.string.jukebox_decade_label, decade),
                                         selected = activeDecade == decade,
                                         onClick = {
                                             selectedJukeboxDecade = if (activeDecade == decade) null else decade
                                         },
-                                        label = { Text(stringResource(R.string.jukebox_decade_label, decade)) },
                                     )
                                 }
                             }
@@ -1935,7 +1984,12 @@ private fun DiscoveryMediaContent(catalog: BrowseCatalog?, unlocked: Boolean, la
                 )
             }
         }
-        SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+        SnackbarHost(
+            snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = com.mylittleblover.mkwplayer.ui.rememberMiniPlayerBottomClearance(0.dp)),
+        )
     }
 }
 
@@ -1996,40 +2050,37 @@ private fun CupMosaicCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    val cardInteraction = remember { MutableInteractionSource() }
-    val pressScale = com.mylittleblover.mkwplayer.ui.rememberPressScale(cardInteraction, pressedScale = 0.97f)
-    Card(
+    MkwCard(
         onClick = onClick,
-        interactionSource = cardInteraction,
-        modifier = modifier.graphicsLayer { scaleX = pressScale; scaleY = pressScale },
-        shape = RoundedCornerShape(18.dp),
+        tone = MkwSurfaceTone.Porcelain,
+        contentPadding = PaddingValues(10.dp),
+        modifier = modifier,
     ) {
-        Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            CourseMosaicBox(
-                route = route,
-                packDirectory = packDirectory,
-                courseArtwork = courseArtwork,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1.35f)
-                    .clip(RoundedCornerShape(12.dp)),
+        CourseMosaicBox(
+            route = route,
+            packDirectory = packDirectory,
+            courseArtwork = courseArtwork,
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1.35f)
+                .clip(MkwKitTokens.Shape.thumb),
+        )
+        Column(Modifier.fillMaxWidth().padding(horizontal = 2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                route.displayName(language),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MkwKitTokens.Palette.ink,
+                maxLines = 2,
+                minLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
-            Column(Modifier.fillMaxWidth().padding(horizontal = 2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    route.displayName(language),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    minLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    stringResource(R.string.map_route_stops, route.stops.size),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
-            }
+            Text(
+                stringResource(R.string.map_route_stops, route.stops.size),
+                style = MkwKitTokens.tabular(MaterialTheme.typography.labelSmall),
+                color = MkwKitTokens.Palette.inkSecondary,
+                maxLines = 1,
+            )
         }
     }
 }
@@ -2043,14 +2094,22 @@ private fun RouteRow(
     courseArtwork: Map<String, String> = emptyMap(),
     onClick: () -> Unit,
 ) {
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
-        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+    MkwCard(
+        onClick = onClick,
+        tone = MkwSurfaceTone.Porcelain,
+        contentPadding = PaddingValues(14.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
             CourseMosaicBox(
                 route = route,
                 packDirectory = packDirectory,
                 courseArtwork = courseArtwork,
-                modifier = Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)),
+                modifier = Modifier.size(64.dp).clip(MkwKitTokens.Shape.thumb),
                 badgeSize = 24.dp,
                 badgePadding = 3.dp,
             )
@@ -2063,8 +2122,8 @@ private fun RouteRow(
                 stopsText
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(route.displayName(language), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(route.displayName(language), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MkwKitTokens.Palette.ink)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MkwKitTokens.Palette.inkSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -2079,12 +2138,17 @@ internal fun DiscoveryCup(
     packDirectory: java.io.File? = null,
     extraCatalog: ExtraMusicCatalog.Catalog = ExtraMusicCatalog.Catalog(),
     inspectOfficialRoute: (OfficialRoute, Map<Int, String>, RoadJukeboxCatalog.RoadMusicRuleMode) -> RoadJukeboxCatalog.RouteValidationReport? = { _, _, _ -> null },
-    onPlayRoute: (OfficialRoute, Boolean, Map<Int, String>, RoadJukeboxCatalog.RoadMusicRuleMode) -> Unit = { _, _, _, _ -> },
+    resolveStopPresetRef: (stageCode: String, stopIndex: Int, stopCount: Int, suiteMode: RoadJukeboxCatalog.RouteSuiteMode) -> String = { code, idx, count, mode ->
+        val kind = route?.kind ?: com.mylittleblover.mkwplayer.routes.OfficialRouteKind.GRAND_PRIX
+        PresetRefs.forSuiteVariant(RoadJukeboxCatalog.resolveSuiteVariantForStop(kind, mode, idx, count, code))
+    },
+    onPlayRoute: (OfficialRoute, Boolean, Map<Int, String>, RoadJukeboxCatalog.RoadMusicRuleMode, RoadJukeboxCatalog.RouteSuiteMode) -> Unit = { _, _, _, _, _ -> },
     onMap: (String) -> Unit,
     onCourse: (String) -> Unit,
 ) {
     var loopRoute by rememberSaveable(route?.id) { mutableStateOf(false) }
     var ruleMode by rememberSaveable(route?.id) { mutableStateOf(RoadJukeboxCatalog.RoadMusicRuleMode.AUTO) }
+    var suiteMode by rememberSaveable(route?.id) { mutableStateOf(RoadJukeboxCatalog.RouteSuiteMode.GAME_SUITE) }
     val sessionOverrides = remember(route?.id) { mutableStateMapOf<Int, String>() }
     var pickingLegIndex by rememberSaveable { mutableStateOf<Int?>(null) }
     val report = remember(route, sessionOverrides.toMap(), ruleMode, packDirectory, installedJukebox) {
@@ -2096,16 +2160,24 @@ internal fun DiscoveryCup(
         extraCatalog.otherMusic.filterIsInstance<ExtraMusicCatalog.OtherMusicItem.OverlaidOpening>()
             .firstOrNull { it.id == openingId }
     }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            top = 16.dp,
+            end = 16.dp,
+            bottom = com.mylittleblover.mkwplayer.ui.rememberMiniPlayerBottomClearance(16.dp),
+        ),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         if (route == null) item { Text(stringResource(R.string.discovery_empty)) }
         else {
             item {
-                Surface(
-                    Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                MkwCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(16.dp),
                 ) {
-                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             val emblem = com.mylittleblover.mkwplayer.ui.art.CupArt.routeEmblem(route.id)
                             if (emblem != null) ResourceArtwork(emblem, Modifier.size(64.dp))
@@ -2123,20 +2195,18 @@ internal fun DiscoveryCup(
                             )
                         }
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
-                                onClick = { onPlayRoute(route, loopRoute, sessionOverrides.toMap(), ruleMode) },
+                            MkwPrimaryButton(
+                                text = stringResource(R.string.route_play),
+                                leadingIcon = Icons.Filled.PlayArrow,
+                                onClick = { onPlayRoute(route, loopRoute, sessionOverrides.toMap(), ruleMode, suiteMode) },
                                 enabled = report?.canPlay != false,
                                 modifier = Modifier.weight(1f),
-                            ) {
-                                Icon(Icons.Filled.PlayArrow, null, Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text(stringResource(R.string.route_play))
-                            }
-                            OutlinedButton(onClick = { onMap(route.id) }) {
-                                Icon(Icons.Filled.Map, null, Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text(stringResource(R.string.discovery_view_map))
-                            }
+                            )
+                            MkwSecondaryButton(
+                                text = stringResource(R.string.discovery_view_map),
+                                leadingIcon = Icons.Filled.Map,
+                                onClick = { onMap(route.id) },
+                            )
                         }
                         Row(
                             Modifier.fillMaxWidth().clickable { loopRoute = !loopRoute },
@@ -2148,7 +2218,7 @@ internal fun DiscoveryCup(
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.weight(1f).padding(end = 12.dp),
                             )
-                            Switch(checked = loopRoute, onCheckedChange = { loopRoute = it })
+                            MkwSwitch(checked = loopRoute, onCheckedChange = { loopRoute = it })
                         }
                         RoadMusicRuleModeSelector(
                             selectedMode = ruleMode,
@@ -2158,33 +2228,38 @@ internal fun DiscoveryCup(
                                 sessionOverrides.clear()
                             },
                         )
+                        com.mylittleblover.mkwplayer.ui.routes.RouteSuiteModeSelector(
+                            selectedMode = suiteMode,
+                            onSelectMode = { suiteMode = it },
+                        )
                     }
                 }
             }
             item { Text(stringResource(R.string.discovery_course_order), style = MaterialTheme.typography.titleLarge) }
             if (openingItem != null) {
                 item(key = "opening:${openingItem.id}") {
-                    Card(modifier = Modifier.fillMaxWidth()) {
+                    MkwCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(14.dp),
+                    ) {
                         Row(
-                            Modifier.fillMaxWidth().padding(14.dp),
+                            Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(14.dp),
                         ) {
-                            Text(
-                                stringResource(R.string.route_opening_badge),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
                             PackArtwork.Thumbnail(
                                 packDirectory,
                                 listOf(openingItem.artwork),
                                 Modifier.size(52.dp).clip(RoundedCornerShape(10.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                    .background(MkwKitTokens.Palette.inset),
                             ) {
                                 Icon(Icons.Outlined.MusicNote, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                MkwBadge(
+                                    text = stringResource(R.string.route_opening_badge),
+                                    tone = MkwBadgeTone.Crimson,
+                                )
                                 Text(
                                     openingItem.localizedName(language),
                                     style = MaterialTheme.typography.titleMedium,
@@ -2205,12 +2280,26 @@ internal fun DiscoveryCup(
             }
             itemsIndexed(route.stops, key = { _, stop -> stop.id }) { idx, stop ->
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Card(onClick = { onCourse(stop.stageCode) }, modifier = Modifier.fillMaxWidth()) {
-                        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically,
+                    MkwCard(
+                        onClick = { onCourse(stop.stageCode) },
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(14.dp),
+                    ) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                            Text(stop.ordinal.toString(), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                            Text(stop.ordinal.toString(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MkwKitTokens.Palette.crimson)
                             StageArt.resolve(stop.stageCode)?.let { ResourceArtwork(it, Modifier.size(52.dp)) }
-                            Text(catalog?.displayName(stop.stageCode, language) ?: stop.stageCode, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(catalog?.displayName(stop.stageCode, language) ?: stop.stageCode, style = MaterialTheme.typography.titleMedium)
+                                val stopPresetRef = resolveStopPresetRef(stop.stageCode, idx, route.stops.size, suiteMode)
+                                Text(
+                                    stringResource(com.mylittleblover.mkwplayer.ui.routes.builtInSuiteLabelRes(stopPresetRef)),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MkwKitTokens.Palette.crimson,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                     }
                     val leg = report?.legs?.getOrNull(idx)
@@ -2218,18 +2307,19 @@ internal fun DiscoveryCup(
                         val fromTitle = catalog?.displayName(leg.from, language) ?: leg.from
                         val toTitle = catalog?.displayName(leg.to, language) ?: leg.to
                         val summary = edgeResolutionSummary(leg.resolution, language)
-                        Surface(
+                        MkwCard(
                             onClick = { pickingLegIndex = idx },
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            tone = MkwSurfaceTone.Recessed,
+                            shape = MkwKitTokens.Shape.control,
                             modifier = Modifier.fillMaxWidth().padding(start = 16.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
                         ) {
                             Row(
-                                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                                Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
-                                Icon(Icons.Outlined.MusicNote, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                                Icon(Icons.Outlined.MusicNote, null, Modifier.size(18.dp), tint = MkwKitTokens.Palette.crimson)
                                 Column(Modifier.weight(1f)) {
                                     Text(
                                         "${stringResource(R.string.route_road_prefix)} $fromTitle → $toTitle",
@@ -2403,107 +2493,122 @@ private fun SmartPlaylistCard(
     onPlayRefs: (List<String>) -> Boolean,
 ) {
     var expanded by rememberSaveable(title) { mutableStateOf(false) }
-    ElevatedCard(shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(44.dp),
-                ) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        val top = entries.firstOrNull()
-                        if (top != null && (top.artworkName != null || top.fallbackCourseCode != null)) {
-                            PackArtwork.Thumbnail(packDirectory, listOfNotNull(top.artworkName), Modifier.fillMaxSize()) {
-                                if (top.fallbackCourseCode != null) CourseCover(top.fallbackCourseCode, Modifier.fillMaxSize())
-                                else Icon(Icons.Outlined.MusicNote, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                            }
-                        } else {
-                            Icon(Icons.Outlined.MusicNote, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+    MkwCard(
+        tone = MkwSurfaceTone.Porcelain,
+        contentPadding = PaddingValues(14.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Surface(
+                shape = MkwKitTokens.Shape.thumb,
+                color = MkwKitTokens.Palette.rose,
+                modifier = Modifier.size(44.dp),
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    val top = entries.firstOrNull()
+                    if (top != null && (top.artworkName != null || top.fallbackCourseCode != null)) {
+                        PackArtwork.Thumbnail(packDirectory, listOfNotNull(top.artworkName), Modifier.fillMaxSize()) {
+                            if (top.fallbackCourseCode != null) CourseCover(top.fallbackCourseCode, Modifier.fillMaxSize())
+                            else Icon(Icons.Outlined.MusicNote, null, tint = MkwKitTokens.Palette.crimsonDeep)
                         }
-                    }
-                }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text(
-                        if (entries.isNotEmpty()) {
-                            "$subtitle · ${stringResource(R.string.jukebox_tracks_count, entries.size)}"
-                        } else {
-                            subtitle
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (entries.isNotEmpty()) {
-                    IconButton(onClick = { expanded = !expanded }) {
-                        Icon(
-                            if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                            contentDescription = null,
-                        )
+                    } else {
+                        Icon(Icons.Outlined.MusicNote, null, tint = MkwKitTokens.Palette.crimsonDeep)
                     }
                 }
             }
-            if (entries.isEmpty()) {
-                Text(emptyText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else {
-                val refs = remember(entries) { entries.map { it.rawRef } }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = { onPlayRefs(refs) },
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Icon(Icons.Filled.PlayArrow, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.discovery_playlist_play_all), maxLines = 1)
-                    }
-                    OutlinedButton(
-                        onClick = { onPlayRefs(refs.shuffled()) },
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Icon(Icons.Filled.Shuffle, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.jukebox_shuffle), maxLines = 1)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MkwKitTokens.Palette.ink,
+                        modifier = Modifier.weight(1f, fill = false),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (entries.isNotEmpty()) {
+                        MkwBadge(
+                            text = pluralStringResource(R.plurals.tracks_count_plurals, entries.size, entries.size),
+                            tone = MkwBadgeTone.Neutral,
+                        )
                     }
                 }
-                AnimatedVisibility(visible = expanded) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                        entries.take(10).forEachIndexed { idx, entry ->
-                            Surface(
-                                onClick = {
-                                    val rotated = listOf(entry.rawRef) + refs.filterIndexed { i, _ -> i != idx }
-                                    onPlayRefs(rotated)
-                                },
-                                shape = RoundedCornerShape(10.dp),
-                                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                modifier = Modifier.fillMaxWidth(),
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MkwKitTokens.Palette.inkSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (entries.isNotEmpty()) {
+                MkwIconButton(
+                    icon = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                    contentDescription = null,
+                    onClick = { expanded = !expanded },
+                    visualSize = 36.dp,
+                    iconSize = 20.dp,
+                )
+            }
+        }
+        if (entries.isEmpty()) {
+            Text(emptyText, style = MaterialTheme.typography.bodySmall, color = MkwKitTokens.Palette.inkSecondary)
+        } else {
+            val refs = remember(entries) { entries.map { it.rawRef } }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MkwPrimaryButton(
+                    text = stringResource(R.string.discovery_playlist_play_all),
+                    onClick = { onPlayRefs(refs) },
+                    leadingIcon = Icons.Filled.PlayArrow,
+                    size = MkwButtonSize.Compact,
+                    modifier = Modifier.weight(1f),
+                )
+                MkwSecondaryButton(
+                    text = stringResource(R.string.jukebox_shuffle),
+                    onClick = { onPlayRefs(refs.shuffled()) },
+                    leadingIcon = Icons.Filled.Shuffle,
+                    size = MkwButtonSize.Compact,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            AnimatedVisibility(visible = expanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    MkwDivider()
+                    entries.take(10).forEachIndexed { idx, entry ->
+                        MkwCard(
+                            onClick = {
+                                val rotated = listOf(entry.rawRef) + refs.filterIndexed { i, _ -> i != idx }
+                                onPlayRefs(rotated)
+                            },
+                            tone = MkwSurfaceTone.White,
+                            shape = MkwKitTokens.Shape.thumb,
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                        ) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
-                                Row(
-                                    Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                ) {
-                                    Text(
-                                        "${idx + 1}",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.width(20.dp),
-                                    )
-                                    Column(Modifier.weight(1f)) {
-                                        Text(entry.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        val meta = if (entry.playCount > 0) {
-                                            "${entry.subtitle} · ${stringResource(R.string.play_count_fmt, entry.playCount)}"
-                                        } else {
-                                            entry.subtitle
-                                        }
-                                        Text(meta, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(
+                                    "${idx + 1}",
+                                    style = MkwKitTokens.tabular(MaterialTheme.typography.labelMedium),
+                                    color = MkwKitTokens.Palette.crimson,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.width(20.dp),
+                                )
+                                Column(Modifier.weight(1f)) {
+                                    Text(entry.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MkwKitTokens.Palette.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    val meta = if (entry.playCount > 0) {
+                                        "${entry.subtitle} · ${pluralStringResource(R.plurals.play_count_plurals, entry.playCount, entry.playCount)}"
+                                    } else {
+                                        entry.subtitle
                                     }
-                                    Icon(Icons.Filled.PlayArrow, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                                    Text(meta, style = MaterialTheme.typography.labelSmall, color = MkwKitTokens.Palette.inkSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
+                                Icon(Icons.Filled.PlayArrow, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }
@@ -2601,30 +2706,46 @@ internal fun DiscoveryPlaylists(
     }
     var creating by rememberSaveable { mutableStateOf(false) }
     var name by rememberSaveable { mutableStateOf("") }
-    if (creating) AlertDialog(
-        onDismissRequest = { creating = false },
-        title = { Text(stringResource(R.string.discovery_create_playlist)) },
-        text = {
-            OutlinedTextField(
+    if (creating) {
+        MkwDialog(
+            onDismissRequest = { creating = false },
+            title = stringResource(R.string.discovery_create_playlist),
+            confirmButton = {
+                MkwPrimaryButton(
+                    text = stringResource(R.string.discovery_create),
+                    onClick = { onCreate(name); name = ""; creating = false },
+                    enabled = name.isNotBlank(),
+                    size = MkwButtonSize.Compact,
+                )
+            },
+            dismissButton = {
+                MkwGhostButton(
+                    text = stringResource(R.string.discovery_cancel),
+                    onClick = { creating = false },
+                )
+            },
+        ) {
+            MkwTextField(
                 value = name,
                 onValueChange = { name = it.take(120) },
-                label = { Text(stringResource(R.string.discovery_playlist_name)) },
-                supportingText = if (name.isBlank()) {
-                    { Text(stringResource(R.string.discovery_create_name_hint)) }
-                } else null,
+                label = stringResource(R.string.discovery_playlist_name),
+                supportingText = if (name.isBlank()) stringResource(R.string.discovery_create_name_hint) else null,
                 singleLine = true,
             )
-        },
-        confirmButton = {
-            TextButton(onClick = { onCreate(name); name = ""; creating = false }, enabled = name.isNotBlank()) {
-                Text(stringResource(R.string.discovery_create))
-            }
-        },
-        dismissButton = { TextButton(onClick = { creating = false }) { Text(stringResource(R.string.discovery_cancel)) } },
-    )
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        }
+    }
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            top = 16.dp,
+            end = 16.dp,
+            bottom = com.mylittleblover.mkwplayer.ui.rememberMiniPlayerBottomClearance(16.dp),
+        ),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
         item(key = "smart-playlists-hdr") {
-            Text(stringResource(R.string.smart_playlists_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.smart_playlists_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MkwKitTokens.Palette.ink)
         }
         item(key = "smart-most-played") {
             SmartPlaylistCard(
@@ -2646,139 +2767,214 @@ internal fun DiscoveryPlaylists(
                 onPlayRefs = onPlaySelectedRefs,
             )
         }
-        item { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)) }
+        item { MkwDivider() }
         item {
             PlaylistGroupHeader(
                 title = stringResource(R.string.discovery_playlists_group_user),
-                count = state.playlists.size,
+                count = state.playlists.size + 1,
                 onViewAll = { onViewAll(0) },
                 action = {
-                    OutlinedButton(onClick = { creating = true }) {
-                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.discovery_create_playlist))
-                    }
+                    MkwSecondaryButton(
+                        text = stringResource(R.string.discovery_create_playlist),
+                        onClick = { creating = true },
+                        leadingIcon = Icons.Filled.Add,
+                        size = MkwButtonSize.Compact,
+                    )
                 },
             )
         }
-        if (state.playlistError != null) item { Text(stringResource(R.string.discovery_save_failed), color = MaterialTheme.colorScheme.error) }
-        if (state.playlists.isEmpty()) {
-            item {
-                Surface(
-                    Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                ) {
-                    Text(
-                        stringResource(R.string.discovery_no_saved),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(16.dp),
-                    )
-                }
-            }
-        } else {
-            item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(state.playlists, key = { "playlist:${it.id}" }) { playlist ->
-                        Card(onClick = { onPlaylist(playlist.id) }, modifier = Modifier.width(164.dp)) {
-                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Box(Modifier.fillMaxWidth().height(112.dp), contentAlignment = Alignment.Center) {
-                                    val firstRef = playlist.courseIds.firstOrNull()?.let {
-                                        com.mylittleblover.mkwplayer.library.PlaylistItemRef.parse(it)
-                                    }
-                                    val courseCode = (firstRef as? com.mylittleblover.mkwplayer.library.PlaylistItemRef.Course)?.logicalCode
-                                    val artworkName = when (firstRef) {
-                                        is com.mylittleblover.mkwplayer.library.PlaylistItemRef.Course ->
-                                            extraCatalog.courseArtwork[firstRef.raw] ?: extraCatalog.courseArtwork[firstRef.logicalCode]
-                                        is com.mylittleblover.mkwplayer.library.PlaylistItemRef.SfcTrack ->
-                                            extraCatalog.sfcCourses.firstOrNull { it.id == firstRef.trackId }?.artwork
-                                        is com.mylittleblover.mkwplayer.library.PlaylistItemRef.BattleTrack ->
-                                            extraCatalog.battleTracks.firstOrNull { it.id == firstRef.trackId }?.artwork
-                                        is com.mylittleblover.mkwplayer.library.PlaylistItemRef.ExtraTrack ->
-                                            extraCatalog.otherMusic.firstOrNull { it.id == firstRef.extraId }?.artwork
-                                                ?: extraCatalog.shortSounds.firstOrNull { it.id == firstRef.extraId }?.artwork
-                                                ?: extraCatalog.nintendoMusicSpecial.firstOrNull { it.id == firstRef.extraId }?.artwork
-                                        is com.mylittleblover.mkwplayer.library.PlaylistItemRef.Jukebox, null -> null
-                                    }
-                                    if (artworkName != null && packDirectory != null) {
-                                        PackArtwork.Thumbnail(packDirectory, listOf(artworkName), Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp))) {
-                                            Icon(Icons.Outlined.MusicNote, null, Modifier.size(40.dp))
-                                        }
-                                    } else {
-                                        val art = courseCode?.let { StageArt.resolve(it) }
+        if (state.playlistError != null) item { Text(stringResource(R.string.discovery_save_failed), color = MkwKitTokens.Palette.danger) }
+        item {
+            val firstFav = favoritesMixEntries.firstOrNull()
+            LazyRow(
+                modifier = Modifier.unpadHorizontal(16.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                item(key = "playlist:${com.mylittleblover.mkwplayer.library.PlaylistConstants.PINNED_FAVORITES_ID}") {
+                    MkwCard(
+                        onClick = { onPlaylist(com.mylittleblover.mkwplayer.library.PlaylistConstants.PINNED_FAVORITES_ID) },
+                        tone = MkwSurfaceTone.Porcelain,
+                        contentPadding = PaddingValues(14.dp),
+                        modifier = Modifier.width(164.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(112.dp)
+                                .clip(MkwKitTokens.Shape.thumb)
+                                .background(MkwKitTokens.Palette.rose),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (firstFav != null && (firstFav.artworkName != null || firstFav.fallbackCourseCode != null)) {
+                                if (firstFav.artworkName != null && packDirectory != null) {
+                                    PackArtwork.Thumbnail(packDirectory, listOf(firstFav.artworkName), Modifier.fillMaxSize()) {
+                                        val art = firstFav.fallbackCourseCode?.let { StageArt.resolve(it) }
                                         if (art != null) ResourceArtwork(art, Modifier.size(90.dp))
-                                        else Icon(Icons.Outlined.MusicNote, null, Modifier.size(40.dp))
+                                        else Icon(Icons.Filled.Favorite, null, Modifier.size(40.dp), tint = MkwKitTokens.Palette.crimson)
                                     }
+                                } else {
+                                    val art = firstFav.fallbackCourseCode?.let { StageArt.resolve(it) }
+                                    if (art != null) ResourceArtwork(art, Modifier.size(90.dp))
+                                    else Icon(Icons.Filled.Favorite, null, Modifier.size(40.dp), tint = MkwKitTokens.Palette.crimson)
                                 }
-                                Text(playlist.name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                Text(
-                                    stringResource(R.string.jukebox_tracks_count, playlist.courseIds.size),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                            } else {
+                                Icon(Icons.Filled.Favorite, null, Modifier.size(42.dp), tint = MkwKitTokens.Palette.crimson)
                             }
+                            Surface(
+                                shape = CircleShape,
+                                color = MkwKitTokens.Palette.ground.copy(alpha = 0.92f),
+                                shadowElevation = 2.dp,
+                                modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(26.dp),
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Filled.Favorite, null, Modifier.size(15.dp), tint = MkwKitTokens.Palette.crimson)
+                                }
+                            }
+                        }
+                        Text(
+                            stringResource(R.string.pinned_favorites_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MkwKitTokens.Palette.ink,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            MkwBadge(text = stringResource(R.string.pinned_favorites_badge), tone = MkwBadgeTone.Rose, tabular = false)
+                            Text(
+                                pluralStringResource(R.plurals.tracks_count_plurals, favoritesMixEntries.size, favoritesMixEntries.size),
+                                style = MkwKitTokens.tabular(MaterialTheme.typography.bodySmall),
+                                color = MkwKitTokens.Palette.inkSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
                     }
                 }
+                items(state.playlists, key = { "playlist:${it.id}" }) { playlist ->
+                        MkwCard(
+                            onClick = { onPlaylist(playlist.id) },
+                            tone = MkwSurfaceTone.Porcelain,
+                            contentPadding = PaddingValues(14.dp),
+                            modifier = Modifier.width(164.dp),
+                        ) {
+                            val firstRef = playlist.courseIds.firstOrNull()?.let {
+                                com.mylittleblover.mkwplayer.library.PlaylistItemRef.parse(it)
+                            }
+                            val courseCode = (firstRef as? com.mylittleblover.mkwplayer.library.PlaylistItemRef.Course)?.logicalCode
+                            val artworkName = when (firstRef) {
+                                is com.mylittleblover.mkwplayer.library.PlaylistItemRef.Course ->
+                                    extraCatalog.courseArtwork[firstRef.raw] ?: extraCatalog.courseArtwork[firstRef.logicalCode]
+                                is com.mylittleblover.mkwplayer.library.PlaylistItemRef.SfcTrack ->
+                                    extraCatalog.sfcCourses.firstOrNull { it.id == firstRef.trackId }?.artwork
+                                is com.mylittleblover.mkwplayer.library.PlaylistItemRef.BattleTrack ->
+                                    extraCatalog.battleTracks.firstOrNull { it.id == firstRef.trackId }?.artwork
+                                is com.mylittleblover.mkwplayer.library.PlaylistItemRef.ExtraTrack ->
+                                    extraCatalog.otherMusic.firstOrNull { it.id == firstRef.extraId }?.artwork
+                                        ?: extraCatalog.shortSounds.firstOrNull { it.id == firstRef.extraId }?.artwork
+                                        ?: extraCatalog.nintendoMusicSpecial.firstOrNull { it.id == firstRef.extraId }?.artwork
+                                is com.mylittleblover.mkwplayer.library.PlaylistItemRef.Jukebox, null -> null
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(112.dp)
+                                    .clip(MkwKitTokens.Shape.thumb)
+                                    .background(MkwKitTokens.Palette.rose),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (artworkName != null && packDirectory != null) {
+                                    PackArtwork.Thumbnail(packDirectory, listOf(artworkName), Modifier.fillMaxSize()) {
+                                        Icon(Icons.Outlined.MusicNote, null, Modifier.size(40.dp), tint = MkwKitTokens.Palette.crimsonDeep)
+                                    }
+                                } else {
+                                    val art = courseCode?.let { StageArt.resolve(it) }
+                                    if (art != null) ResourceArtwork(art, Modifier.size(90.dp))
+                                    else Icon(Icons.Outlined.MusicNote, null, Modifier.size(40.dp), tint = MkwKitTokens.Palette.crimsonDeep)
+                                }
+                            }
+                            Text(playlist.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MkwKitTokens.Palette.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                pluralStringResource(R.plurals.tracks_count_plurals, playlist.courseIds.size, playlist.courseIds.size),
+                                style = MkwKitTokens.tabular(MaterialTheme.typography.bodySmall),
+                                color = MkwKitTokens.Palette.inkSecondary,
+                            )
+                        }
+                    }
             }
         }
 
-        item { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)) }
+        item { MkwDivider() }
         item {
             PlaylistGroupHeader(
                 title = stringResource(R.string.discovery_playlists_group_routes),
                 count = state.customRoutes.size,
                 onViewAll = { onViewAll(1) },
                 action = {
-                    OutlinedButton(onClick = onPlanRouteOnMap) {
-                        Icon(Icons.Filled.Map, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.route_plan_on_map))
-                    }
+                    MkwSecondaryButton(
+                        text = stringResource(R.string.route_plan_on_map),
+                        onClick = onPlanRouteOnMap,
+                        leadingIcon = Icons.Filled.Map,
+                        size = MkwButtonSize.Compact,
+                    )
                 },
             )
         }
         if (state.customRoutes.isEmpty()) {
             item {
-                Text(
-                    stringResource(R.string.discovery_no_saved),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                MkwInsetBox(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        stringResource(R.string.discovery_no_saved),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MkwKitTokens.Palette.inkSecondary,
+                        modifier = Modifier.padding(4.dp),
+                    )
+                }
             }
         } else {
             item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                LazyRow(
+                    modifier = Modifier.unpadHorizontal(16.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                     items(state.customRoutes, key = { "my-route:${it.id}" }) { customRoute ->
                         val report = inspectCustomRoute(customRoute)
                         val isInvalid = report?.canPlay == false
                         val firstCode = customRoute.stops.firstOrNull()?.stageCode?.removeSuffix("_00")
                         val artwork = firstCode?.let { extraCatalog.courseArtwork[it] ?: extraCatalog.courseArtwork["${it}_00"] }
-                        Card(onClick = { onCustomRoute(customRoute.id) }, modifier = Modifier.width(164.dp)) {
-                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                PackArtwork.Thumbnail(
-                                    packDirectory,
-                                    listOfNotNull(artwork),
-                                    Modifier.fillMaxWidth().height(112.dp).clip(RoundedCornerShape(12.dp))
-                                        .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)),
-                                ) {
-                                    if (firstCode != null) CourseCover(firstCode, Modifier.fillMaxSize())
-                                    else Icon(Icons.Filled.Map, null, Modifier.size(36.dp), tint = MaterialTheme.colorScheme.primary)
-                                }
-                                Text(customRoute.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(
-                                    if (isInvalid) {
-                                        report?.blockingReason ?: stringResource(R.string.route_invalid_topology)
-                                    } else {
-                                        stringResource(R.string.route_stops_count, customRoute.stops.size)
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (isInvalid) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
+                        MkwCard(
+                            onClick = { onCustomRoute(customRoute.id) },
+                            tone = MkwSurfaceTone.Porcelain,
+                            error = isInvalid,
+                            contentPadding = PaddingValues(14.dp),
+                            modifier = Modifier.width(164.dp),
+                        ) {
+                            PackArtwork.Thumbnail(
+                                packDirectory,
+                                listOfNotNull(artwork),
+                                Modifier.fillMaxWidth().height(112.dp).clip(MkwKitTokens.Shape.thumb)
+                                    .background(MkwKitTokens.Palette.rose),
+                            ) {
+                                if (firstCode != null) CourseCover(firstCode, Modifier.fillMaxSize())
+                                else Icon(Icons.Filled.Map, null, Modifier.size(36.dp), tint = MkwKitTokens.Palette.crimson)
                             }
+                            Text(customRoute.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MkwKitTokens.Palette.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                if (isInvalid) {
+                                    report?.blockingReason ?: stringResource(R.string.route_invalid_topology)
+                                } else {
+                                    pluralStringResource(R.plurals.route_stops_plurals, customRoute.stops.size, customRoute.stops.size)
+                                },
+                                style = MkwKitTokens.tabular(MaterialTheme.typography.bodySmall),
+                                color = if (isInvalid) MkwKitTokens.Palette.danger else MkwKitTokens.Palette.inkSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
                     }
                 }
@@ -2786,7 +2982,7 @@ internal fun DiscoveryPlaylists(
         }
 
         if (gpRoutes.isNotEmpty() || rallies.isNotEmpty()) {
-            item { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)) }
+            item { MkwDivider() }
         }
         if (gpRoutes.isNotEmpty()) {
             item {
@@ -2810,7 +3006,7 @@ internal fun DiscoveryPlaylists(
         }
 
         if (jukeboxGames.isNotEmpty()) {
-            item { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)) }
+            item { MkwDivider() }
             item {
                 PlaylistGroupHeader(
                     title = stringResource(R.string.discovery_playlists_group_jukebox),
@@ -2819,25 +3015,33 @@ internal fun DiscoveryPlaylists(
                 )
             }
             item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                LazyRow(
+                    modifier = Modifier.unpadHorizontal(16.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                     items(jukeboxGames, key = { "jb-group:${it.id}" }) { game ->
-                        Card(onClick = { onJukeboxGame(game.id) }, modifier = Modifier.width(164.dp)) {
-                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                PackArtwork.Thumbnail(
-                                    packDirectory,
-                                    listOfNotNull(extraCatalog.jukeboxGameArtwork[game.id]),
-                                    Modifier.fillMaxWidth().height(112.dp).clip(RoundedCornerShape(12.dp))
-                                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
-                                ) {
-                                    Text(
-                                        game.yearLabel.ifBlank { "OST" },
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                    )
-                                }
-                                Text(game.localizedName(language), style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                Text(stringResource(R.string.jukebox_tracks_count, game.items.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        MkwCard(
+                            onClick = { onJukeboxGame(game.id) },
+                            tone = MkwSurfaceTone.Porcelain,
+                            contentPadding = PaddingValues(14.dp),
+                            modifier = Modifier.width(164.dp),
+                        ) {
+                            PackArtwork.Thumbnail(
+                                packDirectory,
+                                listOfNotNull(extraCatalog.jukeboxGameArtwork[game.id]),
+                                Modifier.fillMaxWidth().height(112.dp).clip(MkwKitTokens.Shape.thumb)
+                                    .background(MkwKitTokens.Palette.rose),
+                            ) {
+                                Text(
+                                    game.yearLabel.ifBlank { "OST" },
+                                    style = MkwKitTokens.tabular(MaterialTheme.typography.titleMedium),
+                                    fontWeight = FontWeight.Bold,
+                                    color = MkwKitTokens.Palette.crimsonDeep,
+                                )
                             }
+                            Text(game.localizedName(language), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MkwKitTokens.Palette.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text(pluralStringResource(R.plurals.tracks_count_plurals, game.items.size, game.items.size), style = MkwKitTokens.tabular(MaterialTheme.typography.bodySmall), color = MkwKitTokens.Palette.inkSecondary)
                         }
                     }
                 }
@@ -2858,12 +3062,21 @@ private fun PlaylistGroupHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        Text(
+            title,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MkwKitTokens.Palette.ink,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             if (count > 0) {
-                TextButton(onClick = onViewAll) {
-                    Text(stringResource(R.string.discovery_view_all_count, count))
-                }
+                MkwGhostButton(
+                    text = stringResource(R.string.discovery_view_all_count, count),
+                    onClick = onViewAll,
+                )
             }
             action?.invoke()
         }
@@ -2898,24 +3111,33 @@ internal fun DiscoveryAllPlaylists(
         stringResource(R.string.discovery_playlists_group_rallies),
         stringResource(R.string.discovery_playlists_group_jukebox),
     )
-    if (creating) AlertDialog(
-        onDismissRequest = { creating = false },
-        title = { Text(stringResource(R.string.discovery_create_playlist)) },
-        text = {
-            OutlinedTextField(
+    if (creating) {
+        MkwDialog(
+            onDismissRequest = { creating = false },
+            title = stringResource(R.string.discovery_create_playlist),
+            confirmButton = {
+                MkwPrimaryButton(
+                    text = stringResource(R.string.discovery_create),
+                    onClick = { onCreate(newName); newName = ""; creating = false },
+                    enabled = newName.isNotBlank(),
+                    size = MkwButtonSize.Compact,
+                )
+            },
+            dismissButton = {
+                MkwGhostButton(
+                    text = stringResource(R.string.discovery_cancel),
+                    onClick = { creating = false },
+                )
+            },
+        ) {
+            MkwTextField(
                 value = newName,
                 onValueChange = { newName = it.take(120) },
-                label = { Text(stringResource(R.string.discovery_playlist_name)) },
+                label = stringResource(R.string.discovery_playlist_name),
                 singleLine = true,
             )
-        },
-        confirmButton = {
-            TextButton(onClick = { onCreate(newName); newName = ""; creating = false }, enabled = newName.isNotBlank()) {
-                Text(stringResource(R.string.discovery_create))
-            }
-        },
-        dismissButton = { TextButton(onClick = { creating = false }) { Text(stringResource(R.string.discovery_cancel)) } },
-    )
+        }
+    }
     Column(Modifier.fillMaxSize()) {
         val options = sectionTitles.mapIndexed { idx, label ->
             com.mylittleblover.mkwplayer.ui.interactive.DrawerOption(idx, label)
@@ -2930,41 +3152,102 @@ internal fun DiscoveryAllPlaylists(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             compact = true,
         )
-        OutlinedTextField(
+        MkwTextField(
             value = query,
             onValueChange = { query = it },
-            placeholder = { Text(stringResource(R.string.discovery_search)) },
-            leadingIcon = { Icon(Icons.Filled.Search, null) },
-            trailingIcon = {
-                if (query.isNotEmpty()) {
-                    IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Clear, null) }
+            placeholder = stringResource(R.string.discovery_search_playlists),
+            leadingIcon = { Icon(Icons.Filled.Search, null, tint = MkwKitTokens.Palette.inkSecondary) },
+            trailingIcon = if (query.isNotEmpty()) {
+                {
+                    MkwIconButton(
+                        icon = Icons.Filled.Clear,
+                        contentDescription = stringResource(R.string.discovery_cancel),
+                        onClick = { query = "" },
+                        visualSize = 32.dp,
+                        iconSize = 18.dp,
+                    )
                 }
-            },
+            } else null,
             singleLine = true,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         )
+        val pinnedTitle = stringResource(R.string.pinned_favorites_title)
+        val pinnedSubtitle = stringResource(R.string.pinned_favorites_badge)
+        val visibleCourses = catalog?.courses(unlocked).orEmpty().toSet()
+        val visibleFavCount = remember(state.favorites, visibleCourses, unlocked, jukeboxGames, extraCatalog) {
+            val jbByKey = jukeboxGames.flatMap { it.items }.associateBy { it.key }
+            state.favorites.count { raw ->
+                when (val ref = com.mylittleblover.mkwplayer.library.PlaylistItemRef.parse(raw)) {
+                    is com.mylittleblover.mkwplayer.library.PlaylistItemRef.Course -> ref.logicalCode in visibleCourses || raw in visibleCourses
+                    is com.mylittleblover.mkwplayer.library.PlaylistItemRef.Jukebox -> ref.trackKey in jbByKey
+                    is com.mylittleblover.mkwplayer.library.PlaylistItemRef.SfcTrack -> ExtraMusicCatalog.isVisible(ref.trackId, unlocked)
+                    is com.mylittleblover.mkwplayer.library.PlaylistItemRef.BattleTrack -> ExtraMusicCatalog.isVisible(ref.trackId, unlocked)
+                    is com.mylittleblover.mkwplayer.library.PlaylistItemRef.ExtraTrack -> ExtraMusicCatalog.isVisible(ref.extraId, unlocked)
+                }
+            }
+        }
+        val favCountText = pluralStringResource(R.plurals.tracks_count_plurals, visibleFavCount, visibleFavCount)
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                top = 16.dp,
+                end = 16.dp,
+                bottom = com.mylittleblover.mkwplayer.ui.rememberMiniPlayerBottomClearance(16.dp),
+            ),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             val trimmed = query.trim()
             when (section) {
                 0 -> {
                     item {
-                        OutlinedButton(onClick = { creating = true }, modifier = Modifier.fillMaxWidth()) {
-                            Icon(Icons.Filled.Add, null)
-                            Spacer(Modifier.width(6.dp))
-                            Text(stringResource(R.string.discovery_create_playlist))
+                        MkwSecondaryButton(
+                            text = stringResource(R.string.discovery_create_playlist),
+                            onClick = { creating = true },
+                            leadingIcon = Icons.Filled.Add,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    val showPinned = trimmed.isEmpty() || pinnedTitle.contains(trimmed, ignoreCase = true)
+                    if (showPinned) {
+                        item(key = "all-pl:${com.mylittleblover.mkwplayer.library.PlaylistConstants.PINNED_FAVORITES_ID}") {
+                            MkwCard(
+                                onClick = { onPlaylist(com.mylittleblover.mkwplayer.library.PlaylistConstants.PINNED_FAVORITES_ID) },
+                                tone = MkwSurfaceTone.Porcelain,
+                                contentPadding = PaddingValues(12.dp),
+                            ) {
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(52.dp)
+                                            .clip(MkwKitTokens.Shape.thumb)
+                                            .background(MkwKitTokens.Palette.rose),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Icon(Icons.Filled.Favorite, null, Modifier.size(26.dp), tint = MkwKitTokens.Palette.crimson)
+                                    }
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Text(pinnedTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MkwKitTokens.Palette.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            MkwBadge(text = pinnedSubtitle, tone = MkwBadgeTone.Rose, tabular = false)
+                                        }
+                                        Text(favCountText, style = MkwKitTokens.tabular(MaterialTheme.typography.bodySmall), color = MkwKitTokens.Palette.inkSecondary)
+                                    }
+                                }
+                            }
                         }
                     }
                     val list = state.playlists.filter { trimmed.isEmpty() || it.name.contains(trimmed, ignoreCase = true) }
-                    if (list.isEmpty()) item { Text(stringResource(R.string.discovery_no_saved)) }
+                    if (list.isEmpty() && !showPinned) item { Text(stringResource(R.string.discovery_no_saved), color = MkwKitTokens.Palette.inkSecondary) }
                     items(list, key = { "all-pl:${it.id}" }) { playlist ->
                         val first = playlist.courseIds.firstOrNull { it in catalog?.courses(unlocked).orEmpty() }
                         ExtraSquareRow(
                             title = playlist.name,
-                            subtitle = stringResource(R.string.jukebox_tracks_count, playlist.courseIds.size),
+                            subtitle = pluralStringResource(R.plurals.tracks_count_plurals, playlist.courseIds.size, playlist.courseIds.size),
                             packDirectory = packDirectory,
                             artworkName = first?.let { extraCatalog.courseArtwork[it] ?: extraCatalog.courseArtwork[it.removeSuffix("_00")] },
                             fallbackCourseCode = first,
@@ -2974,11 +3257,11 @@ internal fun DiscoveryAllPlaylists(
                 }
                 1 -> {
                     item {
-                        OutlinedButton(onClick = onCreateRouteOnMap) {
-                            Icon(Icons.Filled.Map, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text(stringResource(R.string.route_plan_on_map))
-                        }
+                        MkwSecondaryButton(
+                            text = stringResource(R.string.route_plan_on_map),
+                            onClick = onCreateRouteOnMap,
+                            leadingIcon = Icons.Filled.Map,
+                        )
                     }
                     val matchingRoutes = state.customRoutes.filter {
                         trimmed.isEmpty() || it.name.contains(trimmed, ignoreCase = true)
@@ -2989,8 +3272,9 @@ internal fun DiscoveryAllPlaylists(
                     items(matchingRoutes, key = { "all-route:${it.id}" }) { customRoute ->
                         val report = inspectCustomRoute(customRoute)
                         val first = customRoute.stops.firstOrNull()?.stageCode?.removeSuffix("_00")
-                        val legsSummary = stringResource(R.string.route_legs_count, (customRoute.stops.size - 1).coerceAtLeast(0))
-                        val stopsSummary = stringResource(R.string.route_stops_count, customRoute.stops.size)
+                        val legCount = (customRoute.stops.size - 1).coerceAtLeast(0)
+                        val legsSummary = pluralStringResource(R.plurals.route_legs_plurals, legCount, legCount)
+                        val stopsSummary = pluralStringResource(R.plurals.route_stops_plurals, customRoute.stops.size, customRoute.stops.size)
                         val sub = if (report?.canPlay == false) {
                             "$stopsSummary · $legsSummary · ${report.blockingReason ?: stringResource(R.string.route_invalid_topology)}"
                         } else if (customRoute.loopWholeRoute) {
@@ -3042,7 +3326,11 @@ private fun OfficialRouteStrip(
     courseArtwork: Map<String, String>,
     onCup: (String) -> Unit,
 ) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyRow(
+        modifier = Modifier.unpadHorizontal(16.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         items(routes, key = { it.id }) { route ->
             CupMosaicCard(
                 route = route,
@@ -3051,6 +3339,109 @@ private fun OfficialRouteStrip(
                 courseArtwork = courseArtwork,
                 modifier = Modifier.width(164.dp),
                 onClick = { onCup(route.id) },
+            )
+        }
+    }
+}
+
+private data class ResolvedPlaylistRowDisplay(
+    val ref: com.mylittleblover.mkwplayer.library.PlaylistItemRef,
+    val available: Boolean,
+    val title: String,
+    val categorySubtitle: String,
+    val artworkName: String?,
+    val fallbackCourseCode: String? = null,
+    val editorTargetCode: String? = null,
+    val isCourse: Boolean = false,
+)
+
+private fun resolvePlaylistRowDisplay(
+    rawId: String,
+    catalog: BrowseCatalog?,
+    unlocked: Boolean,
+    language: String,
+    extraCatalog: ExtraMusicCatalog.Catalog,
+    jukebox: JukeboxCatalog.Catalog,
+    gamesById: Map<String, JukeboxCatalog.Game>,
+    visibleCourseSet: Set<String>,
+    courseArtwork: Map<String, String>,
+    coursesCatLabel: String,
+    sfcCatLabel: String,
+    battleCatLabel: String,
+    freeCatLabel: String,
+    otherCatLabel: String,
+    soundsCatLabel: String,
+    nmCatLabel: String,
+): ResolvedPlaylistRowDisplay {
+    return when (val ref = com.mylittleblover.mkwplayer.library.PlaylistItemRef.parse(rawId)) {
+        is com.mylittleblover.mkwplayer.library.PlaylistItemRef.Course -> {
+            val logical = ref.logicalCode
+            val ok = logical in visibleCourseSet || rawId in visibleCourseSet
+            ResolvedPlaylistRowDisplay(
+                ref = ref,
+                available = ok,
+                title = if (ok) catalog?.displayName(logical, language) ?: logical else "",
+                categorySubtitle = coursesCatLabel,
+                artworkName = courseArtwork[rawId] ?: courseArtwork[logical],
+                fallbackCourseCode = logical,
+                editorTargetCode = logical,
+                isCourse = true,
+            )
+        }
+        is com.mylittleblover.mkwplayer.library.PlaylistItemRef.Jukebox -> {
+            val item = jukebox.itemsByKey[ref.trackKey]
+            val gameName = item?.let { gamesById[it.gameId]?.localizedName(language) } ?: freeCatLabel
+            ResolvedPlaylistRowDisplay(
+                ref = ref,
+                available = item != null,
+                title = item?.localizedDisplayName(language).orEmpty(),
+                categorySubtitle = gameName,
+                artworkName = item?.ostIndex?.let { "t_%03d.webp".format(java.util.Locale.ROOT, it) },
+            )
+        }
+        is com.mylittleblover.mkwplayer.library.PlaylistItemRef.SfcTrack -> {
+            val ok = ExtraMusicCatalog.isVisible(ref.trackId, unlocked)
+            val track = extraCatalog.sfcCourses.firstOrNull { it.id == ref.trackId }
+            ResolvedPlaylistRowDisplay(
+                ref = ref,
+                available = ok && track != null,
+                title = track?.localizedName(language).orEmpty(),
+                categorySubtitle = sfcCatLabel,
+                artworkName = track?.artwork,
+                editorTargetCode = "extra:${ref.trackId}",
+            )
+        }
+        is com.mylittleblover.mkwplayer.library.PlaylistItemRef.BattleTrack -> {
+            val ok = ExtraMusicCatalog.isVisible(ref.trackId, unlocked)
+            val track = extraCatalog.battleTracks.firstOrNull { it.id == ref.trackId }
+            ResolvedPlaylistRowDisplay(
+                ref = ref,
+                available = ok && track != null,
+                title = track?.localizedName(language).orEmpty(),
+                categorySubtitle = battleCatLabel,
+                artworkName = track?.artwork,
+                editorTargetCode = "extra:${ref.trackId}",
+            )
+        }
+        is com.mylittleblover.mkwplayer.library.PlaylistItemRef.ExtraTrack -> {
+            val ok = ExtraMusicCatalog.isVisible(ref.extraId, unlocked)
+            val other = extraCatalog.otherMusic.firstOrNull { it.id == ref.extraId }
+            val simple = extraCatalog.shortSounds.firstOrNull { it.id == ref.extraId }
+                ?: extraCatalog.nintendoMusicSpecial.firstOrNull { it.id == ref.extraId }
+            val sub = when {
+                other != null -> otherCatLabel
+                extraCatalog.shortSounds.any { it.id == ref.extraId } -> soundsCatLabel
+                else -> nmCatLabel
+            }
+            ResolvedPlaylistRowDisplay(
+                ref = ref,
+                available = ok && (other != null || simple != null),
+                title = other?.localizedName(language) ?: simple?.localizedName(language).orEmpty(),
+                categorySubtitle = sub,
+                artworkName = other?.artwork ?: simple?.artwork,
+                editorTargetCode = if (other is ExtraMusicCatalog.OtherMusicItem.InteractiveTitle) {
+                    "extra:${other.id}"
+                } else null,
             )
         }
     }
@@ -3106,8 +3497,6 @@ internal fun DiscoveryPlaylist(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val haptic = LocalHapticFeedback.current
-    val systemDefaultLabel = stringResource(R.string.preset_system_default)
-    val systemKnockoutLabel = stringResource(R.string.preset_system_knockout)
     val coursesCatLabel = stringResource(R.string.discovery_courses)
     val sfcCatLabel = stringResource(R.string.discovery_vs_sfc)
     val battleCatLabel = stringResource(R.string.discovery_battle)
@@ -3131,91 +3520,24 @@ internal fun DiscoveryPlaylist(
         selectedIndices = emptyList()
     }
 
-    data class ResolvedRowDisplay(
-        val ref: com.mylittleblover.mkwplayer.library.PlaylistItemRef,
-        val available: Boolean,
-        val title: String,
-        val categorySubtitle: String,
-        val artworkName: String?,
-        val fallbackCourseCode: String? = null,
-        val editorTargetCode: String? = null,
-        val isCourse: Boolean = false,
+    fun resolveEntry(rawId: String): ResolvedPlaylistRowDisplay = resolvePlaylistRowDisplay(
+        rawId = rawId,
+        catalog = catalog,
+        unlocked = unlocked,
+        language = language,
+        extraCatalog = extraCatalog,
+        jukebox = jukebox,
+        gamesById = gamesById,
+        visibleCourseSet = visibleCourseSet,
+        courseArtwork = courseArtwork,
+        coursesCatLabel = coursesCatLabel,
+        sfcCatLabel = sfcCatLabel,
+        battleCatLabel = battleCatLabel,
+        freeCatLabel = freeCatLabel,
+        otherCatLabel = otherCatLabel,
+        soundsCatLabel = soundsCatLabel,
+        nmCatLabel = nmCatLabel,
     )
-
-    fun resolveEntry(rawId: String): ResolvedRowDisplay {
-        return when (val ref = com.mylittleblover.mkwplayer.library.PlaylistItemRef.parse(rawId)) {
-            is com.mylittleblover.mkwplayer.library.PlaylistItemRef.Course -> {
-                val logical = ref.logicalCode
-                val ok = logical in visibleCourseSet || rawId in visibleCourseSet
-                ResolvedRowDisplay(
-                    ref = ref,
-                    available = ok,
-                    title = if (ok) catalog?.displayName(logical, language) ?: logical else "",
-                    categorySubtitle = coursesCatLabel,
-                    artworkName = courseArtwork[rawId] ?: courseArtwork[logical],
-                    fallbackCourseCode = logical,
-                    editorTargetCode = logical,
-                    isCourse = true,
-                )
-            }
-            is com.mylittleblover.mkwplayer.library.PlaylistItemRef.Jukebox -> {
-                val item = jukebox.itemsByKey[ref.trackKey]
-                val gameName = item?.let { gamesById[it.gameId]?.localizedName(language) } ?: freeCatLabel
-                ResolvedRowDisplay(
-                    ref = ref,
-                    available = item != null,
-                    title = item?.localizedDisplayName(language).orEmpty(),
-                    categorySubtitle = gameName,
-                    artworkName = item?.ostIndex?.let { "t_%03d.webp".format(java.util.Locale.ROOT, it) },
-                )
-            }
-            is com.mylittleblover.mkwplayer.library.PlaylistItemRef.SfcTrack -> {
-                val ok = ExtraMusicCatalog.isVisible(ref.trackId, unlocked)
-                val track = extraCatalog.sfcCourses.firstOrNull { it.id == ref.trackId }
-                ResolvedRowDisplay(
-                    ref = ref,
-                    available = ok && track != null,
-                    title = track?.localizedName(language).orEmpty(),
-                    categorySubtitle = sfcCatLabel,
-                    artworkName = track?.artwork,
-                    editorTargetCode = "extra:${ref.trackId}",
-                )
-            }
-            is com.mylittleblover.mkwplayer.library.PlaylistItemRef.BattleTrack -> {
-                val ok = ExtraMusicCatalog.isVisible(ref.trackId, unlocked)
-                val track = extraCatalog.battleTracks.firstOrNull { it.id == ref.trackId }
-                ResolvedRowDisplay(
-                    ref = ref,
-                    available = ok && track != null,
-                    title = track?.localizedName(language).orEmpty(),
-                    categorySubtitle = battleCatLabel,
-                    artworkName = track?.artwork,
-                    editorTargetCode = "extra:${ref.trackId}",
-                )
-            }
-            is com.mylittleblover.mkwplayer.library.PlaylistItemRef.ExtraTrack -> {
-                val ok = ExtraMusicCatalog.isVisible(ref.extraId, unlocked)
-                val other = extraCatalog.otherMusic.firstOrNull { it.id == ref.extraId }
-                val simple = extraCatalog.shortSounds.firstOrNull { it.id == ref.extraId }
-                    ?: extraCatalog.nintendoMusicSpecial.firstOrNull { it.id == ref.extraId }
-                val sub = when {
-                    other != null -> otherCatLabel
-                    extraCatalog.shortSounds.any { it.id == ref.extraId } -> soundsCatLabel
-                    else -> nmCatLabel
-                }
-                ResolvedRowDisplay(
-                    ref = ref,
-                    available = ok && (other != null || simple != null),
-                    title = other?.localizedName(language) ?: simple?.localizedName(language).orEmpty(),
-                    categorySubtitle = sub,
-                    artworkName = other?.artwork ?: simple?.artwork,
-                    editorTargetCode = if (other is ExtraMusicCatalog.OtherMusicItem.InteractiveTitle) {
-                        "extra:${other.id}"
-                    } else null,
-                )
-            }
-        }
-    }
 
     val entryIdx = editingEntryIndex
     if (playlist != null && entryIdx != null && entryIdx in playlist.courseIds.indices) {
@@ -3225,85 +3547,64 @@ internal fun DiscoveryPlaylist(
         if (editorTarget != null) {
             val logicalCode = editorTarget
             val cfg = playlist.configAt(entryIdx)
-            val matchingPresets = presets.filter {
-                it.courseCode.equals(logicalCode, ignoreCase = true) && isPresetSelectable(logicalCode, it.id)
-            }
-            val knockoutSelectable = rowInfo.isCourse && isPresetSelectable(logicalCode, PresetRefs.SYSTEM_KNOCKOUT)
-            val defaultSelectable = !rowInfo.isCourse || isPresetSelectable(logicalCode, PresetRefs.SYSTEM_DEFAULT)
             val itemTitle = rowInfo.title.ifBlank { rawCode }
-            ModalBottomSheet(sheetState = configSheet, onDismissRequest = { editingEntryIndex = null }) {
+            MkwBottomSheet(
+                onDismissRequest = { editingEntryIndex = null },
+                title = "$itemTitle · ${stringResource(R.string.discovery_playlist_entry_config)}",
+            ) {
                 Column(
-                    Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 24.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Text(
-                        "$itemTitle · ${stringResource(R.string.discovery_playlist_entry_config)}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
                     Text(
                         stringResource(R.string.discovery_playlist_entry_preset),
                         style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MkwKitTokens.Palette.inkSecondary,
                     )
-                    Column {
-                        val isDefaultSelected = cfg.presetId == null || cfg.presetId == PresetRefs.SYSTEM_DEFAULT
-                        if (defaultSelectable || isDefaultSelected) {
-                            ListItem(
-                                headlineContent = { Text(systemDefaultLabel) },
-                                trailingContent = { RadioButton(selected = isDefaultSelected, onClick = null) },
-                                modifier = Modifier.fillMaxWidth().clickable { onUpdateEntryPreset(entryIdx, null) },
-                            )
-                        }
-                        if (knockoutSelectable) {
-                            ListItem(
-                                headlineContent = { Text(systemKnockoutLabel) },
-                                trailingContent = { RadioButton(selected = cfg.presetId == PresetRefs.SYSTEM_KNOCKOUT, onClick = null) },
-                                modifier = Modifier.fillMaxWidth().clickable { onUpdateEntryPreset(entryIdx, PresetRefs.SYSTEM_KNOCKOUT) },
-                            )
-                        }
-                        matchingPresets.forEach { preset ->
-                            ListItem(
-                                headlineContent = { Text(preset.name) },
-                                trailingContent = { RadioButton(selected = cfg.presetId == preset.id, onClick = null) },
-                                modifier = Modifier.fillMaxWidth().clickable { onUpdateEntryPreset(entryIdx, preset.id) },
-                            )
-                        }
-                        Spacer(Modifier.height(6.dp))
-                        OutlinedButton(
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        CoursePresetOptionsColumn(
+                            logicalCode = logicalCode,
+                            isCourse = rowInfo.isCourse,
+                            selectedPresetId = cfg.presetId,
+                            presets = presets,
+                            isPresetSelectable = isPresetSelectable,
+                            onSelectPreset = { onUpdateEntryPreset(entryIdx, it) },
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        MkwSecondaryButton(
+                            text = stringResource(R.string.preset_new),
                             onClick = {
                                 editingEntryIndex = null
                                 onOpenFlowEditor(logicalCode, cfg.presetId)
                             },
+                            leadingIcon = Icons.Filled.Edit,
                             modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Icon(Icons.Filled.Edit, null, Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text(stringResource(R.string.preset_new))
-                        }
+                        )
                     }
                     if (rowInfo.isCourse) {
-                        HorizontalDivider()
+                        MkwDivider()
                         Text(
                             stringResource(R.string.discovery_playlist_native_transition),
                             style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MkwKitTokens.Palette.inkSecondary,
                         )
-                        Column {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             listOf(
                                 null to stringResource(R.string.discovery_playlist_entry_native_inherit),
                                 true to stringResource(R.string.discovery_playlist_entry_native_on),
                                 false to stringResource(R.string.discovery_playlist_entry_native_off),
                             ).forEach { (value, label) ->
-                                ListItem(
-                                    headlineContent = { Text(label) },
-                                    trailingContent = { RadioButton(selected = cfg.nativeTransitionEnabled == value, onClick = null) },
-                                    modifier = Modifier.fillMaxWidth().clickable { onUpdateEntryNative(entryIdx, value) },
+                                val selected = cfg.nativeTransitionEnabled == value
+                                MkwOptionRow(
+                                    headline = label,
+                                    selected = selected,
+                                    role = Role.RadioButton,
+                                    onClick = { onUpdateEntryNative(entryIdx, value) },
+                                    trailing = { MkwRadioMark(selected = selected) },
                                 )
                             }
                         }
                     }
-                    Spacer(Modifier.height(12.dp))
                 }
             }
         } else {
@@ -3311,30 +3612,45 @@ internal fun DiscoveryPlaylist(
         }
     }
 
-    if (renaming) AlertDialog(
+    if (renaming) MkwDialog(
         onDismissRequest = { renaming = false },
-        title = { Text(stringResource(R.string.discovery_rename)) },
-        text = {
-            OutlinedTextField(
-                value = newName,
-                onValueChange = { newName = it.take(120) },
-                label = { Text(stringResource(R.string.discovery_playlist_name)) },
-                supportingText = if (newName.isBlank()) {
-                    { Text(stringResource(R.string.discovery_create_name_hint)) }
-                } else null,
-                singleLine = true,
+        title = stringResource(R.string.discovery_rename),
+        confirmButton = {
+            MkwPrimaryButton(
+                text = stringResource(R.string.discovery_rename),
+                onClick = { onRename(newName); renaming = false },
+                enabled = newName.isNotBlank(),
+                size = MkwButtonSize.Compact,
             )
         },
-        confirmButton = { TextButton(onClick = { onRename(newName); renaming = false }, enabled = newName.isNotBlank()) { Text(stringResource(R.string.discovery_rename)) } },
-        dismissButton = { TextButton(onClick = { renaming = false }) { Text(stringResource(R.string.discovery_cancel)) } },
-    )
-    if (deleting) AlertDialog(
+        dismissButton = {
+            MkwGhostButton(text = stringResource(R.string.discovery_cancel), onClick = { renaming = false })
+        },
+    ) {
+        MkwTextField(
+            value = newName,
+            onValueChange = { newName = it.take(120) },
+            label = stringResource(R.string.discovery_playlist_name),
+            supportingText = if (newName.isBlank()) stringResource(R.string.discovery_create_name_hint) else null,
+            singleLine = true,
+        )
+    }
+    if (deleting) MkwDialog(
         onDismissRequest = { deleting = false },
-        title = { Text(stringResource(R.string.discovery_delete_playlist)) },
-        text = { Text(playlist?.name.orEmpty()) },
-        confirmButton = { TextButton(onClick = { deleting = false; onDelete() }) { Text(stringResource(R.string.discovery_delete_playlist)) } },
-        dismissButton = { TextButton(onClick = { deleting = false }) { Text(stringResource(R.string.discovery_cancel)) } },
-    )
+        title = stringResource(R.string.discovery_delete_playlist),
+        confirmButton = {
+            MkwDangerButton(
+                text = stringResource(R.string.discovery_delete_playlist),
+                onClick = { deleting = false; onDelete() },
+                size = MkwButtonSize.Compact,
+            )
+        },
+        dismissButton = {
+            MkwGhostButton(text = stringResource(R.string.discovery_cancel), onClick = { deleting = false })
+        },
+    ) {
+        Text(playlist?.name.orEmpty(), style = MaterialTheme.typography.bodyMedium, color = MkwKitTokens.Palette.ink)
+    }
 
     TrackActionOverlayHosts(
         menuTarget = trackMenuTarget,
@@ -3423,7 +3739,12 @@ internal fun DiscoveryPlaylist(
             LazyColumn(
                 state = plListState,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = PaddingValues(16.dp),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    top = 16.dp,
+                    end = 16.dp,
+                    bottom = com.mylittleblover.mkwplayer.ui.rememberMiniPlayerBottomClearance(16.dp),
+                ),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (playlist == null) item { Text(stringResource(R.string.discovery_empty)) }
@@ -3432,112 +3753,120 @@ internal fun DiscoveryPlaylist(
                     val hasCourses = resolvedEntries.any { it.isCourse }
                     item(key = "pl-hero") {
                         val firstHero = resolvedEntries.firstOrNull { it.available }
-                        ElevatedCard(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                                    PackArtwork.Thumbnail(
-                                        packDirectory,
-                                        listOfNotNull(firstHero?.artworkName),
-                                        Modifier.size(72.dp).clip(RoundedCornerShape(16.dp))
-                                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)),
-                                    ) {
-                                        val fallbackCourse = firstHero?.fallbackCourseCode
-                                        val art = fallbackCourse?.let { StageArt.resolve(it) }
-                                        if (art != null) ResourceArtwork(art, Modifier.size(56.dp))
-                                        else Icon(Icons.Outlined.MusicNote, null, modifier = Modifier.size(32.dp))
+                        MkwCard(
+                            tone = MkwSurfaceTone.Porcelain,
+                            contentPadding = PaddingValues(16.dp),
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                PackArtwork.Thumbnail(
+                                    packDirectory,
+                                    listOfNotNull(firstHero?.artworkName),
+                                    Modifier.size(72.dp).clip(MkwKitTokens.Shape.card)
+                                        .background(MkwKitTokens.Palette.rose),
+                                ) {
+                                    val fallbackCourse = firstHero?.fallbackCourseCode
+                                    val art = fallbackCourse?.let { StageArt.resolve(it) }
+                                    if (art != null) ResourceArtwork(art, Modifier.size(56.dp))
+                                    else Icon(Icons.Outlined.MusicNote, null, modifier = Modifier.size(32.dp), tint = MkwKitTokens.Palette.crimsonDeep)
+                                }
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(playlist.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MkwKitTokens.Palette.ink)
+                                    Text(
+                                        pluralStringResource(R.plurals.tracks_count_plurals, playlist.courseIds.size, playlist.courseIds.size),
+                                        style = MkwKitTokens.tabular(MaterialTheme.typography.bodySmall),
+                                        color = MkwKitTokens.Palette.inkSecondary,
+                                    )
+                                }
+                                Box {
+                                    MkwIconButton(
+                                        icon = Icons.Filled.MoreVert,
+                                        contentDescription = stringResource(R.string.jukebox_more_actions),
+                                        onClick = { menuOpen = true },
+                                    )
+                                    MkwDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                        MkwDropdownItem(
+                                            text = stringResource(R.string.track_action_multi_select),
+                                            leadingIcon = Icons.Outlined.CheckCircle,
+                                            enabled = playlist.courseIds.isNotEmpty(),
+                                            onClick = {
+                                                menuOpen = false
+                                                multiSelectMode = true
+                                                selectedIndices = emptyList()
+                                            },
+                                        )
+                                        MkwDropdownItem(
+                                            text = stringResource(R.string.discovery_rename),
+                                            leadingIcon = Icons.Filled.Edit,
+                                            onClick = {
+                                                menuOpen = false
+                                                newName = playlist.name
+                                                renaming = true
+                                            },
+                                        )
+                                        MkwDropdownItem(
+                                            text = stringResource(R.string.discovery_delete_playlist),
+                                            leadingIcon = Icons.Filled.DeleteOutline,
+                                            destructive = true,
+                                            onClick = {
+                                                menuOpen = false
+                                                deleting = true
+                                            },
+                                        )
                                     }
-                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        Text(playlist.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            val playableCount = resolvedEntries.count { it.available }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                MkwPrimaryButton(
+                                    text = stringResource(R.string.discovery_playlist_play_all),
+                                    onClick = onPlayAll,
+                                    enabled = playableCount > 0,
+                                    leadingIcon = Icons.Filled.PlayArrow,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                MkwSecondaryButton(
+                                    text = stringResource(R.string.jukebox_shuffle),
+                                    onClick = onShuffle,
+                                    enabled = playableCount > 0,
+                                    leadingIcon = Icons.Filled.Shuffle,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+
+                            if (hasCourses) {
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(stringResource(R.string.discovery_playlist_native_transition), style = MaterialTheme.typography.titleSmall, color = MkwKitTokens.Palette.ink)
                                         Text(
-                                            stringResource(R.string.jukebox_tracks_count, playlist.courseIds.size),
+                                            stringResource(R.string.discovery_playlist_native_transition_desc),
                                             style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            color = MkwKitTokens.Palette.inkSecondary,
                                         )
                                     }
-                                    Box {
-                                        IconButton(onClick = { menuOpen = true }) {
-                                            Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.jukebox_more_actions))
-                                        }
-                                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                                            DropdownMenuItem(
-                                                text = { Text(stringResource(R.string.track_action_multi_select)) },
-                                                leadingIcon = { Icon(Icons.Outlined.CheckCircle, contentDescription = null) },
-                                                enabled = playlist.courseIds.isNotEmpty(),
-                                                onClick = {
-                                                    menuOpen = false
-                                                    multiSelectMode = true
-                                                    selectedIndices = emptyList()
-                                                },
-                                            )
-                                            DropdownMenuItem(
-                                                text = { Text(stringResource(R.string.discovery_rename)) },
-                                                leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
-                                                onClick = {
-                                                    menuOpen = false
-                                                    newName = playlist.name
-                                                    renaming = true
-                                                },
-                                            )
-                                            DropdownMenuItem(
-                                                text = { Text(stringResource(R.string.discovery_delete_playlist), color = MaterialTheme.colorScheme.error) },
-                                                leadingIcon = { Icon(Icons.Filled.DeleteOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-                                                onClick = {
-                                                    menuOpen = false
-                                                    deleting = true
-                                                },
-                                            )
-                                        }
-                                    }
-                                }
-
-                                val playableCount = resolvedEntries.count { it.available }
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Button(onClick = onPlayAll, enabled = playableCount > 0, modifier = Modifier.weight(1f)) {
-                                        Icon(Icons.Filled.PlayArrow, null, Modifier.size(18.dp))
-                                        Spacer(Modifier.width(6.dp))
-                                        Text(stringResource(R.string.discovery_playlist_play_all))
-                                    }
-                                    OutlinedButton(onClick = onShuffle, enabled = playableCount > 0, modifier = Modifier.weight(1f)) {
-                                        Icon(Icons.Filled.Shuffle, null, Modifier.size(18.dp))
-                                        Spacer(Modifier.width(6.dp))
-                                        Text(stringResource(R.string.jukebox_shuffle))
-                                    }
-                                }
-
-                                if (hasCourses) {
-                                    Row(
-                                        Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    ) {
-                                        Column(Modifier.weight(1f)) {
-                                            Text(stringResource(R.string.discovery_playlist_native_transition), style = MaterialTheme.typography.titleSmall)
-                                            Text(
-                                                stringResource(R.string.discovery_playlist_native_transition_desc),
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        }
-                                        Switch(
-                                            checked = playlist.nativeTransitionDefault,
-                                            onCheckedChange = onToggleNativeDefault,
-                                        )
-                                    }
+                                    MkwSwitch(
+                                        checked = playlist.nativeTransitionDefault,
+                                        onCheckedChange = onToggleNativeDefault,
+                                    )
                                 }
                             }
                         }
                     }
                     if (isThisPlaylistPlaying) item(key = "pl-playing") {
-                        Surface(
-                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth(),
+                        MkwCard(
+                            tone = MkwSurfaceTone.RoseTint,
+                            selected = true,
+                            shape = MkwKitTokens.Shape.control,
+                            contentPadding = PaddingValues(12.dp),
                         ) {
                             Text(
                                 stringResource(R.string.discovery_playlist_frozen_note),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.padding(12.dp),
+                                color = MkwKitTokens.Palette.crimsonDeep,
                             )
                         }
                     }
@@ -3556,14 +3885,13 @@ internal fun DiscoveryPlaylist(
                         val title = if (info.available) info.title.ifBlank { rawId } else stringResource(R.string.discovery_empty)
                         val editorTarget = info.editorTargetCode
                         val baseMetaLine = if (editorTarget != null) {
-                            val presetName = when {
-                                info.isCourse && cfg.presetId == PresetRefs.SYSTEM_KNOCKOUT &&
-                                    isPresetSelectable(editorTarget, PresetRefs.SYSTEM_KNOCKOUT) -> systemKnockoutLabel
-                                cfg.presetId == null || cfg.presetId == PresetRefs.SYSTEM_DEFAULT -> systemDefaultLabel
-                                else -> presets.firstOrNull {
-                                    it.id == cfg.presetId && it.courseCode.equals(editorTarget, ignoreCase = true)
-                                }?.name ?: systemDefaultLabel
-                            }
+                            val presetName = resolveStopOrEntryPresetLabel(
+                                targetCode = editorTarget,
+                                isCourse = info.isCourse,
+                                presetId = cfg.presetId,
+                                presets = presets,
+                                isPresetSelectable = isPresetSelectable,
+                            )
                             val nativeStatus = if (info.isCourse) {
                                 when (cfg.nativeTransitionEnabled) {
                                     true -> stringResource(R.string.discovery_playlist_entry_native_on)
@@ -3581,7 +3909,7 @@ internal fun DiscoveryPlaylist(
                         }
                         val plays = playStats[statId]?.playCount ?: 0
                         val metaLine = if (plays > 0) {
-                            listOfNotNull(baseMetaLine.takeIf { it.isNotBlank() }, stringResource(R.string.play_count_fmt, plays)).joinToString(" · ")
+                            listOfNotNull(baseMetaLine.takeIf { it.isNotBlank() }, pluralStringResource(R.plurals.play_count_plurals, plays, plays)).joinToString(" · ")
                         } else {
                             baseMetaLine
                         }
@@ -3632,18 +3960,15 @@ internal fun DiscoveryPlaylist(
                             endToStartLabel = stringResource(R.string.swipe_action_remove),
                             endToStartDestructive = true,
                         ) {
-                            Card(
-                                elevation = CardDefaults.cardElevation(defaultElevation = if (dragging) 8.dp else 0.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = when {
-                                        dragging -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)
-                                        isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
-                                        else -> MaterialTheme.colorScheme.surfaceContainerLow
-                                    },
-                                ),
+                            val rowSelected = dragging || isSelected
+                            MkwCard(
+                                selected = rowSelected,
+                                tone = MkwSurfaceTone.Porcelain,
+                                shape = MkwKitTokens.Shape.control,
+                                contentPadding = PaddingValues(10.dp),
                                 modifier = rowMod
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .clip(MkwKitTokens.Shape.control)
                                     .combinedClickable(
                                         onClick = {
                                             if (multiSelectMode) {
@@ -3662,62 +3987,46 @@ internal fun DiscoveryPlaylist(
                                         },
                                     ),
                             ) {
-                                Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                        if (multiSelectMode) {
-                                            Checkbox(
-                                                checked = isSelected,
-                                                onCheckedChange = {
-                                                    selectedIndices = if (isSelected) selectedIndices - index else selectedIndices + index
-                                                },
-                                            )
-                                        }
-                                        PackArtwork.Thumbnail(
-                                            packDirectory,
-                                            listOfNotNull(info.artworkName),
-                                            Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)),
-                                        ) {
-                                            val fallback = info.fallbackCourseCode
-                                            if (fallback != null) CourseCover(fallback, Modifier.fillMaxSize())
-                                            else Icon(Icons.Outlined.MusicNote, null, modifier = Modifier.size(22.dp))
-                                        }
-                                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            Text(metaLine, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        }
-                                        if (!multiSelectMode) {
-                                            if (info.isCourse) {
-                                                IconButton(onClick = { onCourse((info.ref as com.mylittleblover.mkwplayer.library.PlaylistItemRef.Course).logicalCode) }, enabled = info.available) {
-                                                    Icon(Icons.Outlined.MusicNote, contentDescription = title)
-                                                }
-                                            }
-                                            if (editorTarget != null) {
-                                                IconButton(onClick = { editingEntryIndex = index }, enabled = info.available) {
-                                                    Icon(Icons.Filled.Tune, contentDescription = stringResource(R.string.discovery_playlist_entry_config))
-                                                }
-                                            }
-                                            IconButton(onClick = { trackMenuTarget = spec }) {
-                                                Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.jukebox_more_actions))
-                                            }
-                                            if (playlist.courseIds.size > 1) {
-                                                com.mylittleblover.mkwplayer.ui.components.DragHandleButton(
-                                                    index = index,
-                                                    controller = dragController,
-                                                )
-                                            }
-                                        }
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    if (multiSelectMode) {
+                                        MkwCheckboxMark(checked = isSelected)
+                                    }
+                                    PackArtwork.Thumbnail(
+                                        packDirectory,
+                                        listOfNotNull(info.artworkName),
+                                        Modifier.size(44.dp).clip(MkwKitTokens.Shape.thumb),
+                                    ) {
+                                        val fallback = info.fallbackCourseCode
+                                        if (fallback != null) CourseCover(fallback, Modifier.fillMaxSize())
+                                        else Icon(Icons.Outlined.MusicNote, null, modifier = Modifier.size(22.dp), tint = MkwKitTokens.Palette.inkSecondary)
+                                    }
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MkwKitTokens.Palette.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(metaLine, style = MaterialTheme.typography.bodySmall, color = MkwKitTokens.Palette.inkSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     }
                                     if (!multiSelectMode) {
-                                        Row(Modifier.align(Alignment.End)) {
-                                            IconButton(onClick = { onMove(index, index - 1) }, enabled = index > 0) {
-                                                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "${stringResource(R.string.discovery_move_up)}: $title, ${index + 1}")
-                                            }
-                                            IconButton(onClick = { onMove(index, index + 1) }, enabled = index + 1 < playlist.courseIds.size) {
-                                                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "${stringResource(R.string.discovery_move_down)}: $title, ${index + 1}")
-                                            }
-                                            IconButton(onClick = { onRemove(index) }) {
-                                                Icon(Icons.Filled.RemoveCircleOutline, contentDescription = "${stringResource(R.string.discovery_remove)}: $title, ${index + 1}")
-                                            }
+                                        if (editorTarget != null) {
+                                            MkwIconButton(
+                                                icon = Icons.Filled.Tune,
+                                                contentDescription = stringResource(R.string.discovery_playlist_entry_config),
+                                                onClick = { editingEntryIndex = index },
+                                                enabled = info.available,
+                                                visualSize = 36.dp,
+                                                iconSize = 19.dp,
+                                            )
+                                        }
+                                        MkwIconButton(
+                                            icon = Icons.Filled.MoreVert,
+                                            contentDescription = stringResource(R.string.jukebox_more_actions),
+                                            onClick = { trackMenuTarget = spec },
+                                            visualSize = 36.dp,
+                                            iconSize = 19.dp,
+                                        )
+                                        if (playlist.courseIds.size > 1) {
+                                            com.mylittleblover.mkwplayer.ui.components.DragHandleButton(
+                                                index = index,
+                                                controller = dragController,
+                                            )
                                         }
                                     }
                                 }
@@ -3766,7 +4075,449 @@ internal fun DiscoveryPlaylist(
                 )
             }
         }
-        SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+        SnackbarHost(
+            snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = com.mylittleblover.mkwplayer.ui.rememberMiniPlayerBottomClearance(0.dp)),
+        )
+    }
+}
+
+/**
+ * Dedicated screen for the pinned "My Favorites" permanent playlist inside My Playlists.
+ * Reuses the exact track resolution, swipe actions, multi-select, and context sheet model as
+ * user playlists while locking out destructive playlist-level actions (rename/delete).
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+internal fun DiscoveryFavoritesPlaylist(
+    favorites: Set<String>,
+    catalog: BrowseCatalog?,
+    unlocked: Boolean,
+    language: String,
+    presets: List<com.mylittleblover.mkwplayer.library.CoursePreset> = emptyList(),
+    packDirectory: java.io.File? = null,
+    courseArtwork: Map<String, String> = emptyMap(),
+    jukebox: JukeboxCatalog.Catalog = JukeboxCatalog.Catalog(emptyList(), emptyMap()),
+    extraCatalog: ExtraMusicCatalog.Catalog = ExtraMusicCatalog.Catalog(),
+    isThisPlaylistPlaying: Boolean = false,
+    onPlayAll: (playableRefs: List<String>) -> Unit = {},
+    onShuffle: (playableRefs: List<String>) -> Unit = {},
+    onPlayFrom: (playableRefs: List<String>, index: Int) -> Unit = { _, _ -> },
+    onCourse: (String) -> Unit = {},
+    onOpenFlowEditor: (String, String?) -> Unit = { _, _ -> },
+    playlists: List<com.mylittleblover.mkwplayer.library.UserPlaylist> = emptyList(),
+    onToggleFavorite: (String) -> Unit = {},
+    onAddToPlaylist: (playlistId: String, refs: List<String>) -> Unit = { _, _ -> },
+    onCreatePlaylistAndAdd: (name: String, refs: List<String>) -> Unit = { _, _ -> },
+    allowPlayNext: Boolean = true,
+    onPlayNextRefs: (List<String>) -> Boolean = { false },
+    onAddToQueueRefs: (List<String>) -> Boolean = { false },
+    onPlaySelectedRefs: (List<String>) -> Boolean = { false },
+    playStats: Map<String, com.mylittleblover.mkwplayer.library.TrackPlayStat> = emptyMap(),
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+    val visibleCourses = catalog?.courses(unlocked).orEmpty()
+    val visibleCourseSet = remember(visibleCourses) { visibleCourses.toSet() }
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val haptic = LocalHapticFeedback.current
+    val coursesCatLabel = stringResource(R.string.discovery_courses)
+    val sfcCatLabel = stringResource(R.string.discovery_vs_sfc)
+    val battleCatLabel = stringResource(R.string.discovery_battle)
+    val freeCatLabel = stringResource(R.string.discovery_free)
+    val otherCatLabel = stringResource(R.string.discovery_other)
+    val soundsCatLabel = stringResource(R.string.discovery_sounds)
+    val nmCatLabel = stringResource(R.string.discovery_nintendo_music)
+    val addedNextText = stringResource(R.string.jukebox_added_next)
+    val addedQueueText = stringResource(R.string.track_action_added_to_queue)
+    val gamesById = remember(jukebox) { jukebox.games.associateBy { it.id } }
+
+    var trackMenuTarget by remember { mutableStateOf<TrackMenuSpec?>(null) }
+    var infoTarget by remember { mutableStateOf<TrackMenuSpec?>(null) }
+    var playlistPickerRefs by remember { mutableStateOf<List<String>?>(null) }
+    var multiSelectMode by rememberSaveable("favorites-pl") { mutableStateOf(false) }
+    var selectedRefs by rememberSaveable("favorites-pl-sel") { mutableStateOf(listOf<String>()) }
+    val selectedRefSet = remember(selectedRefs) { selectedRefs.toSet() }
+
+    val favoriteRows = remember(
+        favorites,
+        catalog,
+        unlocked,
+        language,
+        extraCatalog,
+        jukebox,
+        courseArtwork,
+        visibleCourseSet,
+    ) {
+        favorites.toList().mapNotNull { rawId ->
+            val info = resolvePlaylistRowDisplay(
+                rawId = rawId,
+                catalog = catalog,
+                unlocked = unlocked,
+                language = language,
+                extraCatalog = extraCatalog,
+                jukebox = jukebox,
+                gamesById = gamesById,
+                visibleCourseSet = visibleCourseSet,
+                courseArtwork = courseArtwork,
+                coursesCatLabel = coursesCatLabel,
+                sfcCatLabel = sfcCatLabel,
+                battleCatLabel = battleCatLabel,
+                freeCatLabel = freeCatLabel,
+                otherCatLabel = otherCatLabel,
+                soundsCatLabel = soundsCatLabel,
+                nmCatLabel = nmCatLabel,
+            )
+            if (!info.available) null else (rawId to info)
+        }
+    }
+    val playableRefs = remember(favoriteRows) { favoriteRows.map { it.first } }
+
+    androidx.activity.compose.BackHandler(enabled = multiSelectMode) {
+        multiSelectMode = false
+        selectedRefs = emptyList()
+    }
+
+    TrackActionOverlayHosts(
+        menuTarget = trackMenuTarget,
+        onDismissMenu = { trackMenuTarget = null },
+        playlistPickerRefs = playlistPickerRefs,
+        onOpenPlaylistPicker = { refs -> playlistPickerRefs = refs },
+        onDismissPlaylistPicker = { playlistPickerRefs = null },
+        infoTarget = infoTarget,
+        onOpenInfo = { infoTarget = it },
+        onDismissInfo = { infoTarget = null },
+        packDirectory = packDirectory,
+        allowPlayNext = allowPlayNext,
+        playlists = playlists,
+        favorites = favorites,
+        onToggleFavorite = onToggleFavorite,
+        onOpenCourse = onCourse,
+        onOpenFlowEditor = { editorCode -> onOpenFlowEditor(editorCode, null) },
+        onEnterMultiSelect = { key ->
+            multiSelectMode = true
+            selectedRefs = (selectedRefs + key).distinct()
+        },
+        onPlayNextRefs = onPlayNextRefs,
+        onAddToQueueRefs = onAddToQueueRefs,
+        onAddToPlaylist = { pid, refs ->
+            onAddToPlaylist(pid, refs)
+            multiSelectMode = false
+            selectedRefs = emptyList()
+        },
+        onCreatePlaylistAndAdd = { name, refs ->
+            onCreatePlaylistAndAdd(name, refs)
+            multiSelectMode = false
+            selectedRefs = emptyList()
+        },
+        snackbarHostState = snackbarHostState,
+        addedNextText = addedNextText,
+        addedQueueText = addedQueueText,
+    )
+
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+            AnimatedVisibility(visible = multiSelectMode) {
+                val allSelected = playableRefs.isNotEmpty() && selectedRefSet.containsAll(playableRefs)
+                MultiSelectTopBanner(
+                    selectedCount = selectedRefSet.size,
+                    allSelected = allSelected,
+                    onToggleSelectAll = {
+                        selectedRefs = if (allSelected) emptyList() else playableRefs
+                    },
+                    onClose = {
+                        multiSelectMode = false
+                        selectedRefs = emptyList()
+                    },
+                )
+            }
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    top = 16.dp,
+                    end = 16.dp,
+                    bottom = com.mylittleblover.mkwplayer.ui.rememberMiniPlayerBottomClearance(16.dp),
+                ),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                item(key = "fav-pl-hero") {
+                    val firstHero = favoriteRows.firstOrNull()?.second
+                    MkwCard(
+                        tone = MkwSurfaceTone.Porcelain,
+                        contentPadding = PaddingValues(16.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(72.dp)
+                                    .clip(MkwKitTokens.Shape.card)
+                                    .background(MkwKitTokens.Palette.rose),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (firstHero != null && (firstHero.artworkName != null || firstHero.fallbackCourseCode != null)) {
+                                    PackArtwork.Thumbnail(
+                                        packDirectory,
+                                        listOfNotNull(firstHero.artworkName),
+                                        Modifier.fillMaxSize(),
+                                    ) {
+                                        val fallbackCourse = firstHero.fallbackCourseCode
+                                        val art = fallbackCourse?.let { StageArt.resolve(it) }
+                                        if (art != null) ResourceArtwork(art, Modifier.size(56.dp))
+                                        else Icon(Icons.Filled.Favorite, null, modifier = Modifier.size(32.dp), tint = MkwKitTokens.Palette.crimson)
+                                    }
+                                } else {
+                                    Icon(Icons.Filled.Favorite, null, modifier = Modifier.size(34.dp), tint = MkwKitTokens.Palette.crimson)
+                                }
+                            }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    stringResource(R.string.pinned_favorites_title),
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MkwKitTokens.Palette.ink,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    MkwBadge(text = stringResource(R.string.pinned_favorites_badge), tone = MkwBadgeTone.Rose, tabular = false)
+                                    Text(
+                                        pluralStringResource(R.plurals.tracks_count_plurals, favoriteRows.size, favoriteRows.size),
+                                        style = MkwKitTokens.tabular(MaterialTheme.typography.bodySmall),
+                                        color = MkwKitTokens.Palette.inkSecondary,
+                                    )
+                                }
+                            }
+                            Box {
+                                MkwIconButton(
+                                    icon = Icons.Filled.MoreVert,
+                                    contentDescription = stringResource(R.string.jukebox_more_actions),
+                                    onClick = { menuOpen = true },
+                                )
+                                MkwDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                    MkwDropdownItem(
+                                        text = stringResource(R.string.track_action_multi_select),
+                                        leadingIcon = Icons.Outlined.CheckCircle,
+                                        enabled = favoriteRows.isNotEmpty(),
+                                        onClick = {
+                                            menuOpen = false
+                                            multiSelectMode = true
+                                            selectedRefs = emptyList()
+                                        },
+                                    )
+                                }
+                            }
+                        }
+
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            MkwPrimaryButton(
+                                text = stringResource(R.string.discovery_playlist_play_all),
+                                onClick = { onPlayAll(playableRefs) },
+                                enabled = playableRefs.isNotEmpty(),
+                                leadingIcon = Icons.Filled.PlayArrow,
+                                modifier = Modifier.weight(1f),
+                            )
+                            MkwSecondaryButton(
+                                text = stringResource(R.string.jukebox_shuffle),
+                                onClick = { onShuffle(playableRefs) },
+                                enabled = playableRefs.isNotEmpty(),
+                                leadingIcon = Icons.Filled.Shuffle,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                }
+                if (isThisPlaylistPlaying) item(key = "fav-pl-playing") {
+                    MkwCard(
+                        tone = MkwSurfaceTone.RoseTint,
+                        selected = true,
+                        shape = MkwKitTokens.Shape.control,
+                        contentPadding = PaddingValues(12.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.discovery_playlist_frozen_note),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MkwKitTokens.Palette.crimsonDeep,
+                        )
+                    }
+                }
+                if (favoriteRows.isEmpty()) {
+                    item(key = "fav-pl-empty") {
+                        MkwInsetBox(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                Icon(Icons.Outlined.FavoriteBorder, null, tint = MkwKitTokens.Palette.crimson)
+                                Text(
+                                    stringResource(R.string.pinned_favorites_empty),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MkwKitTokens.Palette.inkSecondary,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    itemsIndexed(favoriteRows, key = { _, (rawId, _) -> "fav-row:$rawId" }) { index, (rawId, info) ->
+                        val title = info.title.ifBlank { rawId }
+                        val statId = when (val r = info.ref) {
+                            is com.mylittleblover.mkwplayer.library.PlaylistItemRef.Course -> r.logicalCode
+                            else -> r.raw
+                        }
+                        val plays = playStats[statId]?.playCount ?: 0
+                        val metaLine = if (plays > 0) {
+                            listOfNotNull(
+                                info.categorySubtitle.takeIf { it.isNotBlank() },
+                                pluralStringResource(R.plurals.play_count_plurals, plays, plays),
+                            ).joinToString(" · ")
+                        } else {
+                            info.categorySubtitle
+                        }
+                        val courseCodeOrNull = (info.ref as? com.mylittleblover.mkwplayer.library.PlaylistItemRef.Course)?.logicalCode
+                        val favId = if (info.isCourse) (courseCodeOrNull ?: rawId) else rawId
+                        val spec = TrackMenuSpec(
+                            selectionKey = rawId,
+                            playlistRef = rawId,
+                            title = title,
+                            subtitle = metaLine,
+                            artworkName = info.artworkName,
+                            fallbackCourseCode = info.fallbackCourseCode,
+                            favoriteId = favId,
+                            courseCodeForDetail = if (info.isCourse && info.available) courseCodeOrNull else null,
+                            editorTargetCode = if (info.available) info.editorTargetCode else null,
+                            infoPairs = listOf(
+                                R.string.track_info_category to info.categorySubtitle,
+                                R.string.track_info_ref to rawId,
+                            ),
+                            onPlayNow = { onPlayFrom(playableRefs, index) },
+                        )
+                        val isSelected = rawId in selectedRefSet
+                        com.mylittleblover.mkwplayer.ui.components.SwipeToTrackActionBox(
+                            enabled = !multiSelectMode,
+                            onSwipeStartToEnd = if (allowPlayNext) {
+                                {
+                                    if (onPlayNextRefs(listOf(rawId))) {
+                                        scope.launch { snackbarHostState.showSnackbar(addedNextText) }
+                                    }
+                                }
+                            } else null,
+                            onSwipeEndToStart = { onToggleFavorite(favId) },
+                            endToStartIcon = Icons.Filled.Favorite,
+                            endToStartLabel = stringResource(R.string.favorites_remove),
+                            endToStartDestructive = true,
+                        ) {
+                            MkwCard(
+                                selected = isSelected,
+                                tone = MkwSurfaceTone.Porcelain,
+                                shape = MkwKitTokens.Shape.control,
+                                contentPadding = PaddingValues(10.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(MkwKitTokens.Shape.control)
+                                    .combinedClickable(
+                                        onClick = {
+                                            if (multiSelectMode) {
+                                                selectedRefs = if (isSelected) selectedRefs - rawId else selectedRefs + rawId
+                                            } else {
+                                                onPlayFrom(playableRefs, index)
+                                            }
+                                        },
+                                        onLongClick = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            if (multiSelectMode) {
+                                                selectedRefs = if (isSelected) selectedRefs - rawId else selectedRefs + rawId
+                                            } else {
+                                                trackMenuTarget = spec
+                                            }
+                                        },
+                                    ),
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    if (multiSelectMode) {
+                                        MkwCheckboxMark(checked = isSelected)
+                                    }
+                                    PackArtwork.Thumbnail(
+                                        packDirectory,
+                                        listOfNotNull(info.artworkName),
+                                        Modifier.size(44.dp).clip(MkwKitTokens.Shape.thumb),
+                                    ) {
+                                        val fallback = info.fallbackCourseCode
+                                        if (fallback != null) CourseCover(fallback, Modifier.fillMaxSize())
+                                        else Icon(Icons.Outlined.MusicNote, null, modifier = Modifier.size(22.dp), tint = MkwKitTokens.Palette.inkSecondary)
+                                    }
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MkwKitTokens.Palette.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(metaLine, style = MaterialTheme.typography.bodySmall, color = MkwKitTokens.Palette.inkSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
+                                    if (!multiSelectMode) {
+                                        MkwIconButton(
+                                            icon = Icons.Filled.Favorite,
+                                            contentDescription = stringResource(R.string.favorites_remove),
+                                            onClick = { onToggleFavorite(favId) },
+                                            visualSize = 36.dp,
+                                            iconSize = 19.dp,
+                                            tintOverride = MkwKitTokens.Palette.crimson,
+                                        )
+                                        MkwIconButton(
+                                            icon = Icons.Filled.MoreVert,
+                                            contentDescription = stringResource(R.string.jukebox_more_actions),
+                                            onClick = { trackMenuTarget = spec },
+                                            visualSize = 36.dp,
+                                            iconSize = 19.dp,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            AnimatedVisibility(visible = multiSelectMode) {
+                val chosenRefs = playableRefs.filter { it in selectedRefSet }
+                MultiSelectActionBar(
+                    hasSelection = chosenRefs.isNotEmpty(),
+                    allowPlayNext = allowPlayNext,
+                    onPlaySelected = {
+                        if (chosenRefs.isNotEmpty() && onPlaySelectedRefs(chosenRefs)) {
+                            multiSelectMode = false
+                            selectedRefs = emptyList()
+                        }
+                    },
+                    onPlayNextSelected = {
+                        if (chosenRefs.isNotEmpty() && onPlayNextRefs(chosenRefs)) {
+                            scope.launch { snackbarHostState.showSnackbar(addedNextText) }
+                        }
+                        multiSelectMode = false
+                        selectedRefs = emptyList()
+                    },
+                    onAddToQueueSelected = {
+                        if (chosenRefs.isNotEmpty() && onAddToQueueRefs(chosenRefs)) {
+                            scope.launch { snackbarHostState.showSnackbar(addedQueueText) }
+                        }
+                        multiSelectMode = false
+                        selectedRefs = emptyList()
+                    },
+                    onAddToPlaylistSelected = {
+                        if (chosenRefs.isNotEmpty()) playlistPickerRefs = chosenRefs
+                    },
+                    onRemoveSelected = {
+                        chosenRefs.forEach { rawId -> onToggleFavorite(rawId) }
+                        multiSelectMode = false
+                        selectedRefs = emptyList()
+                    },
+                )
+            }
+        }
+        SnackbarHost(
+            snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = com.mylittleblover.mkwplayer.ui.rememberMiniPlayerBottomClearance(0.dp)),
+        )
     }
 }
 
@@ -3780,7 +4531,7 @@ private fun JukeboxGameRow(
     onClick: () -> Unit,
 ) {
     val localized = game.localizedName(language)
-    val countLabel = stringResource(R.string.jukebox_tracks_count, game.items.size)
+    val countLabel = pluralStringResource(R.plurals.tracks_count_plurals, game.items.size, game.items.size)
     val sub = listOfNotNull(
         game.yearLabel.takeIf { it.isNotBlank() },
         countLabel,
@@ -3866,11 +4617,15 @@ private fun JukeboxTrackRow(
         playing -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
         else -> MaterialTheme.colorScheme.surface
     }
-    val shape = RoundedCornerShape(14.dp)
+    val highlighted = playing || selected
+    val shape = MkwKitTokens.Shape.control
+    val borderCol = if (highlighted) MkwKitTokens.Palette.crimson.copy(alpha = 0.55f) else MkwKitTokens.Palette.hairline
+    val bgCol = if (highlighted) MkwKitTokens.Palette.rose.copy(alpha = 0.45f) else MkwKitTokens.Palette.card
     Surface(
-        color = containerColor,
+        color = bgCol,
         shape = shape,
-        tonalElevation = if (playing || selected) 2.dp else 0.dp,
+        tonalElevation = 0.dp,
+        border = BorderStroke(MkwKitTokens.Stroke.border, borderCol),
         modifier = Modifier
             .fillMaxWidth()
             .clip(shape)
@@ -3891,18 +4646,15 @@ private fun JukeboxTrackRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (selectionMode) {
-                Checkbox(
-                    checked = selected,
-                    onCheckedChange = { onPlay() },
-                )
+                MkwCheckboxMark(checked = selected)
             }
             PackArtwork.Thumbnail(
-                packDirectory, listOfNotNull(artworkName), Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)),
+                packDirectory, listOfNotNull(artworkName), Modifier.size(48.dp).clip(MkwKitTokens.Shape.thumb),
             ) {
                 if (playing) {
-                    Icon(Icons.Filled.PlayArrow, null, tint = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Filled.PlayArrow, null, tint = MkwKitTokens.Palette.crimson)
                 } else {
-                    Icon(Icons.Outlined.MusicNote, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(Icons.Outlined.MusicNote, null, tint = MkwKitTokens.Palette.inkSecondary)
                 }
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -3910,7 +4662,7 @@ private fun JukeboxTrackRow(
                     item.localizedTitle(language),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = if (playing) FontWeight.Bold else FontWeight.SemiBold,
-                    color = if (playing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    color = if (playing) MkwKitTokens.Palette.crimsonDeep else MkwKitTokens.Palette.ink,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -3918,13 +4670,13 @@ private fun JukeboxTrackRow(
                     item.localizedArrangement(language)?.let { add(it) }
                     subtitleExtra?.let { add(it) }
                     if (item.durationMs > 0L) add(item.durationFormatted)
-                    if (playCount > 0) add(stringResource(R.string.play_count_fmt, playCount))
+                    if (playCount > 0) add(pluralStringResource(R.plurals.play_count_plurals, playCount, playCount))
                 }
                 if (metaParts.isNotEmpty()) {
                     Text(
                         metaParts.joinToString(" · "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MkwKitTokens.tabular(MaterialTheme.typography.bodySmall),
+                        color = MkwKitTokens.Palette.inkSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -3932,34 +4684,29 @@ private fun JukeboxTrackRow(
             }
             if (!selectionMode) {
                 Box {
-                    IconButton(onClick = {
-                        if (onOpenMenu != null) onOpenMenu() else menuOpen = true
-                    }) {
-                        Icon(
-                            Icons.Filled.MoreVert,
-                            contentDescription = stringResource(R.string.jukebox_more_actions),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    MkwIconButton(
+                        icon = Icons.Filled.MoreVert,
+                        contentDescription = stringResource(R.string.jukebox_more_actions),
+                        onClick = { if (onOpenMenu != null) onOpenMenu() else menuOpen = true },
+                        visualSize = 36.dp,
+                        iconSize = 20.dp,
+                        tintOverride = MkwKitTokens.Palette.inkSecondary,
+                    )
                     if (onOpenMenu == null) {
-                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        if (allowPlayNext) stringResource(R.string.jukebox_play_next)
-                                        else "${stringResource(R.string.jukebox_play_next)} (${stringResource(R.string.route_play_next_disabled)})",
-                                    )
-                                },
-                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.QueueMusic, null) },
+                        MkwDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            MkwDropdownItem(
+                                text = if (allowPlayNext) stringResource(R.string.jukebox_play_next)
+                                else "${stringResource(R.string.jukebox_play_next)} (${stringResource(R.string.route_play_next_disabled)})",
+                                leadingIcon = Icons.AutoMirrored.Filled.QueueMusic,
                                 enabled = allowPlayNext,
                                 onClick = {
                                     menuOpen = false
                                     onPlayNext()
                                 },
                             )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.jukebox_play_from_here)) },
-                                leadingIcon = { Icon(Icons.Filled.PlayArrow, null) },
+                            MkwDropdownItem(
+                                text = stringResource(R.string.jukebox_play_from_here),
+                                leadingIcon = Icons.Filled.PlayArrow,
                                 onClick = {
                                     menuOpen = false
                                     onPlayFromHere()
@@ -4101,63 +4848,61 @@ internal fun DiscoveryJukeboxGame(
             }
             LazyColumn(
                 Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = PaddingValues(16.dp),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    top = 16.dp,
+                    end = 16.dp,
+                    bottom = com.mylittleblover.mkwplayer.ui.rememberMiniPlayerBottomClearance(16.dp),
+                ),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 item(key = "header") {
-                    Card(
-                        Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    MkwCard(
+                        tone = MkwSurfaceTone.Porcelain,
+                        contentPadding = PaddingValues(16.dp),
                     ) {
-                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            stringResource(R.string.jukebox_game_eyebrow),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MkwKitTokens.Palette.crimson,
+                        )
+                        Text(
+                            localizedTitle,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MkwKitTokens.Palette.ink,
+                        )
+                        if (englishTitle != null && !englishTitle.equals(localizedTitle, ignoreCase = true)) {
                             Text(
-                                stringResource(R.string.jukebox_game_eyebrow),
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
+                                englishTitle,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MkwKitTokens.Palette.inkSecondary,
                             )
-                            Text(
-                                localizedTitle,
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
+                        }
+                        val countStr = pluralStringResource(R.plurals.tracks_count_plurals, game.items.size, game.items.size)
+                        val yearAndCount = if (game.yearLabel.isNotBlank()) "${game.yearLabel} · $countStr" else countStr
+                        Text(
+                            yearAndCount,
+                            style = MkwKitTokens.tabular(MaterialTheme.typography.labelLarge),
+                            color = MkwKitTokens.Palette.inkSecondary,
+                        )
+                        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            MkwPrimaryButton(
+                                text = stringResource(R.string.jukebox_play_all),
+                                onClick = { onPlayFromIndex(game, 0, false) },
+                                enabled = game.items.isNotEmpty(),
+                                leadingIcon = Icons.Filled.PlayArrow,
                             )
-                            if (englishTitle != null && !englishTitle.equals(localizedTitle, ignoreCase = true)) {
-                                Text(
-                                    englishTitle,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            val countStr = stringResource(R.string.jukebox_tracks_count, game.items.size)
-                            val yearAndCount = if (game.yearLabel.isNotBlank()) "${game.yearLabel} · $countStr" else countStr
-                            Text(
-                                yearAndCount,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            MkwSecondaryButton(
+                                text = stringResource(R.string.jukebox_shuffle_play),
+                                onClick = {
+                                    val randomStart = game.items.indices.random()
+                                    onPlayFromIndex(game, randomStart, true)
+                                },
+                                enabled = game.items.isNotEmpty(),
+                                leadingIcon = Icons.Filled.Shuffle,
                             )
-                            Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Button(
-                                    onClick = { onPlayFromIndex(game, 0, false) },
-                                    enabled = game.items.isNotEmpty(),
-                                ) {
-                                    Icon(Icons.Filled.PlayArrow, null, Modifier.size(18.dp))
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(stringResource(R.string.jukebox_play_all))
-                                }
-                                OutlinedButton(
-                                    onClick = {
-                                        val randomStart = game.items.indices.random()
-                                        onPlayFromIndex(game, randomStart, true)
-                                    },
-                                    enabled = game.items.isNotEmpty(),
-                                ) {
-                                    Icon(Icons.Filled.Shuffle, null, Modifier.size(18.dp))
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(stringResource(R.string.jukebox_shuffle_play))
-                                }
-                            }
                         }
                     }
                 }
@@ -4175,6 +4920,7 @@ internal fun DiscoveryJukeboxGame(
                             selected = sortOrder,
                             includeOstOrder = true,
                             onSelect = { sortOrder = it },
+                            modifier = Modifier.unpadHorizontal(16.dp),
                         )
                     }
                 }
@@ -4280,7 +5026,12 @@ internal fun DiscoveryJukeboxGame(
                 )
             }
         }
-        SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+        SnackbarHost(
+            snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = com.mylittleblover.mkwplayer.ui.rememberMiniPlayerBottomClearance(0.dp)),
+        )
     }
 }
 
@@ -4303,16 +5054,22 @@ private fun ExtraSquareRow(
 ) {
     val (pressModifier, interactionSource) = com.mylittleblover.mkwplayer.ui.rememberPressScale(0.98f)
     val haptic = LocalHapticFeedback.current
-    val shape = RoundedCornerShape(16.dp)
+    val shape = MkwKitTokens.Shape.card
     val bgColor = if (selected) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
+        MkwKitTokens.Palette.rose.copy(alpha = 0.45f)
     } else {
-        MaterialTheme.colorScheme.surface
+        MkwKitTokens.Palette.card
+    }
+    val borderColor = if (selected) {
+        MkwKitTokens.Palette.crimson.copy(alpha = 0.55f)
+    } else {
+        MkwKitTokens.Palette.hairline
     }
     Surface(
         color = bgColor,
         shape = shape,
-        tonalElevation = if (selected) 2.dp else 1.dp,
+        tonalElevation = 0.dp,
+        border = BorderStroke(MkwKitTokens.Stroke.border, borderColor),
         modifier = Modifier
             .fillMaxWidth()
             .then(pressModifier)
@@ -4335,32 +5092,30 @@ private fun ExtraSquareRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (selectionMode) {
-                Checkbox(
-                    checked = selected,
-                    onCheckedChange = { onClick() },
-                )
+                MkwCheckboxMark(checked = selected)
             }
             PackArtwork.Thumbnail(
                 packDirectory, listOfNotNull(artworkName),
-                Modifier.size(56.dp).clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                Modifier.size(56.dp).clip(MkwKitTokens.Shape.thumb)
+                    .background(MkwKitTokens.Palette.track),
             ) {
                 if (fallbackCourseCode != null) CourseCover(fallbackCourseCode, Modifier.fillMaxSize())
-                else Icon(Icons.Outlined.MusicNote, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                else Icon(Icons.Outlined.MusicNote, null, tint = MkwKitTokens.Palette.inkSecondary)
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
                     title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
+                    color = MkwKitTokens.Palette.ink,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (subtitle.isNotBlank()) {
                     Text(
                         subtitle,
-                        style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MkwKitTokens.tabular(MaterialTheme.typography.bodySmall),
+                        color = MkwKitTokens.Palette.inkSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -4368,25 +5123,26 @@ private fun ExtraSquareRow(
             }
             if (!selectionMode) {
                 if (onSecondaryAction != null) {
-                    IconButton(onClick = onSecondaryAction) {
-                        Icon(
-                            Icons.Filled.Tune,
-                            contentDescription = secondaryActionDescription,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    MkwIconButton(
+                        icon = Icons.Filled.Tune,
+                        contentDescription = secondaryActionDescription,
+                        onClick = onSecondaryAction,
+                        visualSize = 36.dp,
+                        iconSize = 20.dp,
+                        tintOverride = MkwKitTokens.Palette.inkSecondary,
+                    )
                 }
                 if (onAction != null) {
-                    val (actMod, actSrc) = com.mylittleblover.mkwplayer.ui.rememberPressScale(0.94f)
-                    FilledTonalIconButton(
+                    MkwIconButton(
+                        icon = Icons.Filled.PlayArrow,
+                        contentDescription = actionContentDescription,
                         onClick = onAction,
-                        interactionSource = actSrc,
-                        modifier = Modifier.size(44.dp).then(actMod),
-                    ) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = actionContentDescription, modifier = Modifier.size(20.dp))
-                    }
+                        tone = MkwIconButtonTone.Rose,
+                        visualSize = 42.dp,
+                        iconSize = 20.dp,
+                    )
                 } else if (onSecondaryAction == null) {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MkwKitTokens.Palette.inkSecondary)
                 }
             }
         }
@@ -4423,30 +5179,39 @@ private fun MultiSelectTopBanner(
     onClose: () -> Unit,
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        tonalElevation = 2.dp,
+        color = MkwKitTokens.Palette.rose,
+        contentColor = MkwKitTokens.Palette.crimsonDeep,
+        tonalElevation = 0.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            IconButton(onClick = onClose) {
-                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.discovery_cancel))
+        Column(Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                MkwIconButton(
+                    icon = Icons.Filled.Close,
+                    contentDescription = stringResource(R.string.discovery_cancel),
+                    onClick = onClose,
+                    visualSize = 36.dp,
+                    iconSize = 20.dp,
+                    tintOverride = MkwKitTokens.Palette.crimsonDeep,
+                )
+                Text(
+                    text = stringResource(R.string.track_select_count, selectedCount),
+                    style = MkwKitTokens.tabular(MaterialTheme.typography.titleMedium),
+                    fontWeight = FontWeight.Bold,
+                    color = MkwKitTokens.Palette.crimsonDeep,
+                    modifier = Modifier.weight(1f),
+                )
+                MkwGhostButton(
+                    text = stringResource(if (allSelected) R.string.track_select_clear else R.string.track_select_all),
+                    onClick = onToggleSelectAll,
+                    leadingIcon = Icons.Filled.SelectAll,
+                )
             }
-            Text(
-                text = stringResource(R.string.track_select_count, selectedCount),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f),
-            )
-            TextButton(onClick = onToggleSelectAll) {
-                Icon(Icons.Filled.SelectAll, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(stringResource(if (allSelected) R.string.track_select_clear else R.string.track_select_all))
-            }
+            MkwDivider(color = MkwKitTokens.Palette.crimson.copy(alpha = 0.2f))
         }
     }
 }
@@ -4461,55 +5226,64 @@ private fun MultiSelectActionBar(
     onAddToPlaylistSelected: () -> Unit,
     onRemoveSelected: (() -> Unit)? = null,
 ) {
-    Surface(
-        tonalElevation = 6.dp,
+    MkwFloatingPanel(
+        shape = androidx.compose.ui.graphics.RectangleShape,
         shadowElevation = 4.dp,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = Modifier.fillMaxWidth(),
+        alpha = 0.99f,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = com.mylittleblover.mkwplayer.ui.LocalMiniPlayerOverlayPadding.current),
     ) {
         LazyRow(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item {
-                FilledTonalButton(onClick = onPlaySelected, enabled = hasSelection) {
-                    Icon(Icons.Filled.PlayArrow, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.track_select_play))
-                }
+                MkwPrimaryButton(
+                    text = stringResource(R.string.track_select_play),
+                    onClick = onPlaySelected,
+                    enabled = hasSelection,
+                    leadingIcon = Icons.Filled.PlayArrow,
+                    size = MkwButtonSize.Compact,
+                )
             }
             item {
-                OutlinedButton(onClick = onPlayNextSelected, enabled = hasSelection && allowPlayNext) {
-                    Icon(Icons.AutoMirrored.Filled.QueueMusic, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.jukebox_play_next))
-                }
+                MkwSecondaryButton(
+                    text = stringResource(R.string.jukebox_play_next),
+                    onClick = onPlayNextSelected,
+                    enabled = hasSelection && allowPlayNext,
+                    leadingIcon = Icons.AutoMirrored.Filled.QueueMusic,
+                    size = MkwButtonSize.Compact,
+                )
             }
             item {
-                OutlinedButton(onClick = onAddToQueueSelected, enabled = hasSelection && allowPlayNext) {
-                    Icon(Icons.Filled.AddToQueue, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.track_action_add_to_queue))
-                }
+                MkwSecondaryButton(
+                    text = stringResource(R.string.track_action_add_to_queue),
+                    onClick = onAddToQueueSelected,
+                    enabled = hasSelection && allowPlayNext,
+                    leadingIcon = Icons.Filled.AddToQueue,
+                    size = MkwButtonSize.Compact,
+                )
             }
             item {
-                Button(onClick = onAddToPlaylistSelected, enabled = hasSelection) {
-                    Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.track_action_add_to_playlist))
-                }
+                MkwRoseButton(
+                    text = stringResource(R.string.track_action_add_to_playlist),
+                    onClick = onAddToPlaylistSelected,
+                    enabled = hasSelection,
+                    leadingIcon = Icons.AutoMirrored.Filled.PlaylistAdd,
+                    size = MkwButtonSize.Compact,
+                )
             }
             if (onRemoveSelected != null) {
                 item {
-                    OutlinedButton(
+                    MkwDangerButton(
+                        text = stringResource(R.string.track_select_remove_playlist),
                         onClick = onRemoveSelected,
                         enabled = hasSelection,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    ) {
-                        Icon(Icons.Filled.DeleteOutline, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.track_select_remove_playlist))
-                    }
+                        leadingIcon = Icons.Filled.DeleteOutline,
+                        size = MkwButtonSize.Compact,
+                    )
                 }
             }
         }
@@ -4547,27 +5321,27 @@ private fun TrackActionOverlayHosts(
     val context = LocalContext.current
 
     if (menuTarget != null) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         val isFav = menuTarget.favoriteId != null && menuTarget.favoriteId in favorites
-        ModalBottomSheet(onDismissRequest = onDismissMenu, sheetState = sheetState) {
+        MkwBottomSheet(onDismissRequest = onDismissMenu) {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     PackArtwork.Thumbnail(
                         packDirectory,
                         listOfNotNull(menuTarget.artworkName),
-                        Modifier.size(52.dp).clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        Modifier.size(52.dp).clip(MkwKitTokens.Shape.thumb)
+                            .background(MkwKitTokens.Palette.track),
                     ) {
                         if (menuTarget.fallbackCourseCode != null) {
                             CourseCover(menuTarget.fallbackCourseCode, Modifier.fillMaxSize())
                         } else {
-                            Icon(Icons.Outlined.MusicNote, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Outlined.MusicNote, null, tint = MkwKitTokens.Palette.inkSecondary)
                         }
                     }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -4575,6 +5349,7 @@ private fun TrackActionOverlayHosts(
                             menuTarget.title,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
+                            color = MkwKitTokens.Palette.ink,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -4582,44 +5357,40 @@ private fun TrackActionOverlayHosts(
                             Text(
                                 menuTarget.subtitle,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MkwKitTokens.Palette.inkSecondary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
                     if (menuTarget.favoriteId != null) {
-                        IconButton(onClick = { onToggleFavorite(menuTarget.favoriteId) }) {
-                            Icon(
-                                if (isFav) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                                contentDescription = stringResource(
-                                    if (isFav) R.string.discovery_favorite_remove else R.string.discovery_favorite_add,
-                                ),
-                                tint = if (isFav) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                        MkwIconButton(
+                            icon = if (isFav) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                            contentDescription = stringResource(
+                                if (isFav) R.string.discovery_favorite_remove else R.string.discovery_favorite_add,
+                            ),
+                            onClick = { onToggleFavorite(menuTarget.favoriteId) },
+                            tintOverride = if (isFav) MkwKitTokens.Palette.crimson else MkwKitTokens.Palette.inkSecondary,
+                        )
                     }
                 }
-                HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.track_action_play_now)) },
-                    leadingContent = { Icon(Icons.Filled.PlayArrow, null) },
-                    modifier = Modifier.fillMaxWidth().clickable {
+                MkwDivider(Modifier.padding(vertical = 4.dp))
+                MkwOptionRow(
+                    headline = stringResource(R.string.track_action_play_now),
+                    leading = { Icon(Icons.Filled.PlayArrow, null, tint = MkwKitTokens.Palette.ink) },
+                    onClick = {
                         val action = menuTarget.onPlayNow
                         onDismissMenu()
                         action()
                     },
                 )
                 if (menuTarget.onPlayNextDirect != null || menuTarget.playlistRef != null) {
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                if (allowPlayNext) stringResource(R.string.jukebox_play_next)
-                                else "${stringResource(R.string.jukebox_play_next)} (${stringResource(R.string.route_play_next_disabled)})",
-                            )
-                        },
-                        leadingContent = { Icon(Icons.AutoMirrored.Filled.QueueMusic, null) },
-                        modifier = Modifier.fillMaxWidth().clickable(enabled = allowPlayNext) {
+                    MkwOptionRow(
+                        headline = if (allowPlayNext) stringResource(R.string.jukebox_play_next)
+                        else "${stringResource(R.string.jukebox_play_next)} (${stringResource(R.string.route_play_next_disabled)})",
+                        leading = { Icon(Icons.AutoMirrored.Filled.QueueMusic, null, tint = if (allowPlayNext) MkwKitTokens.Palette.ink else MkwKitTokens.Palette.inkSecondary) },
+                        enabled = allowPlayNext,
+                        onClick = {
                             val direct = menuTarget.onPlayNextDirect
                             val ref = menuTarget.playlistRef
                             onDismissMenu()
@@ -4633,37 +5404,34 @@ private fun TrackActionOverlayHosts(
                     )
                 }
                 if (menuTarget.playlistRef != null) {
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                if (allowPlayNext) stringResource(R.string.track_action_add_to_queue)
-                                else "${stringResource(R.string.track_action_add_to_queue)} (${stringResource(R.string.route_play_next_disabled)})",
-                            )
-                        },
-                        leadingContent = { Icon(Icons.Filled.AddToQueue, null) },
-                        modifier = Modifier.fillMaxWidth().clickable(enabled = allowPlayNext) {
-                            val ref = menuTarget.playlistRef
+                    MkwOptionRow(
+                        headline = if (allowPlayNext) stringResource(R.string.track_action_add_to_queue)
+                        else "${stringResource(R.string.track_action_add_to_queue)} (${stringResource(R.string.route_play_next_disabled)})",
+                        leading = { Icon(Icons.Filled.AddToQueue, null, tint = if (allowPlayNext) MkwKitTokens.Palette.ink else MkwKitTokens.Palette.inkSecondary) },
+                        enabled = allowPlayNext,
+                        onClick = {
+                            val ref = menuTarget.playlistRef!!
                             onDismissMenu()
-                            if (ref != null && onAddToQueueRefs(listOf(ref))) {
+                            if (onAddToQueueRefs(listOf(ref))) {
                                 scope.launch { snackbarHostState.showSnackbar(addedQueueText) }
                             }
                         },
                     )
-                    ListItem(
-                        headlineContent = { Text(stringResource(R.string.track_action_add_to_playlist)) },
-                        leadingContent = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null) },
-                        modifier = Modifier.fillMaxWidth().clickable {
-                            val ref = menuTarget.playlistRef
+                    MkwOptionRow(
+                        headline = stringResource(R.string.track_action_add_to_playlist),
+                        leading = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null, tint = MkwKitTokens.Palette.ink) },
+                        onClick = {
+                            val ref = menuTarget.playlistRef!!
                             onDismissMenu()
-                            if (ref != null) onOpenPlaylistPicker(listOf(ref))
+                            onOpenPlaylistPicker(listOf(ref))
                         },
                     )
                 }
                 if (menuTarget.onPlaylistConfig != null) {
-                    ListItem(
-                        headlineContent = { Text(stringResource(R.string.discovery_playlist_entry_config)) },
-                        leadingContent = { Icon(Icons.Filled.Tune, null) },
-                        modifier = Modifier.fillMaxWidth().clickable {
+                    MkwOptionRow(
+                        headline = stringResource(R.string.discovery_playlist_entry_config),
+                        leading = { Icon(Icons.Filled.Tune, null, tint = MkwKitTokens.Palette.ink) },
+                        onClick = {
                             val cfg = menuTarget.onPlaylistConfig
                             onDismissMenu()
                             cfg()
@@ -4671,10 +5439,10 @@ private fun TrackActionOverlayHosts(
                     )
                 }
                 if (menuTarget.courseCodeForDetail != null && onOpenCourse != null) {
-                    ListItem(
-                        headlineContent = { Text(stringResource(R.string.track_action_open_course)) },
-                        leadingContent = { Icon(Icons.Outlined.Album, null) },
-                        modifier = Modifier.fillMaxWidth().clickable {
+                    MkwOptionRow(
+                        headline = stringResource(R.string.track_action_open_course),
+                        leading = { Icon(Icons.Outlined.Album, null, tint = MkwKitTokens.Palette.ink) },
+                        onClick = {
                             val code = menuTarget.courseCodeForDetail
                             onDismissMenu()
                             onOpenCourse(code)
@@ -4682,10 +5450,10 @@ private fun TrackActionOverlayHosts(
                     )
                 }
                 if (menuTarget.editorTargetCode != null && onOpenFlowEditor != null) {
-                    ListItem(
-                        headlineContent = { Text(stringResource(R.string.discovery_open_flow_editor)) },
-                        leadingContent = { Icon(Icons.Filled.Tune, null) },
-                        modifier = Modifier.fillMaxWidth().clickable {
+                    MkwOptionRow(
+                        headline = stringResource(R.string.discovery_open_flow_editor),
+                        leading = { Icon(Icons.Filled.Tune, null, tint = MkwKitTokens.Palette.ink) },
+                        onClick = {
                             val editor = menuTarget.editorTargetCode
                             onDismissMenu()
                             onOpenFlowEditor(editor)
@@ -4693,10 +5461,10 @@ private fun TrackActionOverlayHosts(
                     )
                 }
                 if (menuTarget.onPlaylistMoveUp != null && menuTarget.playlistCanMoveUp) {
-                    ListItem(
-                        headlineContent = { Text(stringResource(R.string.discovery_move_up)) },
-                        leadingContent = { Icon(Icons.Filled.KeyboardArrowUp, null) },
-                        modifier = Modifier.fillMaxWidth().clickable {
+                    MkwOptionRow(
+                        headline = stringResource(R.string.discovery_move_up),
+                        leading = { Icon(Icons.Filled.KeyboardArrowUp, null, tint = MkwKitTokens.Palette.ink) },
+                        onClick = {
                             val act = menuTarget.onPlaylistMoveUp
                             onDismissMenu()
                             act()
@@ -4704,40 +5472,41 @@ private fun TrackActionOverlayHosts(
                     )
                 }
                 if (menuTarget.onPlaylistMoveDown != null && menuTarget.playlistCanMoveDown) {
-                    ListItem(
-                        headlineContent = { Text(stringResource(R.string.discovery_move_down)) },
-                        leadingContent = { Icon(Icons.Filled.KeyboardArrowDown, null) },
-                        modifier = Modifier.fillMaxWidth().clickable {
+                    MkwOptionRow(
+                        headline = stringResource(R.string.discovery_move_down),
+                        leading = { Icon(Icons.Filled.KeyboardArrowDown, null, tint = MkwKitTokens.Palette.ink) },
+                        onClick = {
                             val act = menuTarget.onPlaylistMoveDown
                             onDismissMenu()
                             act()
                         },
                     )
                 }
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.track_action_multi_select)) },
-                    leadingContent = { Icon(Icons.Outlined.CheckCircle, null) },
-                    modifier = Modifier.fillMaxWidth().clickable {
+                MkwOptionRow(
+                    headline = stringResource(R.string.track_action_multi_select),
+                    leading = { Icon(Icons.Outlined.CheckCircle, null, tint = MkwKitTokens.Palette.ink) },
+                    onClick = {
                         val key = menuTarget.selectionKey
                         onDismissMenu()
                         onEnterMultiSelect(key)
                     },
                 )
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.track_action_info)) },
-                    leadingContent = { Icon(Icons.Outlined.Info, null) },
-                    modifier = Modifier.fillMaxWidth().clickable {
+                MkwOptionRow(
+                    headline = stringResource(R.string.track_action_info),
+                    leading = { Icon(Icons.Outlined.Info, null, tint = MkwKitTokens.Palette.ink) },
+                    onClick = {
                         val info = menuTarget
                         onDismissMenu()
                         onOpenInfo(info)
                     },
                 )
                 if (menuTarget.onPlaylistRemove != null) {
-                    HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                    ListItem(
-                        headlineContent = { Text(stringResource(R.string.discovery_remove), color = MaterialTheme.colorScheme.error) },
-                        leadingContent = { Icon(Icons.Filled.DeleteOutline, null, tint = MaterialTheme.colorScheme.error) },
-                        modifier = Modifier.fillMaxWidth().clickable {
+                    MkwDivider(Modifier.padding(vertical = 4.dp))
+                    MkwOptionRow(
+                        headline = stringResource(R.string.discovery_remove),
+                        destructive = true,
+                        leading = { Icon(Icons.Filled.DeleteOutline, null, tint = MkwKitTokens.Palette.danger) },
+                        onClick = {
                             val rem = menuTarget.onPlaylistRemove
                             onDismissMenu()
                             rem()
@@ -4752,41 +5521,40 @@ private fun TrackActionOverlayHosts(
         val refsToAdd = playlistPickerRefs
         var creatingNew by remember { mutableStateOf(false) }
         var newListName by remember { mutableStateOf("") }
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(onDismissRequest = onDismissPlaylistPicker, sheetState = sheetState) {
+        MkwBottomSheet(
+            onDismissRequest = onDismissPlaylistPicker,
+            title = stringResource(R.string.track_action_add_to_playlist),
+        ) {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text(
-                    stringResource(R.string.track_action_add_to_playlist),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                )
-                OutlinedButton(
+                MkwSecondaryButton(
+                    text = stringResource(R.string.track_action_new_playlist_and_add),
                     onClick = { creatingNew = true },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                ) {
-                    Icon(Icons.Filled.Add, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.track_action_new_playlist_and_add))
-                }
-                HorizontalDivider()
+                    leadingIcon = Icons.Filled.Add,
+                    size = MkwButtonSize.Hero,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                MkwDivider()
                 if (playlists.isEmpty()) {
                     Text(
                         stringResource(R.string.track_playlist_pick_empty),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MkwKitTokens.Palette.inkSecondary,
                         modifier = Modifier.padding(vertical = 12.dp),
                     )
                 } else {
-                    LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
                         items(playlists, key = { it.id }) { pl ->
-                            ListItem(
-                                headlineContent = { Text(pl.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                supportingContent = { Text(stringResource(R.string.jukebox_tracks_count, pl.courseIds.size)) },
-                                leadingContent = { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) },
-                                modifier = Modifier.fillMaxWidth().clickable {
+                            MkwOptionRow(
+                                headline = pl.name,
+                                supporting = pluralStringResource(R.plurals.tracks_count_plurals, pl.courseIds.size, pl.courseIds.size),
+                                leading = { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null, tint = MkwKitTokens.Palette.crimson) },
+                                onClick = {
                                     onAddToPlaylist(pl.id, refsToAdd)
                                     val msg = context.getString(R.string.track_action_added_to_playlist, refsToAdd.size, pl.name)
                                     onDismissPlaylistPicker()
@@ -4799,20 +5567,14 @@ private fun TrackActionOverlayHosts(
             }
         }
         if (creatingNew) {
-            AlertDialog(
+            MkwDialog(
                 onDismissRequest = { creatingNew = false },
-                title = { Text(stringResource(R.string.track_action_new_playlist_and_add)) },
-                text = {
-                    OutlinedTextField(
-                        value = newListName,
-                        onValueChange = { newListName = it.take(120) },
-                        label = { Text(stringResource(R.string.discovery_playlist_name)) },
-                        singleLine = true,
-                    )
-                },
+                title = stringResource(R.string.track_action_new_playlist_and_add),
                 confirmButton = {
-                    TextButton(
+                    MkwPrimaryButton(
+                        text = stringResource(R.string.discovery_create),
                         enabled = newListName.isNotBlank(),
+                        size = MkwButtonSize.Compact,
                         onClick = {
                             val cleanName = newListName.trim()
                             onCreatePlaylistAndAdd(cleanName, refsToAdd)
@@ -4821,44 +5583,47 @@ private fun TrackActionOverlayHosts(
                             onDismissPlaylistPicker()
                             scope.launch { snackbarHostState.showSnackbar(msg) }
                         },
-                    ) {
-                        Text(stringResource(R.string.discovery_create))
-                    }
+                    )
                 },
                 dismissButton = {
-                    TextButton(onClick = { creatingNew = false }) { Text(stringResource(R.string.discovery_cancel)) }
+                    MkwGhostButton(text = stringResource(R.string.discovery_cancel), onClick = { creatingNew = false })
                 },
-            )
+            ) {
+                MkwTextField(
+                    value = newListName,
+                    onValueChange = { newListName = it.take(120) },
+                    label = stringResource(R.string.discovery_playlist_name),
+                    singleLine = true,
+                )
+            }
         }
     }
 
     if (infoTarget != null) {
-        AlertDialog(
+        MkwDialog(
             onDismissRequest = onDismissInfo,
-            title = { Text(stringResource(R.string.track_action_info)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(infoTarget.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    if (infoTarget.subtitle.isNotBlank()) {
-                        Text(infoTarget.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    HorizontalDivider()
-                    infoTarget.infoPairs.forEach { (labelRes, value) ->
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(
-                                stringResource(labelRes),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                            Text(value, style = MaterialTheme.typography.bodyMedium)
-                        }
-                    }
-                }
-            },
+            title = stringResource(R.string.track_action_info),
             confirmButton = {
-                TextButton(onClick = onDismissInfo) { Text(stringResource(R.string.discovery_cancel)) }
+                MkwGhostButton(text = stringResource(R.string.discovery_cancel), onClick = onDismissInfo)
             },
-        )
+        ) {
+            Text(infoTarget.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MkwKitTokens.Palette.ink)
+            if (infoTarget.subtitle.isNotBlank()) {
+                Text(infoTarget.subtitle, style = MaterialTheme.typography.bodySmall, color = MkwKitTokens.Palette.inkSecondary)
+            }
+            MkwDivider()
+            infoTarget.infoPairs.forEach { (labelRes, value) ->
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        stringResource(labelRes),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MkwKitTokens.Palette.crimson,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(value, style = MaterialTheme.typography.bodyMedium, color = MkwKitTokens.Palette.ink)
+                }
+            }
+        }
     }
 }
 
@@ -4874,21 +5639,24 @@ private fun ExtraQueueActionsRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            stringResource(R.string.jukebox_tracks_count, count),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
+            pluralStringResource(R.plurals.tracks_count_plurals, count, count),
+            style = MkwKitTokens.tabular(MaterialTheme.typography.labelLarge),
+            color = MkwKitTokens.Palette.crimson,
+            fontWeight = FontWeight.SemiBold,
             modifier = Modifier.weight(1f),
         )
-        FilledTonalButton(onClick = onPlayAll) {
-            Icon(Icons.Filled.PlayArrow, null, Modifier.size(18.dp))
-            Spacer(Modifier.width(4.dp))
-            Text(stringResource(R.string.jukebox_play_all))
-        }
-        OutlinedButton(onClick = onShuffle) {
-            Icon(Icons.Filled.Shuffle, null, Modifier.size(18.dp))
-            Spacer(Modifier.width(4.dp))
-            Text(stringResource(R.string.jukebox_shuffle))
-        }
+        MkwRoseButton(
+            text = stringResource(R.string.jukebox_play_all),
+            onClick = onPlayAll,
+            leadingIcon = Icons.Filled.PlayArrow,
+            size = MkwButtonSize.Compact,
+        )
+        MkwSecondaryButton(
+            text = stringResource(R.string.jukebox_shuffle),
+            onClick = onShuffle,
+            leadingIcon = Icons.Filled.Shuffle,
+            size = MkwButtonSize.Compact,
+        )
     }
 }
 
@@ -4969,6 +5737,107 @@ private fun formatExtraDuration(ms: Long): String {
     return "%d:%02d".format(java.util.Locale.ROOT, min, sec)
 }
 
+@Composable
+private fun CoursePresetOptionsColumn(
+    logicalCode: String,
+    isCourse: Boolean,
+    selectedPresetId: String?,
+    presets: List<com.mylittleblover.mkwplayer.library.CoursePreset>,
+    isPresetSelectable: (String, String?) -> Boolean,
+    onSelectPreset: (String?) -> Unit,
+    autoOptionLabel: String? = null,
+) {
+    val matchingPresets = presets.filter {
+        it.courseCode.equals(logicalCode, ignoreCase = true) && isPresetSelectable(logicalCode, it.id)
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (autoOptionLabel != null) {
+            val isAutoSelected = selectedPresetId == null
+            MkwOptionRow(
+                headline = autoOptionLabel,
+                selected = isAutoSelected,
+                role = Role.RadioButton,
+                onClick = { onSelectPreset(null) },
+                trailing = { MkwRadioMark(selected = isAutoSelected) },
+            )
+        }
+        val builtInRefs = listOf(
+            PresetRefs.SYSTEM_DEFAULT,
+            PresetRefs.SYSTEM_SUITE_A_ALT,
+            PresetRefs.SYSTEM_SUITE_B,
+            PresetRefs.SYSTEM_SUITE_C,
+            PresetRefs.SYSTEM_SUITE_D,
+            PresetRefs.SYSTEM_KNOCKOUT,
+        )
+        builtInRefs.forEach { ref ->
+            val selectable = when (ref) {
+                PresetRefs.SYSTEM_DEFAULT -> !isCourse || isPresetSelectable(logicalCode, ref)
+                else -> isCourse && isPresetSelectable(logicalCode, ref)
+            }
+            val selected = if (autoOptionLabel == null && ref == PresetRefs.SYSTEM_DEFAULT) {
+                selectedPresetId == null || selectedPresetId == PresetRefs.SYSTEM_DEFAULT
+            } else {
+                selectedPresetId == ref
+            }
+            if (selectable || selected) {
+                MkwOptionRow(
+                    headline = stringResource(com.mylittleblover.mkwplayer.ui.routes.builtInSuiteLabelRes(ref)),
+                    selected = selected,
+                    role = Role.RadioButton,
+                    onClick = {
+                        onSelectPreset(
+                            if (autoOptionLabel == null && ref == PresetRefs.SYSTEM_DEFAULT) null else ref,
+                        )
+                    },
+                    trailing = { MkwRadioMark(selected = selected) },
+                )
+            }
+        }
+        matchingPresets.forEach { preset ->
+            val selected = selectedPresetId == preset.id
+            MkwOptionRow(
+                headline = preset.name,
+                selected = selected,
+                role = Role.RadioButton,
+                onClick = { onSelectPreset(preset.id) },
+                trailing = { MkwRadioMark(selected = selected) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun resolveStopOrEntryPresetLabel(
+    targetCode: String,
+    isCourse: Boolean,
+    presetId: String?,
+    presets: List<com.mylittleblover.mkwplayer.library.CoursePreset>,
+    isPresetSelectable: (String, String?) -> Boolean,
+    autoResolvedRef: String? = null,
+): String {
+    if (presetId == null && autoResolvedRef != null) {
+        val resolvedLabel = stringResource(com.mylittleblover.mkwplayer.ui.routes.builtInSuiteLabelRes(autoResolvedRef))
+        return stringResource(R.string.route_stop_preset_auto_fmt, resolvedLabel)
+    }
+    val builtInRefs = setOf(
+        PresetRefs.SYSTEM_DEFAULT,
+        PresetRefs.SYSTEM_SUITE_A_ALT,
+        PresetRefs.SYSTEM_SUITE_B,
+        PresetRefs.SYSTEM_SUITE_C,
+        PresetRefs.SYSTEM_SUITE_D,
+        PresetRefs.SYSTEM_KNOCKOUT,
+    )
+    return when {
+        presetId == null || presetId == PresetRefs.SYSTEM_DEFAULT ->
+            stringResource(R.string.preset_system_default)
+        presetId in builtInRefs && isCourse && isPresetSelectable(targetCode, presetId) ->
+            stringResource(com.mylittleblover.mkwplayer.ui.routes.builtInSuiteLabelRes(presetId))
+        else -> presets.firstOrNull {
+            it.id == presetId && it.courseCode.equals(targetCode, ignoreCase = true)
+        }?.name ?: stringResource(R.string.preset_system_default)
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun DiscoveryCustomRouteDetail(
@@ -4992,6 +5861,10 @@ internal fun DiscoveryCustomRouteDetail(
     onOpenFlowEditor: (String, String?) -> Unit,
     isPresetSelectable: (String, String?) -> Boolean = { _, ref -> ref != PresetRefs.SYSTEM_KNOCKOUT },
     onUpdateRuleMode: (RoadJukeboxCatalog.RoadMusicRuleMode) -> Unit = {},
+    onUpdateSuiteMode: (RoadJukeboxCatalog.RouteSuiteMode) -> Unit = {},
+    resolveAutoStopPresetRef: (stageCode: String, stopIndex: Int, stopCount: Int, suiteMode: RoadJukeboxCatalog.RouteSuiteMode) -> String = { code, idx, count, mode ->
+        PresetRefs.forSuiteVariant(RoadJukeboxCatalog.resolveSuiteVariantForStop(null, mode, idx, count, code))
+    },
 ) {
     if (route == null) {
         Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
@@ -5006,119 +5879,98 @@ internal fun DiscoveryCustomRouteDetail(
     var editingStopIndex by rememberSaveable { mutableStateOf<Int?>(null) }
     var pickingEdgeIndex by rememberSaveable { mutableStateOf<Int?>(null) }
     val presetSheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val systemDefaultLabel = stringResource(R.string.preset_system_default)
-    val systemKnockoutLabel = stringResource(R.string.preset_system_knockout)
 
     if (renaming) {
-        AlertDialog(
+        MkwDialog(
             onDismissRequest = { renaming = false },
-            title = { Text(stringResource(R.string.route_rename)) },
-            text = {
-                OutlinedTextField(
-                    value = newName,
-                    onValueChange = { newName = it.take(120) },
-                    label = { Text(stringResource(R.string.route_name_label)) },
-                    singleLine = true,
+            title = stringResource(R.string.route_rename),
+            confirmButton = {
+                MkwPrimaryButton(
+                    text = stringResource(R.string.route_save_changes),
+                    onClick = { onRename(newName); renaming = false },
+                    enabled = newName.isNotBlank(),
+                    size = MkwButtonSize.Compact,
                 )
             },
-            confirmButton = {
-                TextButton(onClick = { onRename(newName); renaming = false }, enabled = newName.isNotBlank()) {
-                    Text(stringResource(R.string.route_save_changes))
-                }
-            },
             dismissButton = {
-                TextButton(onClick = { renaming = false }) { Text(stringResource(R.string.discovery_cancel)) }
+                MkwGhostButton(text = stringResource(R.string.discovery_cancel), onClick = { renaming = false })
             },
-        )
+        ) {
+            MkwTextField(
+                value = newName,
+                onValueChange = { newName = it.take(120) },
+                label = stringResource(R.string.route_name_label),
+                singleLine = true,
+            )
+        }
     }
 
     if (deleting) {
-        AlertDialog(
+        MkwDialog(
             onDismissRequest = { deleting = false },
-            title = { Text(stringResource(R.string.route_delete_confirm_title)) },
-            text = { Text(route.name) },
+            title = stringResource(R.string.route_delete_confirm_title),
             confirmButton = {
-                TextButton(onClick = { deleting = false; onDelete() }) {
-                    Text(stringResource(R.string.route_delete), color = MaterialTheme.colorScheme.error)
-                }
+                MkwDangerButton(
+                    text = stringResource(R.string.route_delete),
+                    onClick = { deleting = false; onDelete() },
+                    size = MkwButtonSize.Compact,
+                )
             },
             dismissButton = {
-                TextButton(onClick = { deleting = false }) { Text(stringResource(R.string.discovery_cancel)) }
+                MkwGhostButton(text = stringResource(R.string.discovery_cancel), onClick = { deleting = false })
             },
-        )
+        ) {
+            Text(route.name, style = MaterialTheme.typography.bodyMedium, color = MkwKitTokens.Palette.ink)
+        }
     }
 
     val stopPresetIdx = editingStopIndex
     if (stopPresetIdx != null && stopPresetIdx in route.stops.indices) {
         val stop = route.stops[stopPresetIdx]
         val logicalCode = stop.stageCode.removeSuffix("_00")
-        val matchingPresets = presets.filter {
-            it.courseCode.equals(logicalCode, ignoreCase = true) && isPresetSelectable(logicalCode, it.id)
-        }
-        val knockoutSelectable = isPresetSelectable(logicalCode, PresetRefs.SYSTEM_KNOCKOUT)
-        val defaultSelectable = isPresetSelectable(logicalCode, PresetRefs.SYSTEM_DEFAULT)
         val courseTitle = catalog?.displayName(logicalCode, language) ?: logicalCode
-        ModalBottomSheet(sheetState = presetSheet, onDismissRequest = { editingStopIndex = null }) {
+        val autoRef = resolveAutoStopPresetRef(logicalCode, stopPresetIdx, route.stops.size, route.routeSuiteMode)
+        val autoOptionLabel = stringResource(
+            R.string.route_stop_preset_auto_fmt,
+            stringResource(com.mylittleblover.mkwplayer.ui.routes.builtInSuiteLabelRes(autoRef)),
+        )
+        MkwBottomSheet(
+            onDismissRequest = { editingStopIndex = null },
+            title = stringResource(R.string.route_stop_preset_title, stopPresetIdx + 1, courseTitle),
+        ) {
             Column(
-                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
-                    stringResource(R.string.route_stop_preset_title, stopPresetIdx + 1, courseTitle),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
                     stringResource(R.string.discovery_playlist_entry_preset),
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MkwKitTokens.Palette.inkSecondary,
                 )
-                Column {
-                    val isDefaultSelected = stop.presetId == null || stop.presetId == PresetRefs.SYSTEM_DEFAULT
-                    if (defaultSelectable || isDefaultSelected) {
-                        ListItem(
-                            headlineContent = { Text(systemDefaultLabel) },
-                            trailingContent = { RadioButton(selected = isDefaultSelected, onClick = null) },
-                            modifier = Modifier.fillMaxWidth().clickable {
-                                onUpdateStopPreset(stopPresetIdx, null)
-                                editingStopIndex = null
-                            },
-                        )
-                    }
-                    if (knockoutSelectable) {
-                        ListItem(
-                            headlineContent = { Text(systemKnockoutLabel) },
-                            trailingContent = { RadioButton(selected = stop.presetId == PresetRefs.SYSTEM_KNOCKOUT, onClick = null) },
-                            modifier = Modifier.fillMaxWidth().clickable {
-                                onUpdateStopPreset(stopPresetIdx, PresetRefs.SYSTEM_KNOCKOUT)
-                                editingStopIndex = null
-                            },
-                        )
-                    }
-                    matchingPresets.forEach { preset ->
-                        ListItem(
-                            headlineContent = { Text(preset.name) },
-                            trailingContent = { RadioButton(selected = stop.presetId == preset.id, onClick = null) },
-                            modifier = Modifier.fillMaxWidth().clickable {
-                                onUpdateStopPreset(stopPresetIdx, preset.id)
-                                editingStopIndex = null
-                            },
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedButton(
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    CoursePresetOptionsColumn(
+                        logicalCode = logicalCode,
+                        isCourse = true,
+                        selectedPresetId = stop.presetId,
+                        presets = presets,
+                        isPresetSelectable = isPresetSelectable,
+                        onSelectPreset = {
+                            onUpdateStopPreset(stopPresetIdx, it)
+                            editingStopIndex = null
+                        },
+                        autoOptionLabel = autoOptionLabel,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    MkwSecondaryButton(
+                        text = stringResource(R.string.preset_new),
                         onClick = {
                             editingStopIndex = null
                             onOpenFlowEditor(logicalCode, stop.presetId)
                         },
+                        leadingIcon = Icons.Filled.Edit,
                         modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(Icons.Filled.Edit, null, Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.preset_new))
-                    }
+                    )
                 }
-                Spacer(Modifier.height(16.dp))
             }
         }
     }
@@ -5149,162 +6001,183 @@ internal fun DiscoveryCustomRouteDetail(
 
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            top = 16.dp,
+            end = 16.dp,
+            bottom = com.mylittleblover.mkwplayer.ui.rememberMiniPlayerBottomClearance(16.dp),
+        ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Surface(
-                Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
+            MkwCard(
+                tone = MkwSurfaceTone.Porcelain,
+                contentPadding = PaddingValues(16.dp),
             ) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(route.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                            Text(
-                                "${stringResource(R.string.route_stops_count, route.stops.size)} · ${stringResource(R.string.route_legs_count, (route.stops.size - 1).coerceAtLeast(0))}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(route.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MkwKitTokens.Palette.ink)
+                        val legCount = (route.stops.size - 1).coerceAtLeast(0)
+                        Text(
+                            "${pluralStringResource(R.plurals.route_stops_plurals, route.stops.size, route.stops.size)} · ${pluralStringResource(R.plurals.route_legs_plurals, legCount, legCount)}",
+                            style = MkwKitTokens.tabular(MaterialTheme.typography.bodyMedium),
+                            color = MkwKitTokens.Palette.inkSecondary,
+                        )
+                    }
+                    Box {
+                        MkwIconButton(
+                            icon = Icons.Filled.MoreVert,
+                            contentDescription = stringResource(R.string.jukebox_more_actions),
+                            onClick = { menuOpen = true },
+                        )
+                        MkwDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            MkwDropdownItem(
+                                text = stringResource(R.string.route_rename),
+                                leadingIcon = Icons.Filled.Edit,
+                                onClick = { menuOpen = false; newName = route.name; renaming = true },
+                            )
+                            MkwDropdownItem(
+                                text = stringResource(R.string.route_delete),
+                                leadingIcon = Icons.Filled.DeleteOutline,
+                                destructive = true,
+                                onClick = { menuOpen = false; deleting = true },
                             )
                         }
-                        Box {
-                            IconButton(onClick = { menuOpen = true }) {
-                                Icon(Icons.Filled.MoreVert, contentDescription = null)
-                            }
-                            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.route_rename)) },
-                                    leadingIcon = { Icon(Icons.Filled.Edit, null) },
-                                    onClick = { menuOpen = false; newName = route.name; renaming = true },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.route_delete), color = MaterialTheme.colorScheme.error) },
-                                    leadingIcon = { Icon(Icons.Filled.DeleteOutline, null, tint = MaterialTheme.colorScheme.error) },
-                                    onClick = { menuOpen = false; deleting = true },
-                                )
-                            }
-                        }
                     }
+                }
 
-                    if (report?.canPlay == false) {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.errorContainer,
-                        ) {
-                            Row(
-                                Modifier.fillMaxWidth().padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                Icon(Icons.Filled.WarningAmber, null, tint = MaterialTheme.colorScheme.onErrorContainer)
-                                Text(
-                                    report.blockingReason ?: stringResource(R.string.route_invalid_topology),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onErrorContainer,
-                                )
-                            }
-                        }
-                    }
-
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick = { onPlayRoute(route) },
-                            enabled = report?.canPlay != false,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Icon(Icons.Filled.PlayArrow, null, Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text(stringResource(R.string.route_play))
-                        }
-                        OutlinedButton(onClick = { onEditOnMap(route) }) {
-                            Icon(Icons.Filled.Map, null, Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text(stringResource(R.string.route_edit_on_map))
-                        }
-                    }
-
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                if (report?.canPlay == false) {
+                    MkwCard(
+                        tone = MkwSurfaceTone.White,
+                        error = true,
+                        shape = MkwKitTokens.Shape.control,
+                        contentPadding = PaddingValues(12.dp),
                     ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(stringResource(R.string.route_loop_whole), style = MaterialTheme.typography.titleSmall)
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Icon(Icons.Filled.WarningAmber, null, tint = MkwKitTokens.Palette.danger)
                             Text(
-                                stringResource(R.string.route_loop_whole_desc),
+                                report.blockingReason ?: stringResource(R.string.route_invalid_topology),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MkwKitTokens.Palette.danger,
                             )
                         }
-                        Switch(checked = route.loopWholeRoute, onCheckedChange = onToggleLoop)
                     }
+                }
 
-                    RoadMusicRuleModeSelector(
-                        selectedMode = route.roadRuleMode,
-                        officialKind = null,
-                        onSelectMode = onUpdateRuleMode,
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MkwPrimaryButton(
+                        text = stringResource(R.string.route_play),
+                        onClick = { onPlayRoute(route) },
+                        enabled = report?.canPlay != false,
+                        leadingIcon = Icons.Filled.PlayArrow,
+                        modifier = Modifier.weight(1f),
                     )
-
-                    Text(
-                        stringResource(R.string.route_tail_only_note),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    MkwSecondaryButton(
+                        text = stringResource(R.string.route_edit_on_map),
+                        onClick = { onEditOnMap(route) },
+                        leadingIcon = Icons.Filled.Map,
                     )
                 }
+
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.route_loop_whole), style = MaterialTheme.typography.titleSmall, color = MkwKitTokens.Palette.ink)
+                        Text(
+                            stringResource(R.string.route_loop_whole_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MkwKitTokens.Palette.inkSecondary,
+                        )
+                    }
+                    MkwSwitch(checked = route.loopWholeRoute, onCheckedChange = onToggleLoop)
+                }
+
+                RoadMusicRuleModeSelector(
+                    selectedMode = route.roadRuleMode,
+                    officialKind = null,
+                    onSelectMode = onUpdateRuleMode,
+                )
+
+                com.mylittleblover.mkwplayer.ui.routes.RouteSuiteModeSelector(
+                    selectedMode = route.routeSuiteMode,
+                    onSelectMode = onUpdateSuiteMode,
+                )
+
+                Text(
+                    stringResource(R.string.route_tail_only_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MkwKitTokens.Palette.inkSecondary,
+                )
             }
         }
 
         itemsIndexed(route.stops, key = { idx, stop -> "route-stop:$idx:${stop.stageCode}" }) { idx, stop ->
             val logical = stop.stageCode.removeSuffix("_00")
             val stopTitle = catalog?.displayName(logical, language) ?: logical
-            val presetLabel = when {
-                stop.presetId == PresetRefs.SYSTEM_KNOCKOUT && isPresetSelectable(logical, PresetRefs.SYSTEM_KNOCKOUT) -> systemKnockoutLabel
-                stop.presetId == null || stop.presetId == PresetRefs.SYSTEM_DEFAULT -> systemDefaultLabel
-                else -> presets.firstOrNull {
-                    it.id == stop.presetId && isPresetSelectable(logical, it.id)
-                }?.name ?: systemDefaultLabel
-            }
+            val autoResolvedRef = if (stop.presetId == null) {
+                resolveAutoStopPresetRef(logical, idx, route.stops.size, route.routeSuiteMode)
+            } else null
+            val presetLabel = resolveStopOrEntryPresetLabel(
+                targetCode = logical,
+                isCourse = true,
+                presetId = stop.presetId,
+                presets = presets,
+                isPresetSelectable = isPresetSelectable,
+                autoResolvedRef = autoResolvedRef,
+            )
             val artwork = courseArtwork[logical] ?: courseArtwork["${logical}_00"]
             val isLastRemovableTail = idx == route.stops.lastIndex && route.stops.size > 2
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Card(
+                MkwCard(
                     onClick = { onOpenCourse(logical) },
-                    modifier = Modifier.fillMaxWidth(),
+                    tone = MkwSurfaceTone.Porcelain,
+                    contentPadding = PaddingValues(12.dp),
                 ) {
                     Row(
-                        Modifier.fillMaxWidth().padding(12.dp),
+                        Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Text(
                             "${idx + 1}",
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MkwKitTokens.tabular(MaterialTheme.typography.titleMedium),
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = MkwKitTokens.Palette.crimson,
                         )
                         PackArtwork.Thumbnail(
                             packDirectory,
                             listOfNotNull(artwork),
-                            Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)),
+                            Modifier.size(48.dp).clip(MkwKitTokens.Shape.thumb),
                         ) {
                             CourseCover(logical, Modifier.fillMaxSize())
                         }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(stopTitle, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(presetLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(stopTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MkwKitTokens.Palette.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(presetLabel, style = MaterialTheme.typography.bodySmall, color = MkwKitTokens.Palette.crimson, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
-                        IconButton(onClick = { editingStopIndex = idx }) {
-                            Icon(Icons.Filled.Tune, contentDescription = stringResource(R.string.discovery_playlist_entry_preset))
-                        }
+                        MkwIconButton(
+                            icon = Icons.Filled.Tune,
+                            contentDescription = stringResource(R.string.discovery_playlist_entry_preset),
+                            onClick = { editingStopIndex = idx },
+                            visualSize = 36.dp,
+                            iconSize = 20.dp,
+                        )
                         if (isLastRemovableTail) {
-                            IconButton(onClick = onRemoveLastStop) {
-                                Icon(
-                                    Icons.Filled.RemoveCircleOutline,
-                                    contentDescription = stringResource(R.string.route_tail_delete_stop),
-                                    tint = MaterialTheme.colorScheme.error,
-                                )
-                            }
+                            MkwIconButton(
+                                icon = Icons.Filled.RemoveCircleOutline,
+                                contentDescription = stringResource(R.string.route_tail_delete_stop),
+                                onClick = onRemoveLastStop,
+                                visualSize = 36.dp,
+                                iconSize = 20.dp,
+                                tintOverride = MkwKitTokens.Palette.danger,
+                            )
                         }
                     }
                 }
@@ -5320,14 +6193,15 @@ internal fun DiscoveryCustomRouteDetail(
                     } else {
                         stringResource(R.string.route_edge_music_auto)
                     }
-                    Surface(
+                    MkwCard(
                         onClick = { pickingEdgeIndex = idx },
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        tone = MkwSurfaceTone.White,
+                        shape = MkwKitTokens.Shape.control,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
                         modifier = Modifier.fillMaxWidth().padding(start = 16.dp),
                     ) {
                         Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                            Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
@@ -5336,15 +6210,16 @@ internal fun DiscoveryCustomRouteDetail(
                                 null,
                                 Modifier.size(18.dp),
                                 tint = if (leg?.resolution?.isMissingOrIncomplete() == true || leg?.connectionValid == false) {
-                                    MaterialTheme.colorScheme.error
+                                    MkwKitTokens.Palette.danger
                                 } else {
-                                    MaterialTheme.colorScheme.primary
+                                    MkwKitTokens.Palette.crimson
                                 },
                             )
                             Column(Modifier.weight(1f)) {
                                 Text(
                                     "${stringResource(R.string.route_road_prefix)} $fromName → $toName",
                                     style = MaterialTheme.typography.labelLarge,
+                                    color = MkwKitTokens.Palette.ink,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -5352,15 +6227,15 @@ internal fun DiscoveryCustomRouteDetail(
                                     summary,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = if (leg?.resolution?.isMissingOrIncomplete() == true) {
-                                        MaterialTheme.colorScheme.error
+                                        MkwKitTokens.Palette.danger
                                     } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                        MkwKitTokens.Palette.inkSecondary
                                     },
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }
-                            Icon(Icons.Filled.Tune, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Filled.Tune, null, Modifier.size(18.dp), tint = MkwKitTokens.Palette.inkSecondary)
                         }
                     }
                 }

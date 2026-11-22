@@ -2,10 +2,8 @@ package com.mylittleblover.mkwplayer.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyListItemInfo
@@ -13,19 +11,13 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Bedtime
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Equalizer
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Loop
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
@@ -36,6 +28,25 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import com.mylittleblover.mkwplayer.ui.kit.MkwBottomSheet
+import com.mylittleblover.mkwplayer.ui.kit.MkwButtonSize
+import com.mylittleblover.mkwplayer.ui.kit.MkwCard
+import com.mylittleblover.mkwplayer.ui.kit.MkwDivider
+import com.mylittleblover.mkwplayer.ui.kit.MkwFilterPill
+import com.mylittleblover.mkwplayer.ui.kit.MkwGhostButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwInsetBox
+import com.mylittleblover.mkwplayer.ui.kit.MkwKitTokens
+import com.mylittleblover.mkwplayer.ui.kit.MkwOptionRow
+import com.mylittleblover.mkwplayer.ui.kit.MkwPrimaryButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwRadioMark
+import com.mylittleblover.mkwplayer.ui.kit.MkwRoseButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwSecondaryButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwSlider
+import com.mylittleblover.mkwplayer.ui.kit.MkwSurfaceTone
+import com.mylittleblover.mkwplayer.ui.kit.MkwSwitch
+import com.mylittleblover.mkwplayer.ui.kit.MkwTextField
+import com.mylittleblover.mkwplayer.ui.unpadHorizontal
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -52,6 +63,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mylittleblover.mkwplayer.R
 import com.mylittleblover.mkwplayer.audio.EngineSnapshot
@@ -137,6 +149,45 @@ internal fun EqualizerPresetLabel(preset: EqualizerPreset): String = when (prese
 }
 
 @Composable
+private fun MkwLabeledSlider(
+    title: String,
+    valueText: String,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    onValueChange: (Float) -> Unit,
+    enabled: Boolean = true,
+    centerZero: Boolean = false,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = if (enabled) MkwKitTokens.Palette.ink else MkwKitTokens.Palette.inkSecondary,
+            )
+            Text(
+                text = valueText,
+                style = MkwKitTokens.tabular(MaterialTheme.typography.titleSmall),
+                color = if (enabled) MkwKitTokens.Palette.crimson else MkwKitTokens.Palette.inkSecondary,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        MkwSlider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = valueRange,
+            enabled = enabled,
+            centerZero = centerZero,
+        )
+    }
+}
+
+@Composable
 internal fun EqualizerContent(
     config: MasterDspStateConfig,
     onUpdate: (MasterDspStateConfig) -> Unit,
@@ -147,13 +198,14 @@ internal fun EqualizerContent(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        MkwCard(
+            onClick = { onUpdate(config.copy(eqEnabled = !config.eqEnabled)) },
+            selected = config.eqEnabled,
+            tone = MkwSurfaceTone.Porcelain,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
         ) {
             Row(
-                Modifier.fillMaxWidth().clickable { onUpdate(config.copy(eqEnabled = !config.eqEnabled)) }
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
@@ -162,14 +214,19 @@ internal fun EqualizerContent(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.weight(1f),
                 ) {
-                    Icon(Icons.Filled.Equalizer, null, tint = MaterialTheme.colorScheme.primary)
+                    Icon(
+                        imageVector = Icons.Filled.Equalizer,
+                        contentDescription = null,
+                        tint = if (config.eqEnabled) MkwKitTokens.Palette.crimson else MkwKitTokens.Palette.inkSecondary,
+                    )
                     Text(
-                        stringResource(R.string.eq_enabled),
+                        text = stringResource(R.string.eq_enabled),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
+                        color = MkwKitTokens.Palette.ink,
                     )
                 }
-                Switch(
+                MkwSwitch(
                     checked = config.eqEnabled,
                     onCheckedChange = { enabled -> onUpdate(config.copy(eqEnabled = enabled)) },
                 )
@@ -177,16 +234,14 @@ internal fun EqualizerContent(
         }
 
         // Compact frequency curve preview
-        val lineColor = if (config.eqEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-        val gridColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        val lineColor = if (config.eqEnabled) MkwKitTokens.Palette.crimson else MkwKitTokens.Palette.outlineInk
+        val gridColor = MkwKitTokens.Palette.hairline
+        MkwInsetBox(
+            shape = MkwKitTokens.Shape.card,
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            Canvas(
-                Modifier.fillMaxWidth().height(84.dp).padding(horizontal = 18.dp, vertical = 12.dp),
-            ) {
+            Canvas(Modifier.fillMaxWidth().height(78.dp)) {
                 val midY = size.height / 2f
                 drawLine(gridColor, Offset(0f, midY), Offset(size.width, midY), strokeWidth = 2f)
                 val path = Path()
@@ -211,14 +266,19 @@ internal fun EqualizerContent(
         }
 
         Text(
-            stringResource(R.string.eq_preset_label),
+            text = stringResource(R.string.eq_preset_label),
             style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MkwKitTokens.Palette.inkSecondary,
         )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyRow(
+            modifier = Modifier.fillMaxWidth().unpadHorizontal(20.dp),
+            contentPadding = PaddingValues(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             val presets = EqualizerPreset.entries.filter { it != EqualizerPreset.CUSTOM || config.preset == EqualizerPreset.CUSTOM }
             items(presets, key = { it.name }) { preset ->
-                FilterChip(
+                MkwFilterPill(
+                    label = EqualizerPresetLabel(preset),
                     selected = config.preset == preset,
                     onClick = {
                         if (preset != EqualizerPreset.CUSTOM) {
@@ -231,7 +291,6 @@ internal fun EqualizerContent(
                             )
                         }
                     },
-                    label = { Text(EqualizerPresetLabel(preset)) },
                 )
             }
         }
@@ -239,16 +298,17 @@ internal fun EqualizerContent(
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             config.bandsDb.forEachIndexed { idx, gainDb ->
                 Row(
-                    Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        freqLabels.getOrElse(idx) { "" },
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.width(56.dp),
+                        text = freqLabels.getOrElse(idx) { "" },
+                        style = MkwKitTokens.tabular(MaterialTheme.typography.labelMedium),
+                        color = MkwKitTokens.Palette.inkSecondary,
+                        modifier = Modifier.width(54.dp),
                     )
-                    Slider(
+                    MkwSlider(
                         value = gainDb,
                         onValueChange = { raw ->
                             val snapped = (raw * 2f).roundToInt() / 2f
@@ -262,88 +322,73 @@ internal fun EqualizerContent(
                             )
                         },
                         valueRange = -12f..12f,
+                        centerZero = true,
+                        activeColor = if (config.eqEnabled) MkwKitTokens.Palette.crimson else MkwKitTokens.Palette.outlineInk,
                         modifier = Modifier.weight(1f),
                     )
                     Text(
-                        stringResource(R.string.eq_db_fmt, gainDb),
-                        style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
-                        color = MaterialTheme.colorScheme.primary,
+                        text = stringResource(R.string.eq_db_fmt, gainDb),
+                        style = MkwKitTokens.tabular(MaterialTheme.typography.labelMedium),
+                        color = if (config.eqEnabled) MkwKitTokens.Palette.crimson else MkwKitTokens.Palette.inkSecondary,
+                        fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.width(64.dp),
                     )
                 }
             }
         }
 
-        HorizontalDivider()
+        MkwDivider()
 
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                stringResource(R.string.eq_bass_boost, config.bassBoostPercent),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Slider(
-                value = config.bassBoostPercent.toFloat(),
-                onValueChange = { raw ->
-                    onUpdate(config.copy(bassBoostPercent = raw.roundToInt().coerceIn(0, 100)))
-                },
-                valueRange = 0f..100f,
-            )
-        }
+        MkwLabeledSlider(
+            title = stringResource(R.string.eq_bass_boost, config.bassBoostPercent),
+            valueText = "${config.bassBoostPercent}%",
+            value = config.bassBoostPercent.toFloat(),
+            valueRange = 0f..100f,
+            onValueChange = { raw ->
+                onUpdate(config.copy(bassBoostPercent = raw.roundToInt().coerceIn(0, 100)))
+            },
+        )
 
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                stringResource(R.string.eq_loudness_gain, config.loudnessDb),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Slider(
-                value = config.loudnessDb,
-                onValueChange = { raw ->
-                    val snapped = ((raw * 2f).roundToInt() / 2f).coerceIn(0f, 9f)
-                    onUpdate(config.copy(loudnessDb = snapped))
-                },
-                valueRange = 0f..9f,
-            )
-        }
+        MkwLabeledSlider(
+            title = stringResource(R.string.eq_loudness_gain, config.loudnessDb),
+            valueText = stringResource(R.string.eq_db_fmt, config.loudnessDb),
+            value = config.loudnessDb,
+            valueRange = 0f..9f,
+            onValueChange = { raw ->
+                val snapped = ((raw * 2f).roundToInt() / 2f).coerceIn(0f, 9f)
+                onUpdate(config.copy(loudnessDb = snapped))
+            },
+        )
 
-        OutlinedButton(
+        MkwSecondaryButton(
+            text = stringResource(R.string.eq_reset),
             onClick = { onUpdate(MasterDspStateConfig()) },
+            leadingIcon = Icons.Filled.Refresh,
             modifier = Modifier.fillMaxWidth(),
-        ) {
-            Icon(Icons.Filled.Refresh, null, Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(stringResource(R.string.eq_reset))
-        }
+        )
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun EqualizerScreen(
     config: MasterDspStateConfig,
     onUpdate: (MasterDspStateConfig) -> Unit,
-    onBack: () -> Unit,
+    onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    Scaffold(
-        modifier = modifier,
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.eq_title), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        Column(
-            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(18.dp),
-        ) {
-            EqualizerContent(config = config, onUpdate = onUpdate)
-        }
+    Column(
+        modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .navigationBarsPadding()
+            .padding(
+                start = 20.dp,
+                top = 16.dp,
+                end = 20.dp,
+                bottom = com.mylittleblover.mkwplayer.ui.rememberMiniPlayerBottomClearance(16.dp),
+            ),
+    ) {
+        EqualizerContent(config = config, onUpdate = onUpdate)
     }
 }
 
@@ -354,17 +399,16 @@ internal fun EqualizerSheet(
     onUpdate: (MasterDspStateConfig) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(sheetState = sheet, onDismissRequest = onDismiss) {
+    MkwBottomSheet(
+        onDismissRequest = onDismiss,
+        title = stringResource(R.string.eq_title),
+    ) {
         Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 8.dp),
         ) {
-            Text(
-                stringResource(R.string.eq_title),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-            )
             EqualizerContent(config = config, onUpdate = onUpdate)
         }
     }
@@ -378,91 +422,100 @@ internal fun SpeedPitchSheet(
     onReset: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(sheetState = sheet, onDismissRequest = onDismiss) {
+    MkwBottomSheet(onDismissRequest = onDismiss) {
         Column(
-            Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Filled.Speed, null, tint = MaterialTheme.colorScheme.primary)
-                    Text(stringResource(R.string.speed_pitch_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                }
-                TextButton(onClick = onReset) { Text(stringResource(R.string.speed_pitch_reset)) }
-            }
-
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(stringResource(R.string.speed_label), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Icon(Icons.Filled.Speed, contentDescription = null, tint = MkwKitTokens.Palette.crimson)
                     Text(
-                        String.format(Locale.ROOT, "%.2fx", rate.speed),
-                        style = MaterialTheme.typography.titleSmall.copy(fontFeatureSettings = "tnum"),
-                        color = MaterialTheme.colorScheme.primary,
+                        text = stringResource(R.string.speed_pitch_title),
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
+                        color = MkwKitTokens.Palette.ink,
                     )
                 }
-                Slider(
+                MkwGhostButton(
+                    text = stringResource(R.string.speed_pitch_reset),
+                    onClick = onReset,
+                )
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                MkwLabeledSlider(
+                    title = stringResource(R.string.speed_label),
+                    valueText = String.format(Locale.ROOT, "%.2fx", rate.speed),
                     value = rate.speed,
+                    valueRange = 0.5f..2.0f,
                     onValueChange = { raw ->
                         val snapped = ((raw * 20f).roundToInt() / 20f).coerceIn(0.5f, 2.0f)
                         onUpdate(rate.copy(speed = snapped))
                     },
-                    valueRange = 0.5f..2.0f,
                 )
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth().unpadHorizontal(20.dp),
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     items(listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)) { preset ->
-                        FilterChip(
+                        MkwFilterPill(
+                            label = String.format(Locale.ROOT, "%.2fx", preset),
                             selected = abs(rate.speed - preset) < 0.01f,
                             onClick = { onUpdate(rate.copy(speed = preset)) },
-                            label = { Text(String.format(Locale.ROOT, "%.2fx", preset)) },
                         )
                     }
                 }
             }
 
-            Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            MkwCard(
+                onClick = { onUpdate(rate.copy(preservePitch = !rate.preservePitch)) },
+                selected = rate.preservePitch,
+                tone = MkwSurfaceTone.Porcelain,
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
             ) {
                 Row(
-                    Modifier.fillMaxWidth().clickable { onUpdate(rate.copy(preservePitch = !rate.preservePitch)) }
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
-                        stringResource(R.string.preserve_pitch_label),
+                        text = stringResource(R.string.preserve_pitch_label),
                         style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MkwKitTokens.Palette.ink,
                         modifier = Modifier.weight(1f).padding(end = 8.dp),
                     )
-                    Switch(
+                    MkwSwitch(
                         checked = rate.preservePitch,
                         onCheckedChange = { preserve -> onUpdate(rate.copy(preservePitch = preserve)) },
                     )
                 }
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(stringResource(R.string.pitch_label), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        stringResource(R.string.speed_pitch_semitones_fmt, rate.pitchSemitones),
-                        style = MaterialTheme.typography.titleSmall.copy(fontFeatureSettings = "tnum"),
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-                Slider(
-                    value = rate.pitchSemitones,
-                    enabled = rate.preservePitch,
-                    onValueChange = { raw ->
-                        val snapped = ((raw * 2f).roundToInt() / 2f).coerceIn(-12f, 12f)
-                        onUpdate(rate.copy(pitchSemitones = snapped))
-                    },
-                    valueRange = -12f..12f,
-                )
-            }
+            MkwLabeledSlider(
+                title = stringResource(R.string.pitch_label),
+                valueText = stringResource(R.string.speed_pitch_semitones_fmt, rate.pitchSemitones),
+                value = rate.pitchSemitones,
+                valueRange = -12f..12f,
+                enabled = rate.preservePitch,
+                centerZero = true,
+                onValueChange = { raw ->
+                    val snapped = ((raw * 2f).roundToInt() / 2f).coerceIn(-12f, 12f)
+                    onUpdate(rate.copy(pitchSemitones = snapped))
+                },
+            )
         }
     }
 }
@@ -478,98 +531,120 @@ internal fun SleepTimerSheet(
     onCancel: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var customInput by rememberSaveable { mutableStateOf("20") }
     val parsedMin = customInput.trim().toIntOrNull()?.takeIf { it in 1..480 }
 
-    ModalBottomSheet(sheetState = sheet, onDismissRequest = onDismiss) {
+    MkwBottomSheet(onDismissRequest = onDismiss) {
         Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Icon(Icons.Filled.Bedtime, null, tint = MaterialTheme.colorScheme.primary)
-                Text(stringResource(R.string.sleep_timer_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Icon(Icons.Filled.Bedtime, contentDescription = null, tint = MkwKitTokens.Palette.crimson)
+                Text(
+                    text = stringResource(R.string.sleep_timer_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MkwKitTokens.Palette.ink,
+                )
             }
 
             if (state.active) {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
+                MkwCard(
+                    tone = MkwSurfaceTone.RoseTint,
+                    selected = true,
+                    contentPadding = PaddingValues(14.dp),
                 ) {
-                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            when (state.mode) {
-                                SleepTimerMode.COUNTDOWN ->
-                                    stringResource(R.string.sleep_timer_remaining_fmt, formatCountdownMs(state.remainingMs))
-                                SleepTimerMode.AFTER_CURRENT_TRACK ->
-                                    stringResource(R.string.sleep_timer_after_track)
-                                SleepTimerMode.OFF -> stringResource(R.string.sleep_timer_off)
-                            },
-                            style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (state.mode == SleepTimerMode.COUNTDOWN) {
-                                FilledTonalButton(onClick = onExtend5Min) {
-                                    Text(stringResource(R.string.sleep_timer_extend_5m))
-                                }
-                            }
-                            OutlinedButton(onClick = { onCancel(); onDismiss() }) {
-                                Text(stringResource(R.string.sleep_timer_cancel))
-                            }
+                    Text(
+                        text = when (state.mode) {
+                            SleepTimerMode.COUNTDOWN ->
+                                stringResource(R.string.sleep_timer_remaining_fmt, formatCountdownMs(state.remainingMs))
+                            SleepTimerMode.AFTER_CURRENT_TRACK ->
+                                stringResource(R.string.sleep_timer_after_track)
+                            SleepTimerMode.OFF -> stringResource(R.string.sleep_timer_off)
+                        },
+                        style = MkwKitTokens.tabular(MaterialTheme.typography.titleMedium),
+                        fontWeight = FontWeight.Bold,
+                        color = MkwKitTokens.Palette.crimsonDeep,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (state.mode == SleepTimerMode.COUNTDOWN) {
+                            MkwRoseButton(
+                                text = stringResource(R.string.sleep_timer_extend_5m),
+                                onClick = onExtend5Min,
+                                size = MkwButtonSize.Compact,
+                            )
                         }
+                        MkwSecondaryButton(
+                            text = stringResource(R.string.sleep_timer_cancel),
+                            onClick = { onCancel(); onDismiss() },
+                            size = MkwButtonSize.Compact,
+                        )
                     }
                 }
             }
 
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyRow(
+                modifier = Modifier.fillMaxWidth().unpadHorizontal(20.dp),
+                contentPadding = PaddingValues(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 items(listOf(10, 15, 30, 45, 60, 90)) { min ->
-                    FilterChip(
+                    MkwFilterPill(
+                        label = stringResource(R.string.sleep_timer_minutes_fmt, min),
                         selected = false,
                         onClick = { onStartMinutes(min); onDismiss() },
-                        label = { Text(stringResource(R.string.sleep_timer_minutes_fmt, min)) },
                     )
                 }
             }
 
             if (canStopAfterTrack) {
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = if (state.mode == SleepTimerMode.AFTER_CURRENT_TRACK) {
-                        MaterialTheme.colorScheme.secondaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceContainerHigh
-                    },
+                MkwCard(
                     onClick = { onStartAfterTrack(); onDismiss() },
+                    selected = state.mode == SleepTimerMode.AFTER_CURRENT_TRACK,
+                    tone = MkwSurfaceTone.Porcelain,
+                    contentPadding = PaddingValues(14.dp),
                 ) {
-                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(stringResource(R.string.sleep_timer_after_track), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                        Text(stringResource(R.string.sleep_timer_after_track_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    Text(
+                        text = stringResource(R.string.sleep_timer_after_track),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (state.mode == SleepTimerMode.AFTER_CURRENT_TRACK) {
+                            MkwKitTokens.Palette.crimsonDeep
+                        } else {
+                            MkwKitTokens.Palette.ink
+                        },
+                    )
+                    Text(
+                        text = stringResource(R.string.sleep_timer_after_track_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MkwKitTokens.Palette.inkSecondary,
+                    )
                 }
             }
 
             Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                OutlinedTextField(
+                MkwTextField(
                     value = customInput,
                     onValueChange = { customInput = it.filter { ch -> ch.isDigit() }.take(3) },
-                    label = { Text(stringResource(R.string.sleep_timer_custom_min)) },
+                    label = stringResource(R.string.sleep_timer_custom_min),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f),
                 )
-                Button(
+                MkwPrimaryButton(
+                    text = stringResource(R.string.sleep_timer_start),
                     onClick = { parsedMin?.let { onStartMinutes(it); onDismiss() } },
                     enabled = parsedMin != null,
-                ) {
-                    Text(stringResource(R.string.sleep_timer_start))
-                }
+                    size = MkwButtonSize.Hero,
+                )
             }
         }
     }
@@ -599,7 +674,6 @@ internal fun InteractiveTimerSheet(
     onCancel: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val availableActions = remember(
         flow.title,
         flow.hasFast,
@@ -640,35 +714,60 @@ internal fun InteractiveTimerSheet(
     var selectedPresetSec by rememberSaveable { mutableLongStateOf(60L) }
     val parsedSec = delaySecInput.trim().toLongOrNull()?.takeIf { it in 1L..10_800L }
 
-    ModalBottomSheet(sheetState = sheet, onDismissRequest = onDismiss) {
+    MkwBottomSheet(
+        onDismissRequest = onDismiss,
+        footer = {
+            MkwPrimaryButton(
+                text = stringResource(R.string.interactive_timer_start),
+                onClick = {
+                    val secs = parsedSec ?: 60L
+                    onStart(secs, safeSelected)
+                    onDismiss()
+                },
+                enabled = parsedSec != null,
+                size = MkwButtonSize.Hero,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+    ) {
         Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Icon(Icons.Filled.Schedule, null, tint = MaterialTheme.colorScheme.primary)
-                Text(stringResource(R.string.interactive_timer_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Icon(Icons.Filled.Schedule, contentDescription = null, tint = MkwKitTokens.Palette.crimson)
+                Text(
+                    text = stringResource(R.string.interactive_timer_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MkwKitTokens.Palette.ink,
+                )
             }
             Text(
-                stringResource(R.string.interactive_timer_hint),
+                text = stringResource(R.string.interactive_timer_hint),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MkwKitTokens.Palette.inkSecondary,
             )
 
             if (timer.active && timer.action != null) {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
+                MkwCard(
+                    tone = MkwSurfaceTone.RoseTint,
+                    selected = true,
+                    contentPadding = PaddingValues(14.dp),
                 ) {
                     Row(
-                        Modifier.fillMaxWidth().padding(14.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Column(Modifier.weight(1f).padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             val timeStr = formatCountdownMs(timer.remainingMs)
                             Text(
-                                if (timer.pausedByTransport) {
+                                text = if (timer.pausedByTransport) {
                                     stringResource(R.string.interactive_timer_paused_badge, timeStr)
                                 } else {
                                     stringResource(
@@ -677,27 +776,37 @@ internal fun InteractiveTimerSheet(
                                         interactiveTimedActionLabel(timer.action),
                                     )
                                 },
-                                style = MaterialTheme.typography.titleSmall.copy(fontFeatureSettings = "tnum"),
+                                style = MkwKitTokens.tabular(MaterialTheme.typography.titleSmall),
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                color = MkwKitTokens.Palette.crimsonDeep,
                             )
                             if (timer.pausedByTransport) {
                                 Text(
-                                    interactiveTimedActionLabel(timer.action),
+                                    text = interactiveTimedActionLabel(timer.action),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    color = MkwKitTokens.Palette.crimsonDeep,
                                 )
                             }
                         }
-                        OutlinedButton(onClick = { onCancel(); onDismiss() }) {
-                            Text(stringResource(R.string.interactive_timer_cancel))
-                        }
+                        MkwSecondaryButton(
+                            text = stringResource(R.string.interactive_timer_cancel),
+                            onClick = { onCancel(); onDismiss() },
+                            size = MkwButtonSize.Compact,
+                        )
                     }
                 }
             }
 
-            Text(stringResource(R.string.interactive_timer_duration_label), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = stringResource(R.string.interactive_timer_duration_label),
+                style = MaterialTheme.typography.labelLarge,
+                color = MkwKitTokens.Palette.inkSecondary,
+            )
+            LazyRow(
+                modifier = Modifier.fillMaxWidth().unpadHorizontal(20.dp),
+                contentPadding = PaddingValues(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 val presets = listOf(15L to true, 30L to true, 60L to false, 120L to false, 300L to false, 600L to false)
                 items(presets, key = { it.first }) { (sec, isSecLabel) ->
                     val label = if (isSecLabel) {
@@ -705,62 +814,42 @@ internal fun InteractiveTimerSheet(
                     } else {
                         stringResource(R.string.interactive_timer_min_fmt, (sec / 60L).toInt())
                     }
-                    FilterChip(
+                    MkwFilterPill(
+                        label = label,
                         selected = selectedPresetSec == sec && parsedSec == sec,
                         onClick = {
                             selectedPresetSec = sec
                             delaySecInput = sec.toString()
                         },
-                        label = { Text(label) },
                     )
                 }
             }
 
-            OutlinedTextField(
+            MkwTextField(
                 value = delaySecInput,
                 onValueChange = { raw -> delaySecInput = raw.filter { ch -> ch.isDigit() }.take(5) },
-                label = { Text(stringResource(R.string.interactive_timer_custom_seconds)) },
+                label = stringResource(R.string.interactive_timer_custom_seconds),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            Text(stringResource(R.string.interactive_timer_action_label), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                text = stringResource(R.string.interactive_timer_action_label),
+                style = MaterialTheme.typography.labelLarge,
+                color = MkwKitTokens.Palette.inkSecondary,
+            )
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 availableActions.forEachIndexed { idx, candidate ->
                     val selected = idx == selectedIdx
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
+                    MkwOptionRow(
+                        headline = interactiveTimedActionLabel(candidate),
+                        selected = selected,
+                        role = Role.RadioButton,
                         onClick = { selectedIdx = idx },
-                    ) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(
-                                interactiveTimedActionLabel(candidate),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                modifier = Modifier.weight(1f),
-                            )
-                            RadioButton(selected = selected, onClick = null)
-                        }
-                    }
+                        trailing = { MkwRadioMark(selected = selected) },
+                    )
                 }
-            }
-
-            Button(
-                onClick = {
-                    val secs = parsedSec ?: 60L
-                    onStart(secs, safeSelected)
-                    onDismiss()
-                },
-                enabled = parsedSec != null,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-            ) {
-                Text(stringResource(R.string.interactive_timer_start), fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -778,56 +867,47 @@ internal fun AbLoopBar(
     modifier: Modifier = Modifier,
 ) {
     val rate = sampleRate.coerceAtLeast(1)
-    Surface(
+    MkwCard(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(
-            1.dp,
-            if (aFrame != null && bFrame != null) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-            else MaterialTheme.colorScheme.outlineVariant,
-        ),
+        selected = aFrame != null && bFrame != null,
+        shape = MkwKitTokens.Shape.card,
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (aFrame != null) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Icon(Icons.Filled.Loop, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-                    val aText = EngineSnapshot.formatPosition(aFrame, rate)
-                    val bText = bFrame?.let { EngineSnapshot.formatPosition(it, rate) }
-                    Text(
-                        if (bText != null) stringResource(R.string.ab_loop_badge_ab, aText, bText)
-                        else stringResource(R.string.ab_loop_badge_a, aText),
-                        style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
+        if (aFrame != null) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(Icons.Filled.Loop, null, Modifier.size(16.dp), tint = MkwKitTokens.Palette.crimson)
+                val aText = EngineSnapshot.formatPosition(aFrame, rate)
+                val bText = bFrame?.let { EngineSnapshot.formatPosition(it, rate) }
+                Text(
+                    if (bText != null) stringResource(R.string.ab_loop_badge_ab, aText, bText)
+                    else stringResource(R.string.ab_loop_badge_a, aText),
+                    style = MkwKitTokens.tabular(MaterialTheme.typography.labelMedium),
+                    color = MkwKitTokens.Palette.crimson,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = onSetA,
-                    enabled = enabled,
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                ) {
-                    Text(stringResource(R.string.ab_loop_set_a), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                OutlinedButton(
-                    onClick = onSetB,
-                    enabled = enabled,
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                ) {
-                    Text(stringResource(R.string.ab_loop_set_b), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                if (aFrame != null || bFrame != null) {
-                    FilledTonalButton(
-                        onClick = onClear,
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                    ) {
-                        Text(stringResource(R.string.ab_loop_clear), maxLines = 1)
-                    }
-                }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MkwSecondaryButton(
+                text = stringResource(R.string.ab_loop_set_a),
+                onClick = onSetA,
+                enabled = enabled,
+                size = MkwButtonSize.Compact,
+                modifier = Modifier.weight(1f),
+            )
+            MkwSecondaryButton(
+                text = stringResource(R.string.ab_loop_set_b),
+                onClick = onSetB,
+                enabled = enabled,
+                size = MkwButtonSize.Compact,
+                modifier = Modifier.weight(1f),
+            )
+            if (aFrame != null || bFrame != null) {
+                MkwRoseButton(
+                    text = stringResource(R.string.ab_loop_clear),
+                    onClick = onClear,
+                    size = MkwButtonSize.Compact,
+                )
             }
         }
     }
@@ -839,6 +919,7 @@ internal fun TrackSortBar(
     includeOstOrder: Boolean,
     onSelect: (TrackSortOrder) -> Unit,
     modifier: Modifier = Modifier,
+    horizontalEdgePadding: Dp = 16.dp,
 ) {
     val options = remember(includeOstOrder) {
         buildList {
@@ -852,13 +933,13 @@ internal fun TrackSortBar(
     LazyRow(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(horizontal = 2.dp),
+        contentPadding = PaddingValues(horizontal = horizontalEdgePadding),
     ) {
         items(options, key = { it.first.name }) { (order, labelRes) ->
-            FilterChip(
+            MkwFilterPill(
+                label = stringResource(labelRes),
                 selected = selected == order,
                 onClick = { onSelect(order) },
-                label = { Text(stringResource(labelRes), maxLines = 1) },
             )
         }
     }
@@ -907,10 +988,10 @@ internal fun SwipeToTrackActionBox(
             val dir = dismissState.dismissDirection
             val bgColor by animateColorAsState(
                 targetValue = when (dir) {
-                    SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primaryContainer
+                    SwipeToDismissBoxValue.StartToEnd -> MkwKitTokens.Palette.rose
                     SwipeToDismissBoxValue.EndToStart ->
-                        if (endToStartDestructive) MaterialTheme.colorScheme.errorContainer
-                        else MaterialTheme.colorScheme.secondaryContainer
+                        if (endToStartDestructive) MkwKitTokens.Palette.dangerTint
+                        else MkwKitTokens.Palette.roseHover
                     SwipeToDismissBoxValue.Settled -> Color.Transparent
                 },
                 animationSpec = tween(140),
@@ -918,14 +999,14 @@ internal fun SwipeToTrackActionBox(
             )
             val align = if (dir == SwipeToDismissBoxValue.EndToStart) Alignment.CenterEnd else Alignment.CenterStart
             val contentTint = when (dir) {
-                SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.onPrimaryContainer
+                SwipeToDismissBoxValue.StartToEnd -> MkwKitTokens.Palette.crimsonDeep
                 SwipeToDismissBoxValue.EndToStart ->
-                    if (endToStartDestructive) MaterialTheme.colorScheme.onErrorContainer
-                    else MaterialTheme.colorScheme.onSecondaryContainer
-                SwipeToDismissBoxValue.Settled -> MaterialTheme.colorScheme.onSurface
+                    if (endToStartDestructive) MkwKitTokens.Palette.danger
+                    else MkwKitTokens.Palette.crimsonDeep
+                SwipeToDismissBoxValue.Settled -> MkwKitTokens.Palette.ink
             }
             Box(
-                Modifier.fillMaxSize().clip(RoundedCornerShape(14.dp)).background(bgColor).padding(horizontal = 20.dp),
+                Modifier.fillMaxSize().clip(MkwKitTokens.Shape.control).background(bgColor).padding(horizontal = 20.dp),
                 contentAlignment = align,
             ) {
                 when (dir) {

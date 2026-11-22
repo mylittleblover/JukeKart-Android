@@ -23,4 +23,9 @@
     <string name="unlock_congrats_body">You have listened to all eligible courses. Special Cup, Rainbow Road, and their commemorative tracks are now available across the player.</string>
     <string name="unlock_congrats_enter">Enter Special Cup</string>
     <string name="unlock_congrats_close">Close</string>
+    <string name="settings_unlock_reset_btn">Reset unlock progress</string>
+    <string name="settings_unlock_reset_confirm_title">Reset Special Cup progress?</string>
+    <string name="settings_unlock_reset_confirm_body">Clears all recorded course listening progress, re-locks Rainbow Road &amp; Special Cup, and resets unlock test mode to normal.</string>
+    <string name="settings_unlock_reset_confirm_action">Reset progress</string>
+    <string name="settings_unlock_reset_done">Unlock progress reset</string>
 </resources>

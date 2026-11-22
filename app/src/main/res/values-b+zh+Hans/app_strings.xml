@@ -59,13 +59,13 @@
     <string name="media_course_locked_progress">已收听 %1$d / %2$d 首赛道</string>
     <string name="media_course_locked_hint">未解锁赛道 · %1$s</string>
 
-    <string name="widget_label">MKW 播放器控制</string>
+    <string name="widget_label">JukeKart 播放控制</string>
     <string name="widget_description">显示当前曲目及播放控制按钮。</string>
     <string name="widget_artwork_desc">曲目封面</string>
     <string name="widget_prev_desc">上一首</string>
     <string name="widget_play_pause_desc">播放或暂停</string>
     <string name="widget_next_desc">下一首</string>
-    <string name="tile_default_label">MKW 播放器</string>
+    <string name="tile_default_label">JukeKart</string>
     <string name="tile_playing">正在播放</string>
     <string name="tile_paused">已暂停</string>
     <string name="tile_idle">点按打开</string>
@@ -105,12 +105,15 @@
 
     <string name="speed_pitch_title">倍速与变调</string>
     <string name="speed_pitch_button">倍速 / 变调</string>
+    <string name="speed_short_label">倍速</string>
+    <string name="sleep_short_label">睡眠</string>
     <string name="speed_label">播放倍速</string>
     <string name="pitch_label">音调调整</string>
     <string name="preserve_pitch_label">变速不变调</string>
     <string name="speed_pitch_reset">重置为 1.00x / 0 半音</string>
     <string name="speed_pitch_semitones_fmt">%1$+.1f 半音</string>
 
+    <string name="ab_loop_button">A-B 循环</string>
     <string name="ab_loop_set_a">设 A 点</string>
     <string name="ab_loop_set_b">设 B 点</string>
     <string name="ab_loop_clear">清除 A-B</string>
@@ -118,6 +121,7 @@
     <string name="ab_loop_badge_ab">A-B 循环 %1$s – %2$s</string>
 
     <string name="eq_title">均衡器与音效</string>
+    <string name="eq_short_label">均衡器</string>
     <string name="eq_enabled">启用 5 段均衡器</string>
     <string name="eq_preset_label">音效预设</string>
     <string name="eq_preset_flat">原声平直</string>
@@ -142,7 +146,7 @@
 
     <string name="settings_backup_title">数据备份与导出</string>
     <string name="settings_backup_hint">支持完整导出或恢复播放列表、收藏、流程预设、路线、播放统计与音效配置，也可导出通用 M3U 歌单。</string>
-    <string name="settings_backup_export">导出完整备份 (.json)</string>
+    <string name="settings_backup_export">导出 (.json)</string>
     <string name="settings_backup_import">导入恢复备份</string>
     <string name="settings_backup_m3u">导出 M3U 歌单</string>
     <string name="settings_backup_mode_title">选择恢复方式</string>
@@ -163,6 +167,9 @@
     <string name="sort_most_played">按播放次数</string>
     <string name="sort_ost_index">原声带编号</string>
     <string name="play_count_fmt">%1$d 次播放</string>
+    <plurals name="play_count_plurals">
+        <item quantity="other">%1$d 次播放</item>
+    </plurals>
 
     <string name="smart_playlists_title">智能歌单</string>
     <string name="smart_most_played">最多播放</string>

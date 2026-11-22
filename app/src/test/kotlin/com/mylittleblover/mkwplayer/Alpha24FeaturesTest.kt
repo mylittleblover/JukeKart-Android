@@ -171,8 +171,8 @@ class Alpha24FeaturesTest {
         assertTrue("Main" in cinemaAfterPre && "Pattern2" !in cinemaAfterPre && "Fast" in cinemaAfterPre)
         assertTrue("SFC_Main" !in cinemaStart && "SFC_Fast" !in cinemaStart)
         assertTrue("SFC_Main" !in cinemaAfterPre && "SFC_Fast" !in cinemaAfterPre)
-        assertEquals(listOf("Pattern2", "Fast"), cinema.allowedNextRoles(listOf(FlowStep("Main"))))
-        assertEquals(listOf("Main", "Fast_Pattern2"), cinema.allowedNextRoles(listOf(FlowStep("Pattern2"))))
+        assertEquals(listOf("Pattern2", "Fast", "Fast_Pattern2"), cinema.allowedNextRoles(listOf(FlowStep("Main"))))
+        assertEquals(listOf("Main", "Fast_Pattern2", "Fast"), cinema.allowedNextRoles(listOf(FlowStep("Pattern2"))))
         assertTrue("Fast_Pattern2" in cinema.allowedNextRoles(listOf(FlowStep("Fast"))))
         assertEquals(listOf("Fast"), cinema.allowedNextRoles(listOf(FlowStep("Fast_Pattern2"))))
 
@@ -185,8 +185,8 @@ class Alpha24FeaturesTest {
         val snow = CourseFlowRecipeBuilder.inspectCourse("SnowMountain", minfCatalog, medleys, resolver)
         assertTrue(snow.part("Pattern2")?.beats.orEmpty().isNotEmpty())
         assertTrue("Pattern2" !in snow.allowedNextRoles(listOf(FlowStep("Pre"))))
-        assertEquals(listOf("Pattern2", "Fast"), snow.allowedNextRoles(listOf(FlowStep("Main"))))
-        assertEquals(listOf("Main", "Fast_Pattern2"), snow.allowedNextRoles(listOf(FlowStep("Pattern2"))))
+        assertEquals(listOf("Pattern2", "Fast", "Fast_Pattern2"), snow.allowedNextRoles(listOf(FlowStep("Main"))))
+        assertEquals(listOf("Main", "Fast_Pattern2", "Fast"), snow.allowedNextRoles(listOf(FlowStep("Pattern2"))))
         assertTrue("Fast_Pattern2" in snow.allowedNextRoles(listOf(FlowStep("Fast"))))
         assertEquals(listOf("Fast"), snow.allowedNextRoles(listOf(FlowStep("Fast_Pattern2"))))
 

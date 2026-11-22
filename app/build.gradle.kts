@@ -12,9 +12,9 @@ android {
         applicationId = "com.mylittleblover.mkwplayer"
         minSdk = 26
         targetSdk = 35
-        // Alpha 25: Sleep timer, interactive scheduled transition/stop timer, playback speed & pitch control, A-B loop repeat, 5-band parametric EQ + presets + bass boost + loudness gain + limiter, full JSON backup/restore & M3U export, queue/playlist drag-to-reorder & swipe gestures, track sorting, play count badges, Smart Playlists (Most Played & Favorites Mix), home screen widget & QS tile, and optional live FFT visualizer.
-        versionCode = 25
-        versionName = "0.1.0-alpha25"
+        // Beta 01: Fullscreen landscape unlock ceremony video with 1s black fade-in/out, merged course & extra medleys (120 + 14), Koopa Beach speaker/suite updates, route playback suite modes, safe-area fixes, unified JukeKart branding/icons/notification/widget.
+        versionCode = 26
+        versionName = "0.1.0-beta01"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -73,6 +73,10 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+
+    androidResources {
+        noCompress += "webm"
     }
 }
 

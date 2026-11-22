@@ -67,6 +67,9 @@
     <string name="jukebox_subtitle">依原始參考遊戲版本分類，作品依發行日期排列。</string>
     <string name="jukebox_game_subtitle">依官方原聲帶曲序顯示；同曲不同編曲獨立列出。</string>
     <string name="jukebox_tracks_count">%1$d 首</string>
+    <plurals name="tracks_count_plurals">
+        <item quantity="other">%1$d 首</item>
+    </plurals>
     <string name="jukebox_games_summary">%1$d 部作品 &#183; %2$d 首</string>
     <string name="jukebox_play_all">播放全部</string>
     <string name="jukebox_shuffle_play">隨機播放</string>
@@ -86,12 +89,16 @@
     <string name="jukebox_repeat_single">單曲循環</string>
     <string name="jukebox_repeat_off">不循環</string>
     <string name="jukebox_queue">播放佇列</string>
-    <string name="jukebox_queue_subtitle">目前工作階段清單已凍結，臨時插播曲目優先播放。</string>
+    <string name="jukebox_queue_subtitle">目前播放順序將維持不變，插播曲目會優先播放。</string>
     <string name="jukebox_now_playing">正在播放</string>
     <string name="jukebox_up_next_temp">接下來播放（臨時插播）</string>
     <string name="jukebox_up_next_list">目前清單後續曲目</string>
     <string name="jukebox_queue_empty">佇列中暫無後續曲目。</string>
-    <string name="discovery_search_all">搜尋賽道、盃賽、作品與曲目</string>
+    <string name="discovery_search_all">搜尋賽道、作品與曲目</string>
+    <string name="discovery_search_courses">搜尋賽道</string>
+    <string name="discovery_search_jukebox">搜尋作品與曲目</string>
+    <string name="discovery_search_tracks">搜尋曲目</string>
+    <string name="discovery_search_playlists">搜尋歌單與路線</string>
     <string name="discovery_vs_standard">本作賽道</string>
     <string name="discovery_vs_sfc">SFC 復刻賽道 / 任務</string>
     <string name="discovery_battle_summary">共 %1$d 首 · 支援一般 / 即將結束階段切換</string>
@@ -107,7 +114,7 @@
     <string name="discovery_playlists_group_routes">我的路線</string>
     <string name="discovery_playlists_group_rallies">官方巡迴賽</string>
     <string name="discovery_playlists_group_jukebox">官方 OST 精選</string>
-    <string name="discovery_view_all_count">查看全部 %1$d 項</string>
+    <string name="discovery_view_all_count">全部 (%1$d)</string>
     <string name="discovery_playlist_play_all">播放全部</string>
     <string name="discovery_playlist_native_transition">跨曲原生銜接</string>
     <string name="discovery_playlist_native_transition_desc">優先以已驗證的尾奏接口無縫銜接下一首前奏</string>
@@ -119,7 +126,11 @@
     <string name="discovery_playlist_entry_native_off">關閉原生銜接</string>
     <string name="discovery_native_transition_prefix">原聲銜接</string>
     <string name="discovery_native_transition_active">原聲銜接 · %1$s</string>
-    <string name="preset_system_default">大獎賽組曲</string>
+    <string name="preset_system_default">組曲 A</string>
+    <string name="preset_system_suite_a_alt">組曲 A Alt</string>
+    <string name="preset_system_suite_b">組曲 B</string>
+    <string name="preset_system_suite_c">組曲 C</string>
+    <string name="preset_system_suite_d">組曲 D</string>
     <string name="preset_system_knockout">淘汰巡迴賽組曲</string>
     <string name="preset_user_title">自訂編排方案</string>
     <string name="preset_new">新增流程方案</string>
@@ -127,7 +138,7 @@
     <string name="preset_duplicate">複製</string>
     <string name="preset_delete">刪除</string>
     <string name="preset_delete_warning_title">確定刪除方案？</string>
-    <string name="preset_delete_warning_body">以下歌單引用了此方案：%1$s。刪除後這些曲目將自動退回「大獎賽組曲」。</string>
+    <string name="preset_delete_warning_body">以下歌單引用了此方案：%1$s。刪除後這些曲目將自動退回「組曲 A」。</string>
     <string name="flow_editor_title">流程編排器</string>
     <string name="flow_editor_name_label">方案名稱</string>
     <string name="flow_editor_steps_title">段落順序</string>
@@ -178,7 +189,13 @@
     <string name="route_plan_on_map">在地圖中規劃</string>
     <string name="route_edit_on_map">在地圖中編輯</string>
     <string name="route_stops_count">%1$d 站</string>
+    <plurals name="route_stops_plurals">
+        <item quantity="other">%1$d 站</item>
+    </plurals>
     <string name="route_legs_count">%1$d 段連接公路</string>
+    <plurals name="route_legs_plurals">
+        <item quantity="other">%1$d 段連接公路</item>
+    </plurals>
     <string name="route_edge_music_auto">從路段候選池隨機抽取</string>
     <string name="route_edge_music_pool_empty">暫無路段候選曲目資料 · 跳過</string>
     <string name="route_edge_music_override">固定曲目：%1$s</string>
@@ -255,4 +272,16 @@
     <string name="track_info_game">出處作品</string>
     <string name="track_info_ost">原聲帶編號</string>
     <string name="track_playlist_pick_empty">尚無播放清單，可在下方直接建立並加入。</string>
+    <string name="pinned_favorites_title">我的最愛</string>
+    <string name="pinned_favorites_badge">常駐</string>
+    <string name="pinned_favorites_subtitle">收錄你點選愛心的全部賽道、點唱機與曲目</string>
+    <string name="pinned_favorites_empty">尚無收藏曲目。在賽道、曲庫或播放頁面點選愛心即可加入這裡。</string>
+    <string name="favorites_remove">取消收藏</string>
+    <string name="route_suite_mode_label">組曲播放模式</string>
+    <string name="route_suite_mode_game">遊戲組曲</string>
+    <string name="route_suite_mode_complete">完整組曲</string>
+    <string name="route_suite_mode_game_desc">大獎賽第 1 站用 C、DK 太空中心作為末站用 A Alt、其餘用 A；生存賽首站 B、末站 D、中間 A</string>
+    <string name="route_suite_mode_complete_desc">所有站點預設使用組曲 A</string>
+    <string name="route_stop_preset_auto">跟隨路線模式</string>
+    <string name="route_stop_preset_auto_fmt">跟隨路線模式（%1$s）</string>
 </resources>

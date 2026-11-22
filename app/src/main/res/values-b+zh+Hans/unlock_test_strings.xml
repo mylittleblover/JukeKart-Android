@@ -23,4 +23,9 @@
     <string name="unlock_congrats_body">你已收听所有符合条件的赛道。特别杯、彩虹之路及其相关纪念曲目现已在播放器中全面开放。</string>
     <string name="unlock_congrats_enter">前往特别杯</string>
     <string name="unlock_congrats_close">关闭</string>
+    <string name="settings_unlock_reset_btn">重置解锁进度</string>
+    <string name="settings_unlock_reset_confirm_title">确定重置解锁进度？</string>
+    <string name="settings_unlock_reset_confirm_body">将清空全部赛道收听进度记录，重新锁定特别杯与彩虹之路，并将测试模式恢复为正常。</string>
+    <string name="settings_unlock_reset_confirm_action">确认重置</string>
+    <string name="settings_unlock_reset_done">已重置解锁进度</string>
 </resources>

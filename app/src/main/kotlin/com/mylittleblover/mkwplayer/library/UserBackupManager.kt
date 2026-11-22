@@ -144,7 +144,8 @@ internal object UserBackupManager {
                     .put("loopWholeRoute", route.loopWholeRoute)
                     .put("updatedAtEpochMs", route.updatedAtEpochMs)
                     .put("lastUsedEpochMs", route.lastUsedEpochMs)
-                    .put("roadRuleMode", route.roadRuleMode.name),
+                    .put("roadRuleMode", route.roadRuleMode.name)
+                    .put("routeSuiteMode", route.routeSuiteMode.name),
             )
         }
 
@@ -316,6 +317,7 @@ internal object UserBackupManager {
                 updatedAtEpochMs = obj.optLong("updatedAtEpochMs", 0L),
                 lastUsedEpochMs = obj.optLong("lastUsedEpochMs", 0L),
                 roadRuleMode = RoadJukeboxCatalog.RoadMusicRuleMode.fromStored(obj.optString("roadRuleMode", "")),
+                routeSuiteMode = RoadJukeboxCatalog.RouteSuiteMode.fromStored(obj.optString("routeSuiteMode", "")),
             )
         }
 

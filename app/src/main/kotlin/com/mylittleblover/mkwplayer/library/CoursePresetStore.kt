@@ -7,10 +7,24 @@ import java.util.UUID
 
 internal object PresetRefs {
     const val SYSTEM_DEFAULT = "sys:default"
+    const val SYSTEM_SUITE_A_ALT = "sys:suite_a_alt"
     const val SYSTEM_KNOCKOUT = "sys:knockout"
+    const val SYSTEM_SUITE_B = "sys:suite_b"
+    const val SYSTEM_SUITE_C = "sys:suite_c"
+    const val SYSTEM_SUITE_D = "sys:suite_d"
     const val USER_PREFIX = "user:"
 
     fun isUser(ref: String?): Boolean = ref != null && ref.startsWith(USER_PREFIX)
+
+    fun forSuiteVariant(variant: String): String = when (variant.trim().lowercase()) {
+        "", "medley", "a" -> SYSTEM_DEFAULT
+        "a_alt", "a alt", "alt" -> SYSTEM_SUITE_A_ALT
+        "b" -> SYSTEM_SUITE_B
+        "c" -> SYSTEM_SUITE_C
+        "d" -> SYSTEM_SUITE_D
+        "knockout" -> SYSTEM_KNOCKOUT
+        else -> SYSTEM_DEFAULT
+    }
 }
 
 internal data class FlowStep(

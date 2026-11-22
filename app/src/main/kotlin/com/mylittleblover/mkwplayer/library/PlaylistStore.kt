@@ -5,6 +5,11 @@ import java.util.UUID
 import org.json.JSONArray
 import org.json.JSONObject
 
+internal object PlaylistConstants {
+    /** Virtual identifier for the fixed/pinned My Favorites playlist in My Playlists. */
+    const val PINNED_FAVORITES_ID = "__system_favorites__"
+}
+
 internal sealed interface PlaylistItemRef {
     val rawId: String
     val raw: String get() = rawId

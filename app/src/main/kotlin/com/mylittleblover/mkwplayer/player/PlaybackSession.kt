@@ -305,7 +305,7 @@ internal class PlaybackSession(
             return PrepareResult.Failed(reason)
         }
 
-        val loaded = stagedController.loadGraphOnly(packet)
+        val loaded = stagedController.loadGraphOnly(packet, title)
         if (loaded is PlaybackController.State.Failed) return abort(loaded.reason)
 
         assets.forEachIndexed { index, (name, bytes) ->
@@ -508,7 +508,7 @@ internal class PlaybackSession(
 
         closeOutput()
         linearSession = false
-        val loaded = active.loadGraphOnly(packet)
+        val loaded = active.loadGraphOnly(packet, title)
         if (loaded is PlaybackController.State.Failed) return fail(loaded.reason)
 
         // One bind per part. A flow that bound only its first asset would play the prelude and
@@ -677,7 +677,7 @@ internal class PlaybackSession(
         val active = controller ?: return fail("The audio engine is not initialised.")
         closeOutput()
         linearSession = true
-        val loaded = active.loadGraphOnly(packet)
+        val loaded = active.loadGraphOnly(packet, title)
         if (loaded is PlaybackController.State.Failed) return fail(loaded.reason)
 
         assets.forEachIndexed { index, (name, bytes) ->
@@ -982,7 +982,7 @@ internal class PlaybackSession(
             controllerState is PlaybackController.State.Ready -> controllerState.title
             controllerState is PlaybackController.State.Stopped -> controllerState.title
             else -> title
-        }
+        }.ifBlank { title }
 
         val resolvedTotal = when {
             linearSession && linearDisplayOffsetFrames > 0L && prevState.totalFrames > 0L -> prevState.totalFrames

@@ -29,6 +29,7 @@ internal data class CustomRoute(
     val updatedAtEpochMs: Long = 0L,
     val lastUsedEpochMs: Long = 0L,
     val roadRuleMode: RoadJukeboxCatalog.RoadMusicRuleMode = RoadJukeboxCatalog.RoadMusicRuleMode.AUTO,
+    val routeSuiteMode: RoadJukeboxCatalog.RouteSuiteMode = RoadJukeboxCatalog.RouteSuiteMode.GAME_SUITE,
 ) {
     fun edgeFor(index: Int): CustomRouteEdgeConfig? = edges.getOrNull(index)
 
@@ -70,6 +71,7 @@ internal class CustomRouteStore(private val file: File) {
         connections: StageConnections.Catalog,
         loopWholeRoute: Boolean = false,
         roadRuleMode: RoadJukeboxCatalog.RoadMusicRuleMode = RoadJukeboxCatalog.RoadMusicRuleMode.AUTO,
+        routeSuiteMode: RoadJukeboxCatalog.RouteSuiteMode = RoadJukeboxCatalog.RouteSuiteMode.GAME_SUITE,
         nowEpochMs: Long = System.currentTimeMillis(),
     ): Result<CustomRoute> {
         val createdId = UUID.randomUUID().toString()
@@ -88,6 +90,7 @@ internal class CustomRouteStore(private val file: File) {
                 updatedAtEpochMs = nowEpochMs,
                 lastUsedEpochMs = nowEpochMs,
                 roadRuleMode = roadRuleMode,
+                routeSuiteMode = routeSuiteMode,
             )
             listOf(route) + current
         }.map { list -> list.first { it.id == createdId } }
@@ -102,6 +105,7 @@ internal class CustomRouteStore(private val file: File) {
         connections: StageConnections.Catalog,
         loopWholeRoute: Boolean,
         roadRuleMode: RoadJukeboxCatalog.RoadMusicRuleMode? = null,
+        routeSuiteMode: RoadJukeboxCatalog.RouteSuiteMode? = null,
         nowEpochMs: Long = System.currentTimeMillis(),
     ): Result<CustomRoute> = update { current ->
         val existing = current.firstOrNull { it.id == existingId }
@@ -124,6 +128,7 @@ internal class CustomRouteStore(private val file: File) {
             loopWholeRoute = loopWholeRoute,
             updatedAtEpochMs = nowEpochMs,
             roadRuleMode = roadRuleMode ?: existing.roadRuleMode,
+            routeSuiteMode = routeSuiteMode ?: existing.routeSuiteMode,
         )
         current.map { if (it.id == existingId) updated else it }
     }.map { list -> list.first { it.id == existingId } }
@@ -229,7 +234,7 @@ internal class CustomRouteStore(private val file: File) {
             if (route.id != id) route
             else {
                 require(stopIndex in route.stops.indices)
-                val cleanPreset = presetId?.takeIf { it.isNotBlank() && it != PresetRefs.SYSTEM_DEFAULT }
+                val cleanPreset = presetId?.takeIf { it.isNotBlank() }
                 val updatedStops = route.stops.mapIndexed { idx, s ->
                     if (idx == stopIndex) s.copy(presetId = cleanPreset) else s
                 }
@@ -280,6 +285,16 @@ internal class CustomRouteStore(private val file: File) {
     ): Result<List<CustomRoute>> = update { current ->
         current.map { route ->
             if (route.id != id) route else route.copy(roadRuleMode = mode, updatedAtEpochMs = nowEpochMs)
+        }
+    }
+
+    fun setRouteSuiteMode(
+        id: String,
+        mode: RoadJukeboxCatalog.RouteSuiteMode,
+        nowEpochMs: Long = System.currentTimeMillis(),
+    ): Result<List<CustomRoute>> = update { current ->
+        current.map { route ->
+            if (route.id != id) route else route.copy(routeSuiteMode = mode, updatedAtEpochMs = nowEpochMs)
         }
     }
 
@@ -437,6 +452,7 @@ internal class CustomRouteStore(private val file: File) {
             .put("updatedAtEpochMs", route.updatedAtEpochMs)
             .put("lastUsedEpochMs", route.lastUsedEpochMs)
             .put("roadRuleMode", route.roadRuleMode.name)
+            .put("routeSuiteMode", route.routeSuiteMode.name)
     }
 
     private fun decodeRoute(obj: JSONObject): CustomRoute {
@@ -469,6 +485,7 @@ internal class CustomRouteStore(private val file: File) {
             updatedAtEpochMs = obj.optLong("updatedAtEpochMs", 0L),
             lastUsedEpochMs = obj.optLong("lastUsedEpochMs", 0L),
             roadRuleMode = RoadJukeboxCatalog.RoadMusicRuleMode.fromStored(obj.optString("roadRuleMode", "")),
+            routeSuiteMode = RoadJukeboxCatalog.RouteSuiteMode.fromStored(obj.optString("routeSuiteMode", "")),
         )
     }
 

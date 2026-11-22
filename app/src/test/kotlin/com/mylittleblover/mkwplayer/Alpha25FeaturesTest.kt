@@ -309,4 +309,52 @@ class Alpha25FeaturesTest {
         assertEquals(InteractiveTimedAction.ToggleFast, out.triggeredInteractiveAction)
         assertFalse(engine.interactive.value.active)
     }
+
+    @Test
+    fun customRouteStoreAndBackupPersistRouteSuiteModeAndExplicitSuiteA() {
+        val dir = kotlin.io.path.createTempDirectory("a25-suite-mode-").toFile()
+        try {
+            val conn = com.mylittleblover.mkwplayer.library.StageConnections.parse(
+                java.io.File("src/main/assets/stage_connections.json").readText(),
+            )!!
+            assertTrue(conn.connects("FirstCircuit", "WestCity"))
+            val store = com.mylittleblover.mkwplayer.routes.CustomRouteStore(java.io.File(dir, "custom_routes.json"))
+            val created = store.create(
+                name = "Suite Mode Test",
+                stops = listOf(
+                    com.mylittleblover.mkwplayer.routes.CustomRouteStop("FirstCircuit", com.mylittleblover.mkwplayer.library.PresetRefs.SYSTEM_DEFAULT),
+                    com.mylittleblover.mkwplayer.routes.CustomRouteStop("WestCity", null),
+                ),
+                edges = listOf(
+                    com.mylittleblover.mkwplayer.routes.CustomRouteEdgeConfig("FirstCircuit", "WestCity"),
+                ),
+                connections = conn,
+                routeSuiteMode = com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RouteSuiteMode.COMPLETE_SUITE,
+            ).getOrThrow()
+
+            // Verify setStopPreset keeps explicit SYSTEM_DEFAULT vs null follow-route-mode
+            store.setStopPreset(created.id, 0, com.mylittleblover.mkwplayer.library.PresetRefs.SYSTEM_DEFAULT).getOrThrow()
+            store.setRouteSuiteMode(created.id, com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RouteSuiteMode.GAME_SUITE).getOrThrow()
+            val reloaded = store.read().getOrThrow().single()
+            assertEquals(com.mylittleblover.mkwplayer.library.PresetRefs.SYSTEM_DEFAULT, reloaded.stops[0].presetId)
+            assertNull(reloaded.stops[1].presetId)
+            assertEquals(com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RouteSuiteMode.GAME_SUITE, reloaded.routeSuiteMode)
+
+            val backupJson = com.mylittleblover.mkwplayer.library.UserBackupManager.exportToJson(
+                playlists = emptyList(),
+                favorites = emptySet(),
+                presets = emptyList(),
+                customRoutes = listOf(reloaded),
+                recentCourses = emptyList(),
+                playStats = emptyMap(),
+                preferences = com.mylittleblover.mkwplayer.library.BackupPreferencesSnapshot(),
+                appVersion = "0.1.0-alpha25",
+            )
+            val parsed = com.mylittleblover.mkwplayer.library.UserBackupManager.parseBackupJson(backupJson).getOrThrow()
+            assertEquals(com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog.RouteSuiteMode.GAME_SUITE, parsed.customRoutes.single().routeSuiteMode)
+            assertEquals(com.mylittleblover.mkwplayer.library.PresetRefs.SYSTEM_DEFAULT, parsed.customRoutes.single().stops[0].presetId)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
 }

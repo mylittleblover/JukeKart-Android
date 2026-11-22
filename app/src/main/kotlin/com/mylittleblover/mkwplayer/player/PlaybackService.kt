@@ -467,9 +467,11 @@ class PlaybackService : Service() {
             else -> "Stopped"
         }
 
+        val titleText = state.title.ifEmpty { getString(R.string.app_name) }
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentTitle(state.title.ifEmpty { "MKW Player" })
+            .setSmallIcon(R.drawable.ic_stat_jukekart)
+            .setColor(0xFFC52D49.toInt())
+            .setContentTitle(titleText)
             .setContentText(subtitleText)
             .setSubText(state.courseCode?.takeIf { it.isNotBlank() }?.removeSuffix("_00"))
             .setLargeIcon(cover)
@@ -492,33 +494,33 @@ class PlaybackService : Service() {
             if (canSkip) {
                 prevIdx = actionCount++
                 builder.addAction(
-                    android.R.drawable.ic_media_previous, "Previous",
+                    R.drawable.ic_notif_prev, "Previous",
                     command(ACTION_PREV),
                 )
             }
             if (!state.playing) {
                 playPauseIdx = actionCount++
                 builder.addAction(
-                    android.R.drawable.ic_media_play, "Resume",
+                    R.drawable.ic_widget_play, "Resume",
                     command(ACTION_RESUME),
                 )
             }
             if (state.playing) {
                 playPauseIdx = actionCount++
                 builder.addAction(
-                    android.R.drawable.ic_media_pause, "Pause",
+                    R.drawable.ic_widget_pause, "Pause",
                     command(ACTION_PAUSE),
                 )
             }
             if (canSkip) {
                 nextIdx = actionCount++
                 builder.addAction(
-                    android.R.drawable.ic_media_next, "Next",
+                    R.drawable.ic_notif_next, "Next",
                     command(ACTION_NEXT),
                 )
             }
             stopIdx = actionCount++
-            builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", command(ACTION_STOP))
+            builder.addAction(R.drawable.ic_notif_stop, "Stop", command(ACTION_STOP))
         }
 
         mediaSession?.let { media ->

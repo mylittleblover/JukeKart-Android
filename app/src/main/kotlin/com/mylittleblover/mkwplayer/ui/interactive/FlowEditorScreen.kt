@@ -8,7 +8,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,18 +16,15 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -43,25 +39,13 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -77,6 +61,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -89,8 +74,19 @@ import com.mylittleblover.mkwplayer.interactive.CourseFlowRecipeBuilder
 import com.mylittleblover.mkwplayer.library.CoursePreset
 import com.mylittleblover.mkwplayer.library.FlowStep
 import com.mylittleblover.mkwplayer.library.PresetRefs
-import com.mylittleblover.mkwplayer.ui.DragHandlePill
-import com.mylittleblover.mkwplayer.ui.rememberPressScale
+import com.mylittleblover.mkwplayer.ui.kit.MkwBottomSheet
+import com.mylittleblover.mkwplayer.ui.kit.MkwButtonSize
+import com.mylittleblover.mkwplayer.ui.kit.MkwCard
+import com.mylittleblover.mkwplayer.ui.kit.MkwFilterPill
+import com.mylittleblover.mkwplayer.ui.kit.MkwIconButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwIconButtonTone
+import com.mylittleblover.mkwplayer.ui.kit.MkwInsetBox
+import com.mylittleblover.mkwplayer.ui.kit.MkwKitTokens
+import com.mylittleblover.mkwplayer.ui.kit.MkwPrimaryButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwRoseButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwSecondaryButton
+import com.mylittleblover.mkwplayer.ui.kit.MkwSurfaceTone
+import com.mylittleblover.mkwplayer.ui.kit.MkwTextField
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -169,8 +165,12 @@ internal fun FlowEditorScreen(
         mutableStateMapOf<String, Boolean>()
     }
 
+    val stepSourceOffsets = remember(steps, selectedOutroNumber, inventory) {
+        CourseFlowRecipeBuilder.stepSourceOffsets(steps, selectedOutroNumber, inventory)
+    }
+
     // Ensure outro selection remains strictly event-legal and locks/snaps the host exit point on courses
-    LaunchedEffect(steps, selectedOutroNumber, inventory) {
+    LaunchedEffect(steps, selectedOutroNumber, inventory, stepSourceOffsets) {
         if (selectedOutroNumber != null && !inventory.supportsOutroEnding(steps)) {
             selectedOutroNumber = null
             return@LaunchedEffect
@@ -181,17 +181,20 @@ internal fun FlowEditorScreen(
         if (outro.mainTriggerPoints.isEmpty() || steps.isEmpty()) return@LaunchedEffect
         val lastStep = steps.last()
         val lastPart = inventory.part(lastStep.roleKey)
-        val validTriggers = if (lastStep.loopCount > 0 && lastPart?.loopStart != null) {
-            outro.mainTriggerPoints.filter { it > lastPart.loopStart && it <= lastPart.frames }
-                .ifEmpty { outro.mainTriggerPoints }
-        } else {
-            outro.mainTriggerPoints
-        }.distinct().sorted()
+        val lastSourceOffset = stepSourceOffsets.lastOrNull() ?: 0L
+        val validTriggers = CourseFlowRecipeBuilder.reachableOutroTriggers(
+            step = lastStep,
+            sourceOffset = lastSourceOffset,
+            part = lastPart,
+            outro = outro,
+        )
         if (validTriggers.isNotEmpty() && lastStep.exitFrame !in validTriggers) {
             val snapped = if (validTriggers.size == 1) {
                 validTriggers.single()
             } else {
-                validTriggers.firstOrNull { it >= (lastStep.exitFrame ?: 0L) } ?: validTriggers.last()
+                validTriggers.firstOrNull { it > lastSourceOffset }
+                    ?: validTriggers.firstOrNull { it >= (lastStep.exitFrame ?: 0L) }
+                    ?: validTriggers.last()
             }
             steps = steps.dropLast(1) + lastStep.copy(exitFrame = snapped)
         }
@@ -260,13 +263,24 @@ internal fun FlowEditorScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = {
+            SnackbarHost(
+                snackbarHostState,
+                modifier = Modifier.padding(bottom = com.mylittleblover.mkwplayer.ui.rememberMiniPlayerBottomClearance(0.dp)),
+            )
+        },
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
+                .padding(innerPadding)
+                .navigationBarsPadding(),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                top = 16.dp,
+                end = 16.dp,
+                bottom = com.mylittleblover.mkwplayer.ui.rememberMiniPlayerBottomClearance(16.dp),
+            ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
@@ -281,6 +295,7 @@ internal fun FlowEditorScreen(
                                 text = courseTitle,
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
+                                color = MkwKitTokens.Palette.ink,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -290,12 +305,12 @@ internal fun FlowEditorScreen(
                                     EngineSnapshot.formatPosition(compiledStats, inventory.sampleRate),
                                     steps.size,
                                 ),
-                                style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
-                                color = MaterialTheme.colorScheme.primary,
+                                style = MkwKitTokens.tabular(MaterialTheme.typography.labelMedium),
+                                color = MkwKitTokens.Palette.crimson,
                             )
                         }
-                        val (exportScale, exportSrc) = rememberPressScale()
-                        FilledTonalButton(
+                        MkwRoseButton(
+                            text = stringResource(R.string.flow_editor_export_button),
                             onClick = {
                                 val json = onCompileExport(draftPreset())
                                 if (json != null) {
@@ -305,19 +320,15 @@ internal fun FlowEditorScreen(
                                 }
                             },
                             enabled = steps.isNotEmpty(),
-                            interactionSource = exportSrc,
-                            modifier = Modifier.heightIn(min = 42.dp).then(exportScale),
-                        ) {
-                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text(stringResource(R.string.flow_editor_export_button))
-                        }
+                            leadingIcon = Icons.Default.Share,
+                            size = MkwButtonSize.Compact,
+                        )
                     }
 
-                    OutlinedTextField(
+                    MkwTextField(
                         value = presetName,
                         onValueChange = { presetName = it.take(64) },
-                        label = { Text(stringResource(R.string.flow_editor_name_label)) },
+                        label = stringResource(R.string.flow_editor_name_label),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -330,34 +341,32 @@ internal fun FlowEditorScreen(
                     Text(
                         text = stringResource(R.string.flow_editor_templates_title),
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MkwKitTokens.Palette.inkSecondary,
                     )
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        val (stdScale, stdSrc) = rememberPressScale()
-                        AssistChip(
+                        MkwFilterPill(
+                            label = stringResource(R.string.flow_editor_template_standard),
+                            selected = false,
                             onClick = {
                                 steps = inventory.standardMedleyTemplate()
                                 selectedOutroNumber = inventory.outros.firstOrNull()?.number
                                 expandedWaveformStep = null
                             },
-                            interactionSource = stdSrc,
-                            modifier = stdScale,
-                            label = { Text(stringResource(R.string.flow_editor_template_standard)) },
+                            role = Role.Button,
                         )
                         if (inventory.courseCode != "Rainbow") {
-                            val (fastScale, fastSrc) = rememberPressScale()
-                            AssistChip(
+                            MkwFilterPill(
+                                label = stringResource(R.string.flow_editor_template_fast),
+                                selected = false,
                                 onClick = {
                                     steps = inventory.fastRaceTemplate()
                                     selectedOutroNumber = null
                                     expandedWaveformStep = null
                                 },
-                                interactionSource = fastSrc,
-                                modifier = fastScale,
-                                label = { Text(stringResource(R.string.flow_editor_template_fast)) },
+                                role = Role.Button,
                             )
                         }
                     }
@@ -369,21 +378,18 @@ internal fun FlowEditorScreen(
                     text = stringResource(R.string.flow_editor_steps_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
+                    color = MkwKitTokens.Palette.ink,
                 )
             }
 
             if (steps.isEmpty()) {
                 item {
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
+                    MkwInsetBox(modifier = Modifier.fillMaxWidth()) {
                         Text(
                             text = stringResource(R.string.flow_editor_no_steps),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(16.dp),
+                            color = MkwKitTokens.Palette.inkSecondary,
+                            modifier = Modifier.padding(4.dp),
                         )
                     }
                 }
@@ -418,13 +424,12 @@ internal fun FlowEditorScreen(
                     selectedOutroNumber?.let { n -> inventory.outros.firstOrNull { it.number == n } }
                 } else null
                 val outroTriggers = if (activeOutro != null && part != null) {
-                    val l0 = part.loopStart
-                    val base = activeOutro.mainTriggerPoints.distinct().sorted()
-                    if (step.loopCount > 0 && l0 != null) {
-                        base.filter { it > l0 && it <= part.frames }.ifEmpty { base }
-                    } else {
-                        base
-                    }
+                    CourseFlowRecipeBuilder.reachableOutroTriggers(
+                        step = step,
+                        sourceOffset = stepSourceOffsets.getOrElse(index) { 0L },
+                        part = part,
+                        outro = activeOutro,
+                    )
                 } else emptyList()
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -515,56 +520,51 @@ internal fun FlowEditorScreen(
                 val allowedNext = remember(steps, inventory) {
                     inventory.allowedNextRoles(steps)
                 }
-                ElevatedCard(
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.fillMaxWidth(),
+                MkwCard(
+                    tone = MkwSurfaceTone.Porcelain,
+                    contentPadding = PaddingValues(14.dp),
                 ) {
-                    Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
+                    Text(
+                        text = stringResource(R.string.flow_editor_next_event_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MkwKitTokens.Palette.ink,
+                    )
+                    if (allowedNext.isEmpty()) {
                         Text(
-                            text = stringResource(R.string.flow_editor_next_event_title),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
+                            text = stringResource(R.string.flow_editor_no_next_event),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MkwKitTokens.Palette.inkSecondary,
                         )
-                        if (allowedNext.isEmpty()) {
-                            Text(
-                                text = stringResource(R.string.flow_editor_no_next_event),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        } else {
-                            val tailRole = steps.lastOrNull()?.roleKey
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                allowedNext.forEach { role ->
-                                    val (chipScale, chipSrc) = rememberPressScale()
-                                    val part = inventory.part(role)
-                                    val eventText = if (tailRole == null) {
-                                        roleDisplayLabel(role)
-                                    } else {
-                                        inventory.describeTransitionEvent(tailRole, role)
-                                    }
-                                    AssistChip(
-                                        onClick = {
-                                            val defaultLoop = if (part?.supportsLoop == true &&
-                                                (role in setOf("Main", "Main_Speaker", "Pattern2", "Area1_Inst", "Area1", "Area2", "Area3", "Final") || role.startsWith("Region"))
-                                            ) 1 else 0
-                                            steps = steps + FlowStep(
-                                                roleKey = role,
-                                                loopCount = defaultLoop,
-                                                exitFrame = if (part?.isBridgeLocked == true) null else part?.defaultExitFrame,
-                                            )
-                                        },
-                                        leadingIcon = { Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                                        interactionSource = chipSrc,
-                                        modifier = chipScale,
-                                        label = { Text(eventText) },
-                                    )
-                                }
+                    } else {
+                        val tailRole = steps.lastOrNull()?.roleKey
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            allowedNext.forEach { role ->
+                                val part = inventory.part(role)
+                                val eventText = (if (tailRole == null) {
+                                    roleDisplayLabel(role)
+                                } else {
+                                    inventory.describeTransitionEvent(tailRole, role)
+                                }).replace(" -> ", " \u2192 ")
+                                MkwFilterPill(
+                                    label = eventText,
+                                    selected = false,
+                                    onClick = {
+                                        val defaultLoop = if (part?.supportsLoop == true &&
+                                            (role in setOf("Main", "Main_Speaker", "Pattern2", "Area1_Inst", "Area1", "Area2", "Area3", "Final") || role.startsWith("Region"))
+                                        ) 1 else 0
+                                        steps = steps + FlowStep(
+                                            roleKey = role,
+                                            loopCount = defaultLoop,
+                                            exitFrame = if (part?.isBridgeLocked == true) null else part?.defaultExitFrame,
+                                        )
+                                    },
+                                    leadingIcon = Icons.Default.Add,
+                                    role = Role.Button,
+                                )
                             }
                         }
                     }
@@ -630,26 +630,21 @@ internal fun FlowEditorScreen(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 28.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    val (audScale, audSrc) = rememberPressScale()
-                    OutlinedButton(
+                    MkwSecondaryButton(
+                        text = stringResource(R.string.flow_editor_audition_step),
                         onClick = { onAudition(draftPreset()) },
                         enabled = steps.isNotEmpty(),
-                        interactionSource = audSrc,
-                        modifier = Modifier.weight(1f).heightIn(min = 48.dp).then(audScale),
-                    ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.flow_editor_audition_step))
-                    }
-                    val (saveScale, saveSrc) = rememberPressScale()
-                    Button(
+                        leadingIcon = Icons.Default.PlayArrow,
+                        size = MkwButtonSize.Hero,
+                        modifier = Modifier.weight(1f),
+                    )
+                    MkwPrimaryButton(
+                        text = stringResource(R.string.flow_editor_save),
                         onClick = { onSave(draftPreset()) },
                         enabled = steps.isNotEmpty() && presetName.isNotBlank(),
-                        interactionSource = saveSrc,
-                        modifier = Modifier.weight(1f).heightIn(min = 48.dp).then(saveScale),
-                    ) {
-                        Text(stringResource(R.string.flow_editor_save))
-                    }
+                        size = MkwButtonSize.Hero,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
         }
@@ -658,28 +653,19 @@ internal fun FlowEditorScreen(
     // Export Flow Config Bottom Sheet
     val jsonToExport = exportedJson
     if (jsonToExport != null) {
-        val exportSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
+        MkwBottomSheet(
             onDismissRequest = { exportedJson = null },
-            sheetState = exportSheetState,
-            dragHandle = { DragHandlePill() },
+            title = stringResource(R.string.flow_editor_export_title),
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-                    .padding(bottom = 28.dp),
+                    .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(
-                    text = stringResource(R.string.flow_editor_export_title),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                )
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                MkwInsetBox(
+                    shape = MkwKitTokens.Shape.control,
+                    contentPadding = PaddingValues(0.dp),
                     modifier = Modifier.fillMaxWidth().heightIn(max = 280.dp),
                 ) {
                     Box(
@@ -691,7 +677,7 @@ internal fun FlowEditorScreen(
                         Text(
                             text = jsonToExport,
                             style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = MkwKitTokens.Palette.ink,
                         )
                     }
                 }
@@ -699,32 +685,26 @@ internal fun FlowEditorScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    val (copyScale, copySrc) = rememberPressScale()
-                    OutlinedButton(
+                    MkwSecondaryButton(
+                        text = stringResource(R.string.flow_editor_export_copy),
                         onClick = {
                             clipboard.setText(AnnotatedString(jsonToExport))
                             scope.launch { snackbarHostState.showSnackbar(msgCopied) }
                         },
-                        interactionSource = copySrc,
-                        modifier = Modifier.weight(1f).heightIn(min = 48.dp).then(copyScale),
-                    ) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.flow_editor_export_copy))
-                    }
-                    val (dlScale, dlSrc) = rememberPressScale()
-                    Button(
+                        leadingIcon = Icons.Default.ContentCopy,
+                        size = MkwButtonSize.Hero,
+                        modifier = Modifier.weight(1f),
+                    )
+                    MkwPrimaryButton(
+                        text = stringResource(R.string.flow_editor_export_save_file),
                         onClick = {
                             val fileName = "${inventory.courseCode.lowercase()}_medley_flow.json"
                             saveJsonLauncher.launch(fileName)
                         },
-                        interactionSource = dlSrc,
-                        modifier = Modifier.weight(1f).heightIn(min = 48.dp).then(dlScale),
-                    ) {
-                        Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.flow_editor_export_save_file))
-                    }
+                        leadingIcon = Icons.Default.FileDownload,
+                        size = MkwButtonSize.Hero,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
         }
@@ -747,43 +727,22 @@ private fun SeamTransitionRow(
             imageVector = Icons.AutoMirrored.Filled.ArrowForward,
             contentDescription = null,
             modifier = Modifier.size(14.dp),
-            tint = MaterialTheme.colorScheme.primary,
+            tint = MkwKitTokens.Palette.crimson,
         )
         Text(
-            text = eventLabel,
+            text = eventLabel.replace(" -> ", " \u2192 "),
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MkwKitTokens.Palette.inkSecondary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        val (seamScale, seamSrc) = rememberPressScale()
-        Surface(
+        MkwRoseButton(
+            text = stringResource(R.string.flow_editor_preview_seam),
             onClick = onPreviewSeam,
-            shape = RoundedCornerShape(999.dp),
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            interactionSource = seamSrc,
-            modifier = seamScale,
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Icon(
-                    Icons.Default.PlayArrow,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                )
-                Text(
-                    text = stringResource(R.string.flow_editor_preview_seam),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                )
-            }
-        }
+            leadingIcon = Icons.Default.PlayArrow,
+            size = MkwButtonSize.Compact,
+        )
     }
 }
 
@@ -822,79 +781,96 @@ private fun FlowStepEventCard(
         else -> step.exitFrame ?: part?.defaultExitFrame ?: part?.frames ?: 1L
     }
 
-    ElevatedCard(
-        shape = RoundedCornerShape(16.dp),
-        modifier = Modifier.fillMaxWidth(),
+    MkwCard(
+        tone = MkwSurfaceTone.Porcelain,
+        contentPadding = PaddingValues(14.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Text(
-                            text = "${index + 1}. ${roleDisplayLabel(step.roleKey)}",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        if (isExitLocked) {
-                            Icon(
-                                Icons.Default.Lock,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.tertiary,
-                            )
-                        }
-                    }
-                    if (prevRole != null) {
-                        Text(
-                            text = incomingEventLabel,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    if (part != null) {
-                        val exitTime = EngineSnapshot.formatPosition(activeExitFrame, part.sampleRate)
-                        val totalTime = EngineSnapshot.formatPosition(part.frames, part.sampleRate)
-                        Text(
-                            text = when {
-                                isLockedBridge -> "Bridge_ToFull $exitTime / $totalTime"
-                                isOutroHandoverLocked -> stringResource(R.string.flow_editor_area2_outro_handover, exitTime, totalTime)
-                                isOutroSingleLocked -> "Outro %02d Exit %s / %s".format(activeOutroNumber, exitTime, totalTime)
-                                isOutroMultiConstrained -> "Outro %02d Fixed Cue %s / %s".format(activeOutroNumber, exitTime, totalTime)
-                                else -> "$exitTime / $totalTime"
-                            },
-                            style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = "${index + 1}. ${roleDisplayLabel(step.roleKey)}",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MkwKitTokens.Palette.ink,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (isExitLocked) {
+                        Icon(
+                            Icons.Default.Lock,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MkwKitTokens.Palette.crimson,
                         )
                     }
                 }
-                if (canRemove) {
-                    IconButton(onClick = onRemove) {
-                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.flow_editor_remove))
-                    }
+                if (part != null) {
+                    val exitTime = EngineSnapshot.formatPosition(activeExitFrame, part.sampleRate)
+                    val totalTime = EngineSnapshot.formatPosition(part.frames, part.sampleRate)
+                    Text(
+                        text = when {
+                            isLockedBridge -> "Bridge_ToFull $exitTime / $totalTime"
+                            isOutroHandoverLocked -> stringResource(R.string.flow_editor_area2_outro_handover, exitTime, totalTime)
+                            isOutroSingleLocked -> "Outro %02d Exit %s / %s".format(activeOutroNumber, exitTime, totalTime)
+                            isOutroMultiConstrained -> "Outro %02d Fixed Cue %s / %s".format(activeOutroNumber, exitTime, totalTime)
+                            else -> "$exitTime / $totalTime"
+                        },
+                        style = MkwKitTokens.tabular(MaterialTheme.typography.labelSmall),
+                        color = MkwKitTokens.Palette.inkSecondary,
+                    )
                 }
             }
+            if (canRemove) {
+                MkwIconButton(
+                    icon = Icons.Default.Close,
+                    contentDescription = stringResource(R.string.flow_editor_remove),
+                    onClick = onRemove,
+                    visualSize = 36.dp,
+                    iconSize = 18.dp,
+                )
+            }
+        }
 
-            if (isLockedBridge) {
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.65f),
-                    modifier = Modifier.fillMaxWidth(),
+        if (isLockedBridge) {
+            MkwCard(
+                tone = MkwSurfaceTone.RoseTint,
+                selected = true,
+                shape = MkwKitTokens.Shape.thumb,
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 7.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        Icons.Default.Lock,
+                        contentDescription = null,
+                        modifier = Modifier.size(15.dp),
+                        tint = MkwKitTokens.Palette.crimsonDeep,
+                    )
+                    Text(
+                        text = stringResource(R.string.flow_editor_bridge_locked),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MkwKitTokens.Palette.crimsonDeep,
+                    )
+                }
+            }
+        } else {
+            if (isOutroSingleLocked && activeOutroNumber != null) {
+                MkwCard(
+                    tone = MkwSurfaceTone.RoseTint,
+                    selected = true,
+                    shape = MkwKitTokens.Shape.thumb,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 7.dp),
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
@@ -902,184 +878,165 @@ private fun FlowStepEventCard(
                             Icons.Default.Lock,
                             contentDescription = null,
                             modifier = Modifier.size(15.dp),
-                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                            tint = MkwKitTokens.Palette.crimsonDeep,
                         )
                         Text(
-                            text = stringResource(R.string.flow_editor_bridge_locked),
+                            text = stringResource(R.string.flow_editor_outro_locked, activeOutroNumber),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            color = MkwKitTokens.Palette.crimsonDeep,
                         )
                     }
                 }
-            } else {
-                if (isOutroSingleLocked && activeOutroNumber != null) {
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.65f),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            Icon(
-                                Icons.Default.Lock,
-                                contentDescription = null,
-                                modifier = Modifier.size(15.dp),
-                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                            )
-                            Text(
-                                text = stringResource(R.string.flow_editor_outro_locked, activeOutroNumber),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                            )
-                        }
-                    }
-                } else if (isOutroMultiConstrained && activeOutroNumber != null) {
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.flow_editor_outro_multi_trigger_hint, activeOutroNumber, outroTriggers.size),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                        )
-                    }
-                }
-
-                if (rainbowArea2Outros.isNotEmpty()) {
-                    val noneLabel = stringResource(R.string.flow_editor_area2_outro_none)
-                    val area2Options = buildList<DrawerOption<Int?>> {
-                        add(DrawerOption(value = null, label = noneLabel))
-                        rainbowArea2Outros.forEach { outro ->
-                            add(
-                                DrawerOption(
-                                    value = outro.number,
-                                    label = stringResource(R.string.flow_editor_outro_item, outro.number),
-                                    subtitle = if (outro.supportsNativeHandover) {
-                                        stringResource(R.string.flow_editor_outro_native_ready)
-                                    } else null,
-                                ),
-                            )
-                        }
-                    }
-                    val chosenLabel = area2Options.firstOrNull { it.value == selectedRainbowArea2Outro }?.label ?: noneLabel
-                    SelectionDrawerRow(
-                        label = stringResource(R.string.flow_editor_area2_outro_title),
-                        selectedLabel = chosenLabel,
-                        sheetTitle = stringResource(R.string.flow_editor_area2_outro_title),
-                        options = area2Options,
-                        selectedValue = selectedRainbowArea2Outro,
-                        onSelect = onSelectRainbowArea2Outro,
+            } else if (isOutroMultiConstrained && activeOutroNumber != null) {
+                MkwInsetBox(
+                    shape = MkwKitTokens.Shape.thumb,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 7.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = stringResource(R.string.flow_editor_outro_multi_trigger_hint, activeOutroNumber, outroTriggers.size),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MkwKitTokens.Palette.inkSecondary,
                     )
-                }
-
-                if (part != null && part.supportsLoop) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.flow_editor_loop_count, step.loopCount),
-                            style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
-                            modifier = Modifier.weight(1f),
-                        )
-                        IconButton(
-                            onClick = { onUpdate(step.copy(loopCount = (step.loopCount - 1).coerceAtLeast(0))) },
-                            enabled = step.loopCount > 0,
-                        ) {
-                            Icon(Icons.Default.Remove, contentDescription = "-")
-                        }
-                        IconButton(
-                            onClick = { onUpdate(step.copy(loopCount = (step.loopCount + 1).coerceAtMost(8))) },
-                            enabled = step.loopCount < 8,
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = "+")
-                        }
-                    }
                 }
             }
 
-            if (part != null) {
-                val (waveScale, waveSrc) = rememberPressScale()
-                Surface(
-                    onClick = onToggleWaveform,
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    interactionSource = waveSrc,
-                    modifier = Modifier.fillMaxWidth().then(waveScale),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.GraphicEq,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                        Text(
-                            text = stringResource(
-                                if (isWaveformExpanded) R.string.flow_editor_waveform_hide else R.string.flow_editor_waveform_show,
+            if (rainbowArea2Outros.isNotEmpty()) {
+                val noneLabel = stringResource(R.string.flow_editor_area2_outro_none)
+                val area2Options = buildList<DrawerOption<Int?>> {
+                    add(DrawerOption(value = null, label = noneLabel))
+                    rainbowArea2Outros.forEach { outro ->
+                        add(
+                            DrawerOption(
+                                value = outro.number,
+                                label = stringResource(R.string.flow_editor_outro_item, outro.number),
+                                subtitle = if (outro.supportsNativeHandover) {
+                                    stringResource(R.string.flow_editor_outro_native_ready)
+                                } else null,
                             ),
-                            style = MaterialTheme.typography.labelLarge,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Icon(
-                            imageVector = if (isWaveformExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
                         )
                     }
                 }
+                val chosenLabel = area2Options.firstOrNull { it.value == selectedRainbowArea2Outro }?.label ?: noneLabel
+                SelectionDrawerRow(
+                    label = stringResource(R.string.flow_editor_area2_outro_title),
+                    selectedLabel = chosenLabel,
+                    sheetTitle = stringResource(R.string.flow_editor_area2_outro_title),
+                    options = area2Options,
+                    selectedValue = selectedRainbowArea2Outro,
+                    onSelect = onSelectRainbowArea2Outro,
+                )
+            }
 
-                AnimatedVisibility(
-                    visible = isWaveformExpanded,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically(),
+            if (part != null && part.supportsLoop) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    val waveformCandidates = if (isOutroMultiConstrained) {
-                        outroTriggers.map {
-                            CourseFlowRecipeBuilder.ExitCandidate(
-                                it,
-                                EngineSnapshot.formatPosition(it, part.sampleRate),
-                            )
-                        }
-                    } else {
-                        part.exitCandidates
-                    }
-                    val waveformLockLabel = when {
-                        isLockedBridge -> "Bridge_ToFull"
-                        isOutroHandoverLocked -> "Outro_ToNextPre"
-                        isOutroSingleLocked && activeOutroNumber != null -> "Outro %02d".format(activeOutroNumber)
-                        else -> null
-                    }
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ZoomableWaveformEditor(
-                            peaks = if (waveformReady) peaks else null,
-                            frames = part.frames,
-                            sampleRate = part.sampleRate,
-                            beats = part.beats,
-                            exitCandidates = waveformCandidates,
-                            selectedExitFrame = activeExitFrame,
-                            bridgeLocked = isExitLocked,
-                            loopStart = part.loopStart,
-                            loopEnd = part.loopEnd,
-                            constrainToCandidatesOnly = isOutroMultiConstrained,
-                            lockLabel = waveformLockLabel,
-                            onSelectExitFrame = { chosenFrame ->
-                                if (!isExitLocked) {
-                                    onUpdate(step.copy(exitFrame = chosenFrame))
-                                }
-                            },
+                    Text(
+                        text = stringResource(R.string.flow_editor_loop_count, step.loopCount),
+                        style = MkwKitTokens.tabular(MaterialTheme.typography.bodySmall),
+                        color = MkwKitTokens.Palette.ink,
+                        modifier = Modifier.weight(1f),
+                    )
+                    MkwIconButton(
+                        icon = Icons.Default.Remove,
+                        contentDescription = "-",
+                        onClick = { onUpdate(step.copy(loopCount = (step.loopCount - 1).coerceAtLeast(0))) },
+                        enabled = step.loopCount > 0,
+                        tone = MkwIconButtonTone.Bordered,
+                        visualSize = 36.dp,
+                        iconSize = 18.dp,
+                    )
+                    MkwIconButton(
+                        icon = Icons.Default.Add,
+                        contentDescription = "+",
+                        onClick = { onUpdate(step.copy(loopCount = (step.loopCount + 1).coerceAtMost(8))) },
+                        enabled = step.loopCount < 8,
+                        tone = MkwIconButtonTone.Bordered,
+                        visualSize = 36.dp,
+                        iconSize = 18.dp,
+                    )
+                }
+            }
+        }
+
+        if (part != null) {
+            MkwCard(
+                onClick = onToggleWaveform,
+                selected = isWaveformExpanded,
+                tone = MkwSurfaceTone.Recessed,
+                shape = MkwKitTokens.Shape.thumb,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(
+                        Icons.Default.GraphicEq,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MkwKitTokens.Palette.crimson,
+                    )
+                    Text(
+                        text = stringResource(
+                            if (isWaveformExpanded) R.string.flow_editor_waveform_hide else R.string.flow_editor_waveform_show,
+                        ),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MkwKitTokens.Palette.ink,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Icon(
+                        imageVector = if (isWaveformExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MkwKitTokens.Palette.inkSecondary,
+                    )
+                }
+            }
+
+            AnimatedVisibility(
+                visible = isWaveformExpanded,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+            ) {
+                val waveformCandidates = if (isOutroMultiConstrained) {
+                    outroTriggers.map {
+                        CourseFlowRecipeBuilder.ExitCandidate(
+                            it,
+                            EngineSnapshot.formatPosition(it, part.sampleRate),
                         )
                     }
+                } else {
+                    part.exitCandidates
+                }
+                val waveformLockLabel = when {
+                    isLockedBridge -> "Bridge_ToFull"
+                    isOutroHandoverLocked -> "Outro_ToNextPre"
+                    isOutroSingleLocked && activeOutroNumber != null -> "Outro %02d".format(activeOutroNumber)
+                    else -> null
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ZoomableWaveformEditor(
+                        peaks = if (waveformReady) peaks else null,
+                        frames = part.frames,
+                        sampleRate = part.sampleRate,
+                        beats = part.beats,
+                        exitCandidates = waveformCandidates,
+                        selectedExitFrame = activeExitFrame,
+                        bridgeLocked = isExitLocked,
+                        loopStart = part.loopStart,
+                        loopEnd = part.loopEnd,
+                        constrainToCandidatesOnly = isOutroMultiConstrained,
+                        lockLabel = waveformLockLabel,
+                        onSelectExitFrame = { chosenFrame ->
+                            if (!isExitLocked) {
+                                onUpdate(step.copy(exitFrame = chosenFrame))
+                            }
+                        },
+                    )
                 }
             }
         }

@@ -195,17 +195,18 @@ internal class PlaybackController(private val engine: PlaybackEngine) {
      * transport is running. So the flow path loads the packet, binds, then plays: separate steps
      * rather than the single bundled sequence [load] performs.
      */
-    fun loadGraphOnly(packet: ByteArray): State {
+    fun loadGraphOnly(packet: ByteArray, title: String = ""): State {
         val status = engine.loadGraph(packet)
         if (status != AudioEngine.STATUS_OK) {
             return fail("Could not load the flow: ${describe(status)}")
         }
+        this.title = title
         linearMode = false
         linearRepeating = false
         userStopped = false
         sawActivePlayback = false
         reportedNaturalEnd = false
-        state = State.Ready(title, totalFrames = 0, sampleRate = engine.sampleRate)
+        state = State.Ready(this.title, totalFrames = 0, sampleRate = engine.sampleRate)
         sampleRate = engine.sampleRate
         return state
     }
