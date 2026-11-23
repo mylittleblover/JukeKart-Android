@@ -7,12 +7,15 @@ import com.mylittleblover.mkwplayer.audio.PlaybackController
 import com.mylittleblover.mkwplayer.audio.PlaybackEngine
 import com.mylittleblover.mkwplayer.audio.SessionAudioEngine
 import com.mylittleblover.mkwplayer.audio.SessionAudioOutput
+import com.mylittleblover.mkwplayer.interactive.CourseMedleyCompiler
 import com.mylittleblover.mkwplayer.interactive.NativeInteractiveDriver
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -276,6 +279,7 @@ internal class PlaybackSession(
         internal val autoAdvance: Map<Int, Int> = emptyMap(),
         internal val initialAutoSource: Int? = null,
         internal val initialSeeked: Boolean = false,
+        internal val startSegment: Int = -1,
     ) {
         fun discard() {
             controller.release()
@@ -304,6 +308,94 @@ internal class PlaybackSession(
         initialLayerGains: Map<Int, Double> = emptyMap(),
         linear: Boolean = false,
         initialSeekFrames: Long = 0L,
+    ): PrepareResult = prepareFlowInternal(
+        title = title,
+        packet = packet,
+        frames = frames,
+        startSegment = startSegment,
+        autoAdvance = autoAdvance,
+        prequeueInitial = prequeueInitial,
+        initialLayerGains = initialLayerGains,
+        linear = linear,
+        initialSeekFrames = initialSeekFrames,
+    ) bindAssets@{ staged ->
+        assets.forEachIndexed { index, (name, bytes) ->
+            val status = if (streamed && name !in preparedAssets) {
+                staged.bindStreamedBwav(index, bytes, name)
+            } else {
+                staged.bindBwav(index, bytes, name)
+            }
+            if (status != AudioEngine.STATUS_OK) {
+                return@bindAssets "Could not bind '$name': ${AudioStatusText.engineHint(status) ?: AudioStatusText.engine(status)}"
+            }
+        }
+        null
+    }
+
+    /**
+     * Builds and prepares a fresh native engine off the main thread for a file-backed graph
+     * without reading full BWAV payloads into Kotlin ByteArrays.
+     */
+    fun prepareFlowFromFiles(
+        title: String,
+        packet: ByteArray,
+        assets: List<CourseMedleyCompiler.AssetSource>,
+        frames: Long,
+        startSegment: Int,
+        streamed: Boolean = false,
+        autoAdvance: Map<Int, Int> = emptyMap(),
+        preparedAssets: Set<String> = emptySet(),
+        prequeueInitial: Boolean = false,
+        initialLayerGains: Map<Int, Double> = emptyMap(),
+        linear: Boolean = false,
+        initialSeekFrames: Long = 0L,
+    ): PrepareResult = prepareFlowInternal(
+        title = title,
+        packet = packet,
+        frames = frames,
+        startSegment = startSegment,
+        autoAdvance = autoAdvance,
+        prequeueInitial = prequeueInitial,
+        initialLayerGains = initialLayerGains,
+        linear = linear,
+        initialSeekFrames = initialSeekFrames,
+    ) bindAssets@{ staged ->
+        assets.forEachIndexed { index, asset ->
+            val isStreamed = streamed && asset.path !in preparedAssets
+            val status = when (asset) {
+                is CourseMedleyCompiler.AssetSource.DiskFile ->
+                    staged.bindBwavFile(
+                        assetIndex = index,
+                        file = asset.file,
+                        assetId = asset.path,
+                        streamed = isStreamed,
+                        expectedSha256 = asset.sha256,
+                    )
+                is CourseMedleyCompiler.AssetSource.Bytes ->
+                    if (isStreamed) {
+                        staged.bindStreamedBwav(index, asset.bytes, asset.path)
+                    } else {
+                        staged.bindBwav(index, asset.bytes, asset.path)
+                    }
+            }
+            if (status != AudioEngine.STATUS_OK) {
+                return@bindAssets "Could not bind '${asset.path}': ${AudioStatusText.engineHint(status) ?: AudioStatusText.engine(status)}"
+            }
+        }
+        null
+    }
+
+    private fun prepareFlowInternal(
+        title: String,
+        packet: ByteArray,
+        frames: Long,
+        startSegment: Int,
+        autoAdvance: Map<Int, Int>,
+        prequeueInitial: Boolean,
+        initialLayerGains: Map<Int, Double>,
+        linear: Boolean,
+        initialSeekFrames: Long,
+        bindAssets: (SessionAudioEngine) -> String?,
     ): PrepareResult {
         val staged = createEngine() ?: return PrepareResult.Failed("Out of memory creating the audio engine.")
         val stagedController = PlaybackController(staged as PlaybackEngine)
@@ -315,12 +407,7 @@ internal class PlaybackSession(
         val loaded = stagedController.loadGraphOnly(packet, title)
         if (loaded is PlaybackController.State.Failed) return abort(loaded.reason)
 
-        assets.forEachIndexed { index, (name, bytes) ->
-            val status = if (streamed && name !in preparedAssets) staged.bindStreamedBwav(index, bytes, name) else staged.bindBwav(index, bytes, name)
-            if (status != AudioEngine.STATUS_OK) {
-                return abort("Could not bind '$name': ${AudioStatusText.engineHint(status) ?: AudioStatusText.engine(status)}")
-            }
-        }
+        bindAssets(staged)?.let { return abort(it) }
 
         val started = stagedController.playSegment(startSegment)
         if (started is PlaybackController.State.Failed) return abort(started.reason)
@@ -362,6 +449,7 @@ internal class PlaybackSession(
                 autoAdvance = autoAdvance.toMap(),
                 initialAutoSource = autoSource,
                 initialSeeked = initialSeekFrames > 0L,
+                startSegment = startSegment,
             ),
         )
     }
@@ -459,16 +547,25 @@ internal class PlaybackSession(
         )
     }
 
-    /** Swaps a background-prepared engine into the active session and opens output on Main. */
+    /** Swaps a background-prepared engine into the active session and rebinds or opens output on Main. */
     fun commitPrepared(prepared: Prepared): State {
-        closeOutput()
+        applySessionEffectsToEngine(prepared.engine)
+        val existingOut = output
+        val rebound = existingOut != null &&
+            existingOut.rebindEngine(prepared.engine.nativeHandle(), prepared.engine.sampleRate)
+        if (!rebound) {
+            closeOutput()
+        }
         engineEpoch++
         isSeeking = false
         if (prepared.initialSeeked) {
             seekSequence++
         }
+        var oldEngine: SessionAudioEngine? = null
+        var oldController: PlaybackController? = null
         synchronized(nativeLifecycleLock) {
-            controller?.release()
+            oldEngine = engine
+            oldController = controller
             engine = prepared.engine
             controller = prepared.controller
         }
@@ -478,12 +575,22 @@ internal class PlaybackSession(
         automaticPending = null
         linearDisplayOffsetFrames = 0L
         linearActiveSegment = if (prepared.linear && prepared.autoAdvance.isNotEmpty()) {
-            interactiveObservation()?.segment ?: -1
+            interactiveObservation()?.segment?.takeIf { it >= 0 } ?: prepared.startSegment
         } else {
             -1
         }
-        applySessionEffectsToEngine(prepared.engine)
-        output = openOutput(prepared.engine.nativeHandle(), prepared.engine.sampleRate)
+        if (!rebound) {
+            output = openOutput(prepared.engine.nativeHandle(), prepared.engine.sampleRate)
+        }
+        oldController?.let { staleController ->
+            if (oldEngine is AudioEngine) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    staleController.release()
+                }
+            } else {
+                staleController.release()
+            }
+        }
         val published = publish(prepared.started, prepared.title, prepared.frames, prepared.engine.sampleRate)
         _state.value = published.copy(loaded = true, linear = prepared.linear, naturalEnd = false)
         return _state.value
@@ -711,7 +818,7 @@ internal class PlaybackSession(
         if (!linearSession) return _state.value
         val hadOutput = output != null
         if (hadOutput) {
-            suspendOrCloseOutput()
+            suspendOrCloseOutput(preserveAutoTransitions = true)
         }
         val updated = active.setLinearRepeat(enabled, begin, end)
         if (hadOutput && updated !is PlaybackController.State.Failed) {
@@ -767,7 +874,7 @@ internal class PlaybackSession(
         // the output stream across the seek without dropping interactive transition rules.
         val hadOutput = output != null
         if (hadOutput) {
-            suspendOrCloseOutput()
+            suspendOrCloseOutput(preserveAutoTransitions = true)
         }
         seekSequence++
         val sought = synchronized(nativeLifecycleLock) {
@@ -817,7 +924,7 @@ internal class PlaybackSession(
                         if (controller === active && engineEpoch == capturedEpoch) {
                             if (output != null) {
                                 hadOutput = true
-                                suspendOrCloseOutput()
+                                suspendOrCloseOutput(preserveAutoTransitions = true)
                             }
                             seekSequence++
                             active.seek(target)
@@ -874,7 +981,10 @@ internal class PlaybackSession(
                     linearActiveSegment = observation.segment
                 }
             }
-            if(observation?.segment!=automaticSource) { automaticSource=null;automaticPending=null }
+            if (observation == null || (observation.segment >= 0 && observation.segment != automaticSource)) {
+                automaticSource = null
+                automaticPending = null
+            }
             if(observation!=null && !observation.paused && !observation.transitioning && (linearSession || observation.sourceFrame!=null)) {
                 val target=automaticTransitions[observation.segment]
                 if(target!=null && automaticSource!=observation.segment) {
@@ -934,24 +1044,30 @@ internal class PlaybackSession(
     }
 
     /** Native output destruction joins its callback before a graph or binding can change. */
-    private fun closeOutput() {
+    private fun closeOutput(preserveAutoTransitions: Boolean = false) {
         output?.close()
         output = null
-        automaticTransitions=emptyMap();automaticSource=null;automaticPending=null
+        if (!preserveAutoTransitions) {
+            automaticTransitions = emptyMap()
+        }
+        automaticSource = null
+        automaticPending = null
     }
 
     /**
      * Suspends an existing output handle when supported so native Oboe worker threads survive
      * across same-engine mutations/seeks; falls back to full close for legacy/fake outputs.
      */
-    private fun suspendOrCloseOutput() {
+    private fun suspendOrCloseOutput(preserveAutoTransitions: Boolean = false) {
         val currentOutput = output
         if (currentOutput != null && currentOutput.suspendStream()) {
-            automaticTransitions = emptyMap()
+            if (!preserveAutoTransitions) {
+                automaticTransitions = emptyMap()
+            }
             automaticSource = null
             automaticPending = null
         } else {
-            closeOutput()
+            closeOutput(preserveAutoTransitions = preserveAutoTransitions)
         }
     }
 

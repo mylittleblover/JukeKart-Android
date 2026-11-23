@@ -2,6 +2,7 @@ package com.mylittleblover.mkwplayer.ui.routes
 
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Remove
@@ -16,6 +17,7 @@ import androidx.compose.material.icons.filled.MusicOff
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -31,7 +33,10 @@ import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -65,6 +70,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -78,10 +85,12 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
@@ -132,7 +141,9 @@ import com.mylittleblover.mkwplayer.routes.OfficialRouteCatalog
 import com.mylittleblover.mkwplayer.routes.OfficialRouteKind
 import com.mylittleblover.mkwplayer.routes.RoadJukeboxCatalog
 import com.mylittleblover.mkwplayer.ui.AppMotion
+import com.mylittleblover.mkwplayer.ui.rememberPressScale
 import com.mylittleblover.mkwplayer.ui.rememberReducedMotion
+import com.mylittleblover.mkwplayer.ui.unpadHorizontal
 import com.mylittleblover.mkwplayer.ui.art.CupArt
 import com.mylittleblover.mkwplayer.ui.art.MapArtworkCache
 import com.mylittleblover.mkwplayer.ui.art.ArtworkSlot
@@ -187,6 +198,10 @@ internal fun OfficialMapScreen(
     val sink = course != null && connections != null && connections.outgoing(course).isEmpty()
     var picker by rememberSaveable { mutableStateOf(false) }
     var stops by rememberSaveable { mutableStateOf(false) }
+    var draftSettingsOpen by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(state.editing) {
+        if (!state.editing) draftSettingsOpen = false
+    }
     var officialLoop by rememberSaveable(route?.id) { mutableStateOf(false) }
     var officialRuleMode by rememberSaveable(route?.id) { mutableStateOf(RoadJukeboxCatalog.RoadMusicRuleMode.AUTO) }
     var officialSuiteMode by rememberSaveable(route?.id) { mutableStateOf(RoadJukeboxCatalog.RouteSuiteMode.GAME_SUITE) }
@@ -373,22 +388,16 @@ internal fun OfficialMapScreen(
                                 }
                             } else {
                                 MkwFloatingPanel(
-                                    modifier = Modifier.fillMaxWidth().heightIn(max = availablePanelHeight * if (state.editing) .62f else .56f),
+                                    modifier = Modifier.fillMaxWidth().heightIn(max = availablePanelHeight * if (state.editing) .48f else .56f),
                                     shape = MkwKitTokens.Shape.card,
                                     shadowElevation = 4.dp,
                                     alpha = 0.98f,
                                 ) {
                                     if (state.editing) {
-                                        ConnectionEditorPanel(
+                                        DraftRouteCompactDock(
                                             state = state,
                                             name = name,
-                                            languageTag = languageTag,
-                                            connections = connections,
                                             draftReport = draftReport,
-                                            onPickEdgeMusic = { idx ->
-                                                pickingOfficialLeg = false
-                                                pickingEdgeIndex = idx
-                                            },
                                             onSaveClick = {
                                                 saveDraftName = state.editingRouteName.ifBlank { defaultRouteName }
                                                 saveDialogOpen = true
@@ -404,7 +413,11 @@ internal fun OfficialMapScreen(
                                                     state.draftRouteSuiteMode,
                                                 )
                                             },
-                                            onDone = { stops = false },
+                                            onOpenSettings = { draftSettingsOpen = true },
+                                            onDone = {
+                                                stops = false
+                                                draftSettingsOpen = false
+                                            },
                                         )
                                     } else if (course == null && route != null) {
                                         OfficialRouteCompactDock(
@@ -472,7 +485,6 @@ internal fun OfficialMapScreen(
                             state = state,
                             name = name,
                             languageTag = languageTag,
-                            connections = connections,
                             draftReport = draftReport,
                             onPickEdgeMusic = { idx ->
                                 pickingOfficialLeg = false
@@ -822,6 +834,35 @@ internal fun OfficialMapScreen(
         }
     }
 
+    if (draftSettingsOpen && state.editing) {
+        DraftRouteSettingsSheet(
+            state = state,
+            name = name,
+            languageTag = languageTag,
+            draftReport = draftReport,
+            onPickEdgeMusic = { idx ->
+                pickingOfficialLeg = false
+                pickingEdgeIndex = idx
+            },
+            onSaveClick = {
+                saveDraftName = state.editingRouteName.ifBlank { defaultRouteName }
+                saveDialogOpen = true
+            },
+            onPlayDraft = {
+                val routeName = state.editingRouteName.ifBlank { defaultRouteName }
+                onPlayCustomDraft(
+                    routeName,
+                    state.toCustomRouteStops(),
+                    state.toCustomRouteEdges(),
+                    state.draftLoopWholeRoute,
+                    state.draftRoadRuleMode,
+                    state.draftRouteSuiteMode,
+                )
+            },
+            onDismiss = { draftSettingsOpen = false },
+        )
+    }
+
     val activeLegIndex = pickingEdgeIndex
     val activeReport = if (pickingOfficialLeg) officialReport else draftReport
     val activeLeg = if (activeLegIndex != null) activeReport?.legs?.getOrNull(activeLegIndex) else null
@@ -909,13 +950,532 @@ internal fun OfficialMapScreen(
     }
 }
 
+@Composable
+private fun DraftRouteCompactDock(
+    state: WorldMapState,
+    name: (String) -> String,
+    draftReport: RoadJukeboxCatalog.RouteValidationReport?,
+    onSaveClick: () -> Unit,
+    onPlayDraft: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onDone: () -> Unit,
+) {
+    val stops = state.draftStops()
+    val effectiveStops = remember(stops, state.editFrom) {
+        if (stops.isNotEmpty()) stops else listOfNotNull(state.editFrom)
+    }
+    val reduceMotion = rememberReducedMotion()
+    val listState = rememberLazyListState()
+    LaunchedEffect(effectiveStops.size) {
+        if (effectiveStops.isNotEmpty()) {
+            listState.animateScrollToItem(effectiveStops.lastIndex)
+        }
+    }
+
+    val badgeText = if (effectiveStops.isEmpty()) {
+        stringResource(R.string.map_edit_badge_active)
+    } else {
+        stringResource(R.string.map_route_stops, effectiveStops.size)
+    }
+    val statusLine = when {
+        effectiveStops.isEmpty() -> stringResource(R.string.map_edit_tap_start)
+        effectiveStops.size == 1 -> stringResource(R.string.map_edit_tap_next_fmt, name(effectiveStops.first()))
+        state.editingRouteName.isNotBlank() -> state.editingRouteName
+        else -> "${name(effectiveStops.first())} → ${name(effectiveStops.last())}"
+    }
+    val errorText = state.editRefusal ?: if (draftReport?.canPlay == false) {
+        draftReport.blockingReason ?: stringResource(R.string.route_blocked_incomplete_pool)
+    } else null
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    MkwBadge(
+                        text = badgeText,
+                        tone = MkwBadgeTone.Crimson,
+                        tabular = effectiveStops.isNotEmpty(),
+                    )
+                    Text(
+                        text = statusLine,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MkwKitTokens.Palette.ink,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                if (errorText != null) {
+                    Text(
+                        text = errorText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MkwKitTokens.Palette.danger,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                DockToolIconButton(
+                    icon = Icons.AutoMirrored.Filled.Undo,
+                    contentDescription = stringResource(R.string.map_edit_undo),
+                    enabled = state.draft.isNotEmpty(),
+                    onClick = state::editUndo,
+                )
+                AnimatedVisibility(
+                    visible = state.draft.isNotEmpty() && state.editingRouteId == null,
+                    enter = if (reduceMotion) {
+                        fadeIn(snap())
+                    } else {
+                        fadeIn(tween(180, easing = AppMotion.easeOut)) +
+                            scaleIn(tween(180, easing = AppMotion.easeOut), initialScale = 0.92f)
+                    },
+                    exit = if (reduceMotion) {
+                        fadeOut(snap())
+                    } else {
+                        fadeOut(tween(140)) + scaleOut(tween(140), targetScale = 0.92f)
+                    },
+                ) {
+                    DockToolIconButton(
+                        icon = Icons.Outlined.DeleteSweep,
+                        contentDescription = stringResource(R.string.map_edit_clear),
+                        enabled = state.draft.isNotEmpty() && state.editingRouteId == null,
+                        onClick = state::editClear,
+                    )
+                }
+                DockToolIconButton(
+                    icon = Icons.Filled.Close,
+                    contentDescription = stringResource(R.string.map_edit_exit),
+                    enabled = true,
+                    onClick = {
+                        state.exitEdit()
+                        onDone()
+                    },
+                )
+            }
+        }
+
+        AnimatedVisibility(
+            visible = effectiveStops.isNotEmpty(),
+            enter = if (reduceMotion) {
+                fadeIn(snap())
+            } else {
+                expandVertically(tween(220, easing = AppMotion.easeOut)) +
+                    fadeIn(tween(180, easing = AppMotion.easeOut))
+            },
+            exit = if (reduceMotion) {
+                fadeOut(snap())
+            } else {
+                shrinkVertically(tween(160)) + fadeOut(tween(120))
+            },
+        ) {
+            LazyRow(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .unpadHorizontal(12.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                itemsIndexed(effectiveStops, key = { index, code -> "$index:$code" }) { index, code ->
+                    val isTail = index == effectiveStops.lastIndex
+                    DraftStopPill(
+                        stepNumber = index + 1,
+                        label = name(code),
+                        isTail = isTail,
+                    )
+                    if (index < effectiveStops.lastIndex) {
+                        Text(
+                            text = "→",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MkwKitTokens.Palette.outlineInk,
+                            modifier = Modifier.padding(start = 4.dp),
+                        )
+                    }
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            MkwPrimaryButton(
+                text = stringResource(R.string.map_edit_save_short),
+                onClick = onSaveClick,
+                enabled = state.draft.isNotEmpty(),
+                leadingIcon = Icons.Filled.Save,
+                size = MkwButtonSize.Compact,
+            )
+            MkwRoseButton(
+                text = stringResource(R.string.map_edit_play_short),
+                onClick = onPlayDraft,
+                enabled = state.draft.isNotEmpty() && draftReport?.canPlay != false,
+                leadingIcon = Icons.Filled.PlayArrow,
+                size = MkwButtonSize.Compact,
+            )
+            MkwSecondaryButton(
+                text = stringResource(R.string.map_edit_settings_btn),
+                onClick = onOpenSettings,
+                leadingIcon = Icons.Filled.Tune,
+                size = MkwButtonSize.Compact,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DockToolIconButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val reduceMotion = rememberReducedMotion()
+    val (pressScale, interactionSource) = rememberPressScale(pressedScale = 0.94f)
+    val bgColor by animateColorAsState(
+        targetValue = if (enabled) MkwKitTokens.Palette.inset else MkwKitTokens.Palette.card,
+        animationSpec = tween(if (reduceMotion) 0 else 200, easing = AppMotion.easeOut),
+        label = "dock-tool-bg",
+    )
+    val fgColor by animateColorAsState(
+        targetValue = if (enabled) MkwKitTokens.Palette.ink else MkwKitTokens.Palette.inkSecondary.copy(alpha = 0.38f),
+        animationSpec = tween(if (reduceMotion) 0 else 200, easing = AppMotion.easeOut),
+        label = "dock-tool-fg",
+    )
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        interactionSource = interactionSource,
+        shape = MkwKitTokens.Shape.pill,
+        color = bgColor,
+        border = BorderStroke(
+            MkwKitTokens.Stroke.hairline,
+            if (enabled) MkwKitTokens.Palette.hairline else MkwKitTokens.Palette.hairline.copy(alpha = 0.6f),
+        ),
+        modifier = Modifier
+            .size(34.dp)
+            .then(if (enabled) pressScale else Modifier)
+            .semantics {
+                role = Role.Button
+                this.contentDescription = contentDescription
+            },
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = fgColor,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DraftStopPill(
+    stepNumber: Int,
+    label: String,
+    isTail: Boolean,
+) {
+    val reduceMotion = rememberReducedMotion()
+    val bgColor by animateColorAsState(
+        targetValue = if (isTail) MkwKitTokens.Palette.rose else MkwKitTokens.Palette.inset,
+        animationSpec = tween(if (reduceMotion) 0 else 200, easing = AppMotion.easeOut),
+        label = "stop-pill-bg",
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (isTail) MkwKitTokens.Palette.crimson.copy(alpha = 0.55f) else MkwKitTokens.Palette.hairline,
+        animationSpec = tween(if (reduceMotion) 0 else 200, easing = AppMotion.easeOut),
+        label = "stop-pill-border",
+    )
+    Surface(
+        shape = MkwKitTokens.Shape.pill,
+        color = bgColor,
+        border = BorderStroke(MkwKitTokens.Stroke.hairline, borderColor),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = stepNumber.toString(),
+                style = MkwKitTokens.tabular(MaterialTheme.typography.labelSmall),
+                fontWeight = FontWeight.Bold,
+                color = if (isTail) MkwKitTokens.Palette.crimsonDeep else MkwKitTokens.Palette.crimson,
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = if (isTail) FontWeight.SemiBold else FontWeight.Medium,
+                color = if (isTail) MkwKitTokens.Palette.crimsonDeep else MkwKitTokens.Palette.ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DraftEdgeLegCard(
+    edgeIdx: Int,
+    fromName: String,
+    toName: String,
+    leg: RoadJukeboxCatalog.RouteLegInspection?,
+    musicEnabled: Boolean,
+    languageTag: String,
+    onClick: () -> Unit,
+) {
+    val edgeTitle = "${edgeIdx + 1}. $fromName → $toName"
+    val edgeSub = if (leg != null) {
+        edgeResolutionSummary(leg.resolution, languageTag)
+    } else {
+        stringResource(R.string.route_edge_music_auto)
+    }
+    val hasIssue = leg?.resolution?.isMissingOrIncomplete() == true
+    MkwCard(
+        onClick = onClick,
+        tone = MkwSurfaceTone.Porcelain,
+        shape = MkwKitTokens.Shape.thumb,
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(
+                imageVector = if (musicEnabled) Icons.Filled.MusicNote else Icons.Filled.MusicOff,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = if (hasIssue) MkwKitTokens.Palette.danger else MkwKitTokens.Palette.crimson,
+            )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(
+                    text = edgeTitle,
+                    style = MkwKitTokens.tabular(MaterialTheme.typography.labelMedium),
+                    fontWeight = FontWeight.SemiBold,
+                    color = MkwKitTokens.Palette.ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = edgeSub,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (hasIssue) MkwKitTokens.Palette.danger else MkwKitTokens.Palette.inkSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (leg?.resolution?.hasKnownPool() == true) {
+                Text(
+                    text = stringResource(R.string.preset_edit),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MkwKitTokens.Palette.crimson,
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DraftRouteSettingsSheet(
+    state: WorldMapState,
+    name: (String) -> String,
+    languageTag: String,
+    draftReport: RoadJukeboxCatalog.RouteValidationReport?,
+    onPickEdgeMusic: (Int) -> Unit,
+    onSaveClick: () -> Unit,
+    onPlayDraft: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val stops = state.draftStops()
+    val summarySubtitle = if (stops.isNotEmpty()) {
+        "${stringResource(R.string.map_route_stops, stops.size)} · ${stringResource(R.string.route_legs_count, state.draft.size)}"
+    } else if (state.editFrom != null) {
+        "${stringResource(R.string.map_route_stops, 1)} · ${name(state.editFrom!!)}"
+    } else {
+        stringResource(R.string.map_edit_tap_start)
+    }
+    MkwBottomSheet(
+        onDismissRequest = onDismiss,
+        title = state.editingRouteName.ifBlank { stringResource(R.string.map_edit_settings_title) },
+        subtitle = summarySubtitle,
+        modifier = Modifier.fillMaxHeight(0.82f),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            if (draftReport?.canPlay == false) {
+                Text(
+                    text = draftReport.blockingReason ?: stringResource(R.string.route_blocked_incomplete_pool),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MkwKitTokens.Palette.danger,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                MkwPrimaryButton(
+                    text = stringResource(R.string.map_edit_save_short),
+                    onClick = onSaveClick,
+                    enabled = state.draft.isNotEmpty(),
+                    leadingIcon = Icons.Filled.Save,
+                    size = MkwButtonSize.Compact,
+                    modifier = Modifier.weight(1f),
+                )
+                MkwRoseButton(
+                    text = stringResource(R.string.map_edit_play_short),
+                    onClick = onPlayDraft,
+                    enabled = state.draft.isNotEmpty() && draftReport?.canPlay != false,
+                    leadingIcon = Icons.Filled.PlayArrow,
+                    size = MkwButtonSize.Compact,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            MkwCard(
+                tone = MkwSurfaceTone.Recessed,
+                shape = MkwKitTokens.Shape.control,
+                contentPadding = PaddingValues(10.dp),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(MkwKitTokens.Shape.thumb)
+                        .clickable { state.draftLoopWholeRoute = !state.draftLoopWholeRoute }
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f).padding(end = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Loop,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = MkwKitTokens.Palette.crimson,
+                        )
+                        Text(
+                            text = stringResource(R.string.route_loop_whole),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MkwKitTokens.Palette.ink,
+                        )
+                    }
+                    MkwSwitch(
+                        checked = state.draftLoopWholeRoute,
+                        onCheckedChange = { state.draftLoopWholeRoute = it },
+                    )
+                }
+                RoadMusicRuleModeSelector(
+                    selectedMode = state.draftRoadRuleMode,
+                    officialKind = null,
+                    onSelectMode = { state.draftRoadRuleMode = it },
+                )
+                RouteSuiteModeSelector(
+                    selectedMode = state.draftRouteSuiteMode,
+                    onSelectMode = { state.draftRouteSuiteMode = it },
+                )
+            }
+        }
+        MkwDivider(modifier = Modifier.padding(top = 4.dp))
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (state.editingRouteId != null) {
+                item(key = "tail-only-note") {
+                    Text(
+                        text = stringResource(R.string.route_tail_only_note),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MkwKitTokens.Palette.inkSecondary,
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
+                }
+            }
+            if (state.draft.isEmpty()) {
+                item(key = "draft-empty") {
+                    MkwCard(
+                        tone = MkwSurfaceTone.Recessed,
+                        shape = MkwKitTokens.Shape.control,
+                        contentPadding = PaddingValues(14.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.map_edit_empty),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MkwKitTokens.Palette.ink,
+                        )
+                        Text(
+                            text = stringResource(R.string.map_edit_tap_start),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MkwKitTokens.Palette.inkSecondary,
+                        )
+                    }
+                }
+            } else {
+                items(
+                    count = state.draft.size,
+                    key = { idx -> "draft-leg-$idx-${state.draft[idx].first}-${state.draft[idx].second}" },
+                ) { edgeIdx ->
+                    val edge = state.draft[edgeIdx]
+                    val leg = draftReport?.legs?.getOrNull(edgeIdx)
+                    val cfg = state.edgeConfigAt(edgeIdx)
+                    DraftEdgeLegCard(
+                        edgeIdx = edgeIdx,
+                        fromName = name(edge.first),
+                        toName = name(edge.second),
+                        leg = leg,
+                        musicEnabled = cfg.musicEnabled,
+                        languageTag = languageTag,
+                        onClick = { onPickEdgeMusic(edgeIdx) },
+                    )
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ConnectionEditorPanel(
     state: WorldMapState,
     name: (String) -> String,
     languageTag: String,
-    connections: com.mylittleblover.mkwplayer.library.StageConnections.Catalog?,
     draftReport: RoadJukeboxCatalog.RouteValidationReport?,
     onPickEdgeMusic: (Int) -> Unit,
     onSaveClick: () -> Unit,
@@ -924,20 +1484,50 @@ private fun ConnectionEditorPanel(
     scrollable: Boolean = true,
 ) {
     val stops = state.draftStops()
-    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    val effectiveStops = remember(stops, state.editFrom) {
+        if (stops.isNotEmpty()) stops else listOfNotNull(state.editFrom)
+    }
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = state.editingRouteName.ifBlank { stringResource(R.string.map_edit_title) },
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MkwKitTokens.Palette.ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            MkwBadge(
+                text = if (effectiveStops.isEmpty()) {
+                    stringResource(R.string.map_edit_badge_active)
+                } else {
+                    stringResource(R.string.map_route_stops, effectiveStops.size)
+                },
+                tone = MkwBadgeTone.Crimson,
+                tabular = effectiveStops.isNotEmpty(),
+            )
+        }
         Text(
-            state.editingRouteName.ifBlank { stringResource(R.string.map_edit_title) },
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            if (state.editingRouteId != null) stringResource(R.string.route_tail_only_note)
-            else stringResource(R.string.map_edit_hint),
+            text = if (state.editingRouteId != null) {
+                stringResource(R.string.route_tail_only_note)
+            } else if (effectiveStops.isEmpty()) {
+                stringResource(R.string.map_edit_tap_start)
+            } else {
+                stringResource(R.string.map_edit_tap_next_fmt, name(effectiveStops.last()))
+            },
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MkwKitTokens.Palette.inkSecondary,
         )
         state.editRefusal?.let {
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MkwKitTokens.Palette.danger)
         }
         val bodyScrollMod = if (scrollable) {
             Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState())
@@ -948,116 +1538,126 @@ private fun ConnectionEditorPanel(
             modifier = bodyScrollMod,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-        RoadMusicRuleModeSelector(
-            selectedMode = state.draftRoadRuleMode,
-            officialKind = null,
-            onSelectMode = { state.draftRoadRuleMode = it },
-        )
-        RouteSuiteModeSelector(
-            selectedMode = state.draftRouteSuiteMode,
-            onSelectMode = { state.draftRouteSuiteMode = it },
-        )
-        if (stops.isEmpty()) {
-            Text(stringResource(R.string.map_edit_empty), style = MaterialTheme.typography.bodyMedium)
-        } else {
-            // Numbered so the order is visible: a route is a sequence, not a set of connections.
-            Text(stops.mapIndexed { index, code -> "${index + 1}. ${name(code)}" }.joinToString("  →  "),
-                style = MaterialTheme.typography.bodyMedium)
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+            MkwCard(
+                tone = MkwSurfaceTone.Recessed,
+                shape = MkwKitTokens.Shape.control,
+                contentPadding = PaddingValues(10.dp),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Icon(Icons.Filled.Loop, null, Modifier.size(16.dp), tint = MkwKitTokens.Palette.crimson)
-                    Text(stringResource(R.string.route_loop_whole), style = MaterialTheme.typography.bodySmall, color = MkwKitTokens.Palette.ink)
-                }
-                MkwSwitch(
-                    checked = state.draftLoopWholeRoute,
-                    onCheckedChange = { state.draftLoopWholeRoute = it },
+                RoadMusicRuleModeSelector(
+                    selectedMode = state.draftRoadRuleMode,
+                    officialKind = null,
+                    onSelectMode = { state.draftRoadRuleMode = it },
                 )
-            }
-            for ((edgeIdx, edge) in state.draft.withIndex()) {
-                val leg = draftReport?.legs?.getOrNull(edgeIdx)
-                val edgeTitle = "${edgeIdx + 1}. ${name(edge.first)} → ${name(edge.second)}"
-                val edgeSub = if (leg != null) {
-                    edgeResolutionSummary(leg.resolution, languageTag)
-                } else {
-                    stringResource(R.string.route_edge_music_auto)
-                }
-                val cfg = state.edgeConfigAt(edgeIdx)
-                MkwCard(
-                    onClick = { onPickEdgeMusic(edgeIdx) },
-                    tone = MkwSurfaceTone.Porcelain,
-                    shape = MkwKitTokens.Shape.thumb,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                ) {
+                RouteSuiteModeSelector(
+                    selectedMode = state.draftRouteSuiteMode,
+                    onSelectMode = { state.draftRouteSuiteMode = it },
+                )
+                if (stops.isNotEmpty()) {
                     Row(
-                        Modifier.fillMaxWidth(),
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(MkwKitTokens.Shape.thumb)
+                            .clickable { state.draftLoopWholeRoute = !state.draftLoopWholeRoute }
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Icon(
-                            if (cfg.musicEnabled) Icons.Filled.MusicNote else Icons.Filled.MusicOff,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = if (leg?.resolution?.isMissingOrIncomplete() == true) {
-                                MkwKitTokens.Palette.danger
-                            } else {
-                                MkwKitTokens.Palette.crimson
-                            },
-                        )
-                        Column(Modifier.weight(1f)) {
-                            Text(edgeTitle, style = MaterialTheme.typography.labelMedium, color = MkwKitTokens.Palette.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(edgeSub, style = MaterialTheme.typography.bodySmall, color = MkwKitTokens.Palette.inkSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Row(
+                            modifier = Modifier.weight(1f).padding(end = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Icon(Icons.Filled.Loop, null, Modifier.size(16.dp), tint = MkwKitTokens.Palette.crimson)
+                            Text(stringResource(R.string.route_loop_whole), style = MaterialTheme.typography.bodySmall, color = MkwKitTokens.Palette.ink)
                         }
+                        MkwSwitch(
+                            checked = state.draftLoopWholeRoute,
+                            onCheckedChange = { state.draftLoopWholeRoute = it },
+                        )
                     }
                 }
             }
-            if (draftReport?.canPlay == false) {
+            if (effectiveStops.isEmpty()) {
                 Text(
-                    draftReport.blockingReason ?: stringResource(R.string.route_blocked_incomplete_pool),
+                    stringResource(R.string.map_edit_empty),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MkwKitTokens.Palette.danger,
+                    color = MkwKitTokens.Palette.inkSecondary,
                 )
+            } else {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    effectiveStops.forEachIndexed { index, code ->
+                        DraftStopPill(
+                            stepNumber = index + 1,
+                            label = name(code),
+                            isTail = index == effectiveStops.lastIndex,
+                        )
+                    }
+                }
+                for ((edgeIdx, edge) in state.draft.withIndex()) {
+                    val leg = draftReport?.legs?.getOrNull(edgeIdx)
+                    val cfg = state.edgeConfigAt(edgeIdx)
+                    DraftEdgeLegCard(
+                        edgeIdx = edgeIdx,
+                        fromName = name(edge.first),
+                        toName = name(edge.second),
+                        leg = leg,
+                        musicEnabled = cfg.musicEnabled,
+                        languageTag = languageTag,
+                        onClick = { onPickEdgeMusic(edgeIdx) },
+                    )
+                }
+                if (draftReport?.canPlay == false) {
+                    Text(
+                        draftReport.blockingReason ?: stringResource(R.string.route_blocked_incomplete_pool),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MkwKitTokens.Palette.danger,
+                    )
+                }
             }
         }
-        }
         MkwDivider()
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             MkwPrimaryButton(
-                text = stringResource(R.string.map_edit_save),
+                text = stringResource(R.string.map_edit_save_short),
                 onClick = onSaveClick,
                 enabled = state.draft.isNotEmpty(),
                 leadingIcon = Icons.Filled.Save,
                 size = MkwButtonSize.Compact,
+                modifier = Modifier.weight(1f),
             )
             MkwRoseButton(
-                text = stringResource(R.string.route_play),
+                text = stringResource(R.string.map_edit_play_short),
                 onClick = onPlayDraft,
                 enabled = state.draft.isNotEmpty() && draftReport?.canPlay != false,
                 leadingIcon = Icons.Filled.PlayArrow,
                 size = MkwButtonSize.Compact,
+                modifier = Modifier.weight(1f),
             )
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             MkwGhostButton(
                 text = stringResource(R.string.map_edit_undo),
                 onClick = state::editUndo,
                 enabled = state.draft.isNotEmpty(),
             )
-            MkwGhostButton(
-                text = stringResource(R.string.map_edit_clear),
-                onClick = state::editClear,
-                enabled = state.draft.isNotEmpty() && state.editingRouteId == null,
-            )
+            if (state.editingRouteId == null) {
+                MkwGhostButton(
+                    text = stringResource(R.string.map_edit_clear),
+                    onClick = state::editClear,
+                    enabled = state.draft.isNotEmpty(),
+                )
+            }
             MkwGhostButton(
                 text = stringResource(R.string.map_edit_exit),
                 onClick = { state.exitEdit(); onDone() },
             )
         }
-        // The provenance line is deliberately here and not in a tooltip: a route the listener builds is only
-        // as trustworthy as the table behind it, and that table has a name.
-        Text(stringResource(R.string.map_edit_source), style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

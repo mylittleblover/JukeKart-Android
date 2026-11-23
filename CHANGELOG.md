@@ -4,6 +4,12 @@
 
 以下记录按可从 Git 历史核实的版本和开发里程碑整理。
 
+## 0.1.0-beta04 · 2026-11-23
+
+- 重构竖屏手机端世界地图自定义路线编辑体验：采用精简底栏（`DraftRouteCompactDock`）搭配可展开的“路段与规则”设置抽屉（`DraftRouteSettingsSheet`），保留更大地图视野并移除内部标识符文本。
+- 完善生存赛 6 站全程原生接续与线性无缝衔接：扩展链路最大段数至 8 段，补充带序号 `Outro` 事件标记与岩浆赛道 `Outro01 -> Outro00` 回退匹配、提升 `KNOCKOUT_DIRECT` 路线解析优先级，并在拖动进度条或切换循环模式后保留 `Outro -> Next Pre` 自动接续链路。
+- 优化后台连续切歌稳定性与流畅度：在 `NativeOutput` 新增 `rebindOutput` 热切换输出流能力（避免频繁开关音频流）、将 Oboe 缓冲区容量提升至 `8192` 帧（`max(burst * 8, 4096)`）、将旧引擎释放移至后台 IO 线程，并支持免重扫文件直编与已知摘要复用。
+
 ## 0.1.0-beta03 · 2026-11-22
 
 - 仓库 URL 迁移至 `mylittleblover/JukeKart-Android`，同步更新 `README.md`、`docs/USAGE.md` 与多语言设置页反馈入口。

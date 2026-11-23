@@ -115,6 +115,7 @@ internal object NativeAudioLibrary {
     external fun startOutput(handle: Long, rate: Int): Boolean
     external fun stopOutput(handle: Long)
     external fun rebuildOutput(handle: Long, rate: Int): Boolean
+    external fun rebindOutput(outputHandle: Long, engineHandle: Long, sampleRate: Int): Boolean
     external fun outputSnapshot(handle: Long): LongArray
     external fun outputTimingSnapshot(handle: Long): LongArray?
 }

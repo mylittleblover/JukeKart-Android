@@ -29,6 +29,7 @@ pauseDecodeWorkerHarness
 performanceSnapshot
 playlistDecisionSnapshot
 playlistGroupSnapshot
+rebindOutput
 rebuildOutput
 render
 renderRealtime

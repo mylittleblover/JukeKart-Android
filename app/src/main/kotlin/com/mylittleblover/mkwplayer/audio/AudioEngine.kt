@@ -45,6 +45,32 @@ internal class AudioEngine private constructor(private val handle: Long) : Sessi
     override fun bindStreamedBwav(assetIndex: Int,bytes: ByteArray,assetId: String): Int =
         if(closed) CLOSED else NativeAudioLibrary.bindSource(handle,assetIndex,PROVIDER_BWAV,bytes,1,assetId,null,null,null)
 
+    override fun bindBwavFile(
+        assetIndex: Int,
+        file: java.io.File,
+        assetId: String,
+        streamed: Boolean,
+        expectedSha256: ByteArray?,
+    ): Int {
+        if (closed) return CLOSED
+        val digest = expectedSha256
+            ?: com.mylittleblover.mkwplayer.interactive.CourseMedleyCompiler.decodeHexSha256(assetId)
+        return android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
+            NativeAudioLibrary.bindSourceInput(
+                handle,
+                assetIndex,
+                PROVIDER_BWAV,
+                pfd.fileDescriptor,
+                if (streamed) PREPARATION_STREAMED else PREPARATION_PREPARED,
+                assetId,
+                null,
+                null,
+                null,
+                digest,
+            )
+        }
+    }
+
     override fun setOutputGain(gainDb: Double, ceilingDb: Double): Int =
         if (closed) CLOSED else NativeAudioLibrary.setOutputGain(handle, gainDb, ceilingDb)
 
@@ -89,6 +115,7 @@ internal class AudioEngine private constructor(private val handle: Long) : Sessi
 
     override fun loadLinearFile(file: java.io.File, assetId: String, loop: Boolean, streamed: Boolean): Int {
         if (closed) return CLOSED
+        val expectedDigest = com.mylittleblover.mkwplayer.interactive.CourseMedleyCompiler.decodeHexSha256(assetId)
         return android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
             NativeAudioLibrary.loadLinearInput(
                 handle,
@@ -100,7 +127,7 @@ internal class AudioEngine private constructor(private val handle: Long) : Sessi
                 null,
                 null,
                 null,
-                null,
+                expectedDigest,
             )
         }
     }

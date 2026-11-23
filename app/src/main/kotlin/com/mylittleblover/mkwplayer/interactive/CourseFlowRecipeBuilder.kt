@@ -1585,15 +1585,21 @@ internal object CourseFlowRecipeBuilder {
         for (record in byRole) {
             record.event("Outro_ToNextPre")?.singleOrNull()?.let { return it }
         }
-        // Handle grouped outro records like Outro / Outro00020305 / Outro010203
+        // Handle grouped outro records like Outro / Outro00020305 / Outro010203 or event-tagged Outro00/Outro05/Outro06
         val numMatch = Regex("Outro(\\d{2})$").find(stem)?.groupValues?.get(1)
         if (numMatch != null) {
             val grouped = minf.records.filter {
                 it.stage == stage && it.role.startsWith("Outro") &&
-                    (it.role == "Outro" || it.role.contains(numMatch))
+                    (it.role == "Outro" || it.role.contains(numMatch) || it.event("Outro$numMatch") != null)
             }
             for (record in grouped) {
                 record.event("Outro_ToNextPre")?.singleOrNull()?.let { return it }
+            }
+            if (stage == "Lava" && numMatch == "01") {
+                val lavaFallback = minf.records.filter { it.stage == "Lava" && it.role == "Outro00" }
+                for (record in lavaFallback) {
+                    record.event("Outro_ToNextPre")?.singleOrNull()?.let { return it }
+                }
             }
         }
         return null

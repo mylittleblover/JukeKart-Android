@@ -583,6 +583,9 @@ internal object RoadJukeboxCatalog {
         wikiCatalog: RouteMusicCatalog?,
         effectiveRuleMode: EffectiveRuleMode,
     ): EdgeMusicResolution {
+        if (effectiveRuleMode == EffectiveRuleMode.KNOCKOUT_DIRECT) {
+            return EdgeMusicResolution.KnockoutTourDirect(edge)
+        }
         val poolRefs = pool.candidatesFor(from, to)
         if (!poolRefs.isNullOrEmpty()) {
             // Known candidate pool from pack: #82 requires ALL candidates to exist & be readable, even if toggled off.
@@ -609,9 +612,6 @@ internal object RoadJukeboxCatalog {
         }
 
         if (wikiCatalog != null) {
-            if (effectiveRuleMode == EffectiveRuleMode.KNOCKOUT_DIRECT) {
-                return EdgeMusicResolution.KnockoutTourDirect(edge)
-            }
             val special = wikiCatalog.specialFor(from, to)
             if (special != null) {
                 if (!musicEnabled) return EdgeMusicResolution.DisabledByUser(edge)

@@ -91,6 +91,7 @@ player2::api::EngineStatus prepareInput(JNIEnv* env,jlong engine,jint asset,jstr
     request.entryId=entryPin.text();request.subsongId=subsongPin.text();request.variantId=variantPin.text();
     std::array<std::uint8_t,32> digest{};
     if(!player2::platform::sourceDigest(env,expectedDigest,digest,request.expectedRootSha256))return EngineStatus::InvalidRequest;
+    if(request.expectedRootSha256!=nullptr)request.trustExpectedDigest=true;
     return linear ? player2::api::loadLinearSourceInput(handle(engine),request,std::move(lease.input),loop,static_cast<player2::api::SourcePreparation>(preparation)) :
         player2::api::bindEngineSourceInput(handle(engine),asset,request,std::move(lease.input),static_cast<player2::api::SourcePreparation>(preparation));
 }

@@ -4,6 +4,12 @@
 
 The entries below summarize releases and development milestones verifiable from the Git history.
 
+## 0.1.0-beta04 · 2026-11-23
+
+- Redesigned the mobile portrait custom-route editor in World Map: introduced a compact bottom dock (`DraftRouteCompactDock`) paired with an expandable legs-and-rules sheet (`DraftRouteSettingsSheet`), maximizing map visibility and removing internal identifier labels.
+- Improved 6-stop Survival Rally (Knockout Tour) and linear `Outro -> Next Pre` handover: raised `MAX_CHAIN_SEGMENTS` to 8, added numbered `Outro` event-marker and Lava `Outro01 -> Outro00` fallbacks, prioritized `KNOCKOUT_DIRECT` edge resolution, and preserved automatic segment chains across `seek` and repeat-mode changes.
+- Improved background track-to-track transition smoothness: added `NativeOutput::rebind` (`rebindOutput`) hot-swap stream binding to avoid closing/reopening the Oboe stream, increased Oboe buffer capacity to `8192` frames (`max(burst * 8, 4096)`), offloaded old `AudioEngine` release to `Dispatchers.IO`, and added file-backed / `trustExpectedDigest` zero-rehash compilation.
+
 ## 0.1.0-beta03 · 2026-11-22
 
 - Migrated the repository URL to `mylittleblover/JukeKart-Android` and updated `README.md`, `docs/USAGE.md`, and localized Settings feedback links accordingly.

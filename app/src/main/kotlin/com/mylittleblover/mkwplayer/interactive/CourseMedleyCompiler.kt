@@ -39,6 +39,29 @@ internal object CourseMedleyCompiler {
         return ResolvedMedley(medley = medley, sampleRate = sampleRate, stemDigests = digests)
     }
 
+    sealed interface AssetSource {
+        val path: String
+        val sha256: ByteArray
+
+        data class Bytes(
+            override val path: String,
+            override val sha256: ByteArray,
+            val bytes: ByteArray,
+        ) : AssetSource
+
+        data class DiskFile(
+            override val path: String,
+            override val sha256: ByteArray,
+            val file: File,
+        ) : AssetSource
+    }
+
+    data class CompiledFileLinearGraph(
+        val packet: ByteArray,
+        val assets: List<AssetSource>,
+        val totalFrames: Long,
+    )
+
     fun compileGraph(
         medley: CourseMedleyCatalog.Medley,
         sampleRate: Int,
@@ -57,28 +80,93 @@ internal object CourseMedleyCompiler {
                 is BwavHeader.Result.Ok -> parsed.info
                 is BwavHeader.Result.Rejected -> error("Unreadable stem '$stem': ${parsed.reason}")
             }
-            val frames = info.frames.toLong()
-            require(frames > 0L) { "Stem '$stem' has non-positive frame count $frames" }
-            val path = "$stem.bwav"
             val shaBytes = knownDigestsHex[stem]?.let(::decodeHexSha256) ?: run {
                 val digest = md ?: MessageDigest.getInstance("SHA-256").also { md = it }
                 digest.digest(bytes)
             }
-            val spec = G.Asset(
-                path = path,
-                sampleRate = info.sampleRate,
-                channels = if (info.channels > 2) 2 else info.channels.coerceAtLeast(1),
-                frames = frames,
-                sha256 = shaBytes,
-            )
+            val spec = buildAssetSpec(stem, info, shaBytes)
             assetIndexByStem[stem] = uniqueAssets.size
             uniqueAssets[stem] = spec to bytes
         }
 
+        val assetSpecs = uniqueAssets.values.map { it.first }
+        val (packet, totalFrames) = buildGraphPacket(medley, sampleRate, assetSpecs, assetIndexByStem)
+        return ExtraInteractiveCompilers.CompiledLinearGraph(
+            packet = packet,
+            assets = uniqueAssets.values.map { it.first.path to it.second },
+            totalFrames = totalFrames,
+        )
+    }
+
+    fun compileGraphFromFiles(
+        medley: CourseMedleyCatalog.Medley,
+        sampleRate: Int,
+        filesByStem: Map<String, File>,
+        knownDigestsHex: Map<String, String> = emptyMap(),
+        fallbackBytesByStem: Map<String, ByteArray> = emptyMap(),
+    ): CompiledFileLinearGraph {
+        require(medley.clips.isNotEmpty()) { "Medley '${medley.id}' has no clips" }
+
+        val uniqueAssets = linkedMapOf<String, Pair<G.Asset, AssetSource>>()
+        val assetIndexByStem = linkedMapOf<String, Int>()
+
+        medley.uniqueStems.forEach { stem ->
+            val file = filesByStem[stem]
+            if (file != null) {
+                val info = when (val parsed = BwavHeader.readFile(file)) {
+                    is BwavHeader.Result.Ok -> parsed.info
+                    is BwavHeader.Result.Rejected -> error("Unreadable stem '$stem': ${parsed.reason}")
+                }
+                val shaBytes = knownDigestsHex[stem]?.let(::decodeHexSha256) ?: sha256File(file)
+                val spec = buildAssetSpec(stem, info, shaBytes)
+                assetIndexByStem[stem] = uniqueAssets.size
+                uniqueAssets[stem] = spec to AssetSource.DiskFile(spec.path, shaBytes, file)
+            } else {
+                val bytes = fallbackBytesByStem[stem]
+                    ?: error("Missing stem '$stem' for medley '${medley.id}'")
+                val info = when (val parsed = BwavHeader.read(bytes)) {
+                    is BwavHeader.Result.Ok -> parsed.info
+                    is BwavHeader.Result.Rejected -> error("Unreadable stem '$stem': ${parsed.reason}")
+                }
+                val shaBytes = knownDigestsHex[stem]?.let(::decodeHexSha256)
+                    ?: MessageDigest.getInstance("SHA-256").digest(bytes)
+                val spec = buildAssetSpec(stem, info, shaBytes)
+                assetIndexByStem[stem] = uniqueAssets.size
+                uniqueAssets[stem] = spec to AssetSource.Bytes(spec.path, shaBytes, bytes)
+            }
+        }
+
+        val assetSpecs = uniqueAssets.values.map { it.first }
+        val (packet, totalFrames) = buildGraphPacket(medley, sampleRate, assetSpecs, assetIndexByStem)
+        return CompiledFileLinearGraph(
+            packet = packet,
+            assets = uniqueAssets.values.map { it.second },
+            totalFrames = totalFrames,
+        )
+    }
+
+    private fun buildAssetSpec(stem: String, info: BwavHeader.Info, shaBytes: ByteArray): G.Asset {
+        val frames = info.frames.toLong()
+        require(frames > 0L) { "Stem '$stem' has non-positive frame count $frames" }
+        return G.Asset(
+            path = "$stem.bwav",
+            sampleRate = info.sampleRate,
+            channels = if (info.channels > 2) 2 else info.channels.coerceAtLeast(1),
+            frames = frames,
+            sha256 = shaBytes,
+        )
+    }
+
+    private fun buildGraphPacket(
+        medley: CourseMedleyCatalog.Medley,
+        sampleRate: Int,
+        assetSpecs: List<G.Asset>,
+        assetIndexByStem: Map<String, Int>,
+    ): Pair<ByteArray, Long> {
         var maxEnd = 0L
         val tracks = medley.clips.mapIndexed { idx, clip ->
             val assetIdx = assetIndexByStem.getValue(clip.stem)
-            val assetFrames = uniqueAssets.getValue(clip.stem).first.frames
+            val assetFrames = assetSpecs[assetIdx].frames
             val offset = clip.sourceOffset.coerceIn(0L, assetFrames - 1L)
             val length = clip.sourceLength.coerceIn(1L, assetFrames - offset)
             val start = clip.start.coerceAtLeast(0L)
@@ -109,7 +197,6 @@ internal object CourseMedleyCompiler {
 
         val totalFrames = maxOf(medley.totalFrames, maxEnd)
         val segment = G.Segment(index = 100, entry = 0L, exit = totalFrames)
-        val assetSpecs = uniqueAssets.values.map { it.first }
         val spec = G.Spec(
             assets = assetSpecs,
             segments = listOf(segment),
@@ -118,11 +205,20 @@ internal object CourseMedleyCompiler {
             transportSampleRate = sampleRate,
             clipEnvelopes = clipEnvelopes,
         )
-        return ExtraInteractiveCompilers.CompiledLinearGraph(
-            packet = G.build(spec),
-            assets = uniqueAssets.values.map { it.first.path to it.second },
-            totalFrames = totalFrames,
-        )
+        return G.build(spec) to totalFrames
+    }
+
+    internal fun sha256File(file: File): ByteArray {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val buffer = ByteArray(16 * 1024)
+        file.inputStream().use { input ->
+            while (true) {
+                val read = input.read(buffer)
+                if (read <= 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        return digest.digest()
     }
 
     internal fun decodeHexSha256(hex: String): ByteArray? {

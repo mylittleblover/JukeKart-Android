@@ -52,4 +52,11 @@
     <string name="map_picker_subtitle">Choose a Grand Prix cup or Knockout Tour rally to highlight its route on the map.</string>
     <string name="map_stops_sheet_action">Stops &amp; road music</string>
     <string name="map_kind_count_fmt">%1$s (%2$d)</string>
+    <string name="map_edit_badge_active">Linking</string>
+    <string name="map_edit_tap_start">Tap a starting course on the map</string>
+    <string name="map_edit_tap_next_fmt">%1$s → Tap a connected course</string>
+    <string name="map_edit_save_short">Save</string>
+    <string name="map_edit_play_short">Play</string>
+    <string name="map_edit_settings_btn">Legs &amp; rules</string>
+    <string name="map_edit_settings_title">Route legs &amp; rules</string>
 </resources>

@@ -194,9 +194,13 @@ SourceOpenResult openAudioSourceInput(const SourceOpenRequest& request,std::uniq
     if(!vag && !vgmFm && !vgzFm && !xwb && !rwar && !swar && !nintendoWave && !wwiseOpus && !acb && !opus && !pck && !hca && !legacyFsb && !bnk && !aiff && !fsb && !awb && !bwav && !adx && !nsfe && !spc && !vgz && !standaloneDsp && !wave && !vorbis && !mp3 && !flac && !bfstm && !dsp && !bcstmDsp && !bcstm && !brstm && !brstmDsp && !vgm && !mod && !xm && !mo3 && !it && !s3m && !ptm)return {SourceStatus::UnsupportedFormat,nullptr};
     try {
         auto handle=std::make_unique<AudioSourceHandle>();
-        const auto status=audio::sourceSha256(*input,request.limits,handle->encodedRootSha256);
-        if(status!=SourceStatus::Ok)return {status,nullptr};
-        if(request.expectedRootSha256 && handle->encodedRootSha256!=*request.expectedRootSha256)return {SourceStatus::InputChanged,nullptr};
+        if(request.trustExpectedDigest && request.expectedRootSha256!=nullptr) {
+            handle->encodedRootSha256=*request.expectedRootSha256;
+        } else {
+            const auto status=audio::sourceSha256(*input,request.limits,handle->encodedRootSha256);
+            if(status!=SourceStatus::Ok)return {status,nullptr};
+            if(request.expectedRootSha256 && handle->encodedRootSha256!=*request.expectedRootSha256)return {SourceStatus::InputChanged,nullptr};
+        }
         if(wwiseOpus)handle->source=audio::openWwiseOpus(std::move(input),request.limits);
         else if(wave)handle->source=audio::openWave(std::move(input),request.limits);
         else if(opus)handle->source=audio::openOpus(std::move(input),request.limits);

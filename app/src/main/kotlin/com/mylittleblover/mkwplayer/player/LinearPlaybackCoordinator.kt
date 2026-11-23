@@ -922,17 +922,16 @@ internal class LinearPlaybackCoordinator(
         }
         if (entry.courseMedley != null) {
             if (chainEntries.size >= 2) {
-                val bytesByStem = linkedMapOf<String, ByteArray>()
-                chainEntries.forEach { item ->
-                    item.courseMedley?.stemDigests?.forEach { (stem, sha) ->
-                        if (stem !in bytesByStem) {
-                            bytesByStem[stem] = readRawBwav(sha, packDir)
-                        }
-                    }
-                }
+                val (filesByStem, fallbackBytesByStem) = resolveStemsOnDisk(
+                    chainEntries.flatMap { item ->
+                        item.courseMedley?.stemDigests?.entries?.map { it.key to it.value }.orEmpty()
+                    },
+                    packDir,
+                )
                 val pairs = chainEntries.map { item -> item.key to item.courseMedley!! }
-                val chain = com.mylittleblover.mkwplayer.interactive.CourseMedleyChainCompiler.compileChain(pairs, bytesByStem)
-                val prep = session.prepareFlow(
+                val chain = com.mylittleblover.mkwplayer.interactive.CourseMedleyChainCompiler
+                    .compileChainFromFiles(pairs, filesByStem, fallbackBytesByStem)
+                val prep = session.prepareFlowFromFiles(
                     title = entry.title,
                     packet = chain.packet,
                     assets = chain.assets,
@@ -957,16 +956,18 @@ internal class LinearPlaybackCoordinator(
                 }
             }
             val resolved = entry.courseMedley
-            val bytesByStem = resolved.stemDigests.mapValues { (_, sha) ->
-                readRawBwav(sha, packDir)
-            }
-            val compiled = com.mylittleblover.mkwplayer.interactive.CourseMedleyCompiler.compileGraph(
+            val (filesByStem, fallbackBytesByStem) = resolveStemsOnDisk(
+                resolved.stemDigests.entries.map { it.key to it.value },
+                packDir,
+            )
+            val compiled = com.mylittleblover.mkwplayer.interactive.CourseMedleyCompiler.compileGraphFromFiles(
                 medley = resolved.medley,
                 sampleRate = resolved.sampleRate,
-                bytesByStem = bytesByStem,
+                filesByStem = filesByStem,
                 knownDigestsHex = resolved.stemDigests,
+                fallbackBytesByStem = fallbackBytesByStem,
             )
-            val prep = session.prepareFlow(
+            val prep = session.prepareFlowFromFiles(
                 title = entry.title,
                 packet = compiled.packet,
                 assets = compiled.assets,
@@ -1146,22 +1147,36 @@ internal class LinearPlaybackCoordinator(
                     )
                     return@launch
                 }
-                openCompiledFlowEntry(
+                openPreparedFlowEntry(
                     entry = entry,
-                    session = session,
                     generation = generation,
                     sampleRate = resolved.sampleRate,
-                    streamed = true,
-                    initialSeekFrames = initialSeekFrames,
                 ) {
-                    val bytesByStem = resolved.stemDigests.mapValues { (_, sha) ->
-                        readRawBwav(sha, packDir)
-                    }
-                    com.mylittleblover.mkwplayer.interactive.CourseMedleyCompiler.compileGraph(
+                    val (filesByStem, fallbackBytesByStem) = resolveStemsOnDisk(
+                        resolved.stemDigests.entries.map { it.key to it.value },
+                        packDir,
+                    )
+                    val compiled = com.mylittleblover.mkwplayer.interactive.CourseMedleyCompiler.compileGraphFromFiles(
                         medley = resolved.medley,
                         sampleRate = resolved.sampleRate,
-                        bytesByStem = bytesByStem,
+                        filesByStem = filesByStem,
                         knownDigestsHex = resolved.stemDigests,
+                        fallbackBytesByStem = fallbackBytesByStem,
+                    )
+                    val clampedSeek = initialSeekFrames.coerceIn(0L, (compiled.totalFrames - 1L).coerceAtLeast(0L))
+                    Triple(
+                        compiled.totalFrames,
+                        clampedSeek,
+                        session.prepareFlowFromFiles(
+                            title = entry.title,
+                            packet = compiled.packet,
+                            assets = compiled.assets,
+                            frames = compiled.totalFrames,
+                            startSegment = 100,
+                            streamed = true,
+                            linear = true,
+                            initialSeekFrames = clampedSeek,
+                        ),
                     )
                 }
                 return@launch
@@ -1261,23 +1276,22 @@ internal class LinearPlaybackCoordinator(
         val first = chainEntries.first()
         val preparedResult = withContext(ioDispatcher) {
             runCatching {
-                val bytesByStem = linkedMapOf<String, ByteArray>()
-                chainEntries.forEach { item ->
-                    item.courseMedley?.stemDigests?.forEach { (stem, sha) ->
-                        if (stem !in bytesByStem) {
-                            bytesByStem[stem] = readRawBwav(sha, packDir)
-                        }
-                    }
-                }
+                val (filesByStem, fallbackBytesByStem) = resolveStemsOnDisk(
+                    chainEntries.flatMap { item ->
+                        item.courseMedley?.stemDigests?.entries?.map { it.key to it.value }.orEmpty()
+                    },
+                    packDir,
+                )
                 val pairs = chainEntries.map { item -> item.key to item.courseMedley!! }
-                val chain = com.mylittleblover.mkwplayer.interactive.CourseMedleyChainCompiler.compileChain(pairs, bytesByStem)
+                val chain = com.mylittleblover.mkwplayer.interactive.CourseMedleyChainCompiler
+                    .compileChainFromFiles(pairs, filesByStem, fallbackBytesByStem)
                 val maxChainSeek = chain.windows.firstOrNull()?.handoverExitFrame?.minus(1L)?.coerceAtLeast(0L)
                     ?: (chain.firstTotalFrames - 1L).coerceAtLeast(0L)
                 val clampedSeek = initialSeekFrames.coerceIn(0L, maxChainSeek)
                 Triple(
                     chain,
                     clampedSeek,
-                    session.prepareFlow(
+                    session.prepareFlowFromFiles(
                         title = first.title,
                         packet = chain.packet,
                         assets = chain.assets,
@@ -1357,25 +1371,39 @@ internal class LinearPlaybackCoordinator(
         initialSeekFrames: Long = 0L,
         compile: () -> com.mylittleblover.mkwplayer.interactive.ExtraInteractiveCompilers.CompiledLinearGraph,
     ) {
+        openPreparedFlowEntry(
+            entry = entry,
+            generation = generation,
+            sampleRate = sampleRate,
+        ) {
+            val compiled = compile()
+            val clampedSeek = initialSeekFrames.coerceIn(0L, (compiled.totalFrames - 1L).coerceAtLeast(0L))
+            Triple(
+                compiled.totalFrames,
+                clampedSeek,
+                session.prepareFlow(
+                    title = entry.title,
+                    packet = compiled.packet,
+                    assets = compiled.assets,
+                    frames = compiled.totalFrames,
+                    startSegment = 100,
+                    streamed = streamed,
+                    linear = true,
+                    initialSeekFrames = clampedSeek,
+                ),
+            )
+        }
+    }
+
+    private suspend fun openPreparedFlowEntry(
+        entry: LinearQueue.Entry,
+        generation: Long,
+        sampleRate: Int,
+        prepareOffMain: () -> Triple<Long, Long, PlaybackSession.PrepareResult>,
+    ) {
+        val session = sessionProvider()
         val preparedResult = withContext(ioDispatcher) {
-            runCatching {
-                val compiled = compile()
-                val clampedSeek = initialSeekFrames.coerceIn(0L, (compiled.totalFrames - 1L).coerceAtLeast(0L))
-                Triple(
-                    compiled.totalFrames,
-                    clampedSeek,
-                    session.prepareFlow(
-                        title = entry.title,
-                        packet = compiled.packet,
-                        assets = compiled.assets,
-                        frames = compiled.totalFrames,
-                        startSegment = 100,
-                        streamed = streamed,
-                        linear = true,
-                        initialSeekFrames = clampedSeek,
-                    ),
-                )
-            }
+            runCatching { prepareOffMain() }
         }
         val (totalFrames, clampedSeek, prep) = preparedResult.getOrElse { problem ->
             if (generation == requestGeneration) {
@@ -1465,6 +1493,37 @@ internal class LinearPlaybackCoordinator(
         val loopStart: Long? = null,
         val loopEnd: Long? = null,
     )
+
+    private fun validateBwavFileHeader(file: File) {
+        val info = when (val parsed = BwavHeader.readFile(file)) {
+            is BwavHeader.Result.Ok -> parsed.info
+            is BwavHeader.Result.Rejected -> error(parsed.reason)
+        }
+        if (!PackCoverage.isDecodable(info.codecKind)) {
+            error("Codec ${info.codecKind} is not decodable by this build.")
+        }
+    }
+
+    private fun resolveStemsOnDisk(
+        stemDigests: Iterable<Pair<String, String>>,
+        packDir: File,
+    ): Pair<Map<String, File>, Map<String, ByteArray>> {
+        val filesByStem = linkedMapOf<String, File>()
+        val fallbackBytesByStem = linkedMapOf<String, ByteArray>()
+        stemDigests.forEach { (stem, sha) ->
+            if (stem in filesByStem || stem in fallbackBytesByStem) return@forEach
+            val file = File(packDir, "audio/$sha")
+            if (file.isFile) {
+                validateBwavFileHeader(file)
+                filesByStem[stem] = file
+            } else if (sha.equals(com.mylittleblover.mkwplayer.interactive.FinalLapFanfareCompiler.SHA256, ignoreCase = true)) {
+                fallbackBytesByStem[stem] = readRawBwav(sha, packDir)
+            } else {
+                error("Missing audio file for track.")
+            }
+        }
+        return filesByStem to fallbackBytesByStem
+    }
 
     private fun readRawBwav(sha256: String, packDir: File): ByteArray {
         val file = File(packDir, "audio/$sha256")

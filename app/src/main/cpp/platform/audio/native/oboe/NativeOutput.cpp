@@ -4,7 +4,8 @@
 #include <time.h>
 namespace player2::platform {
 struct NativeOutput::State {
-    api::EngineHandle* engine_;
+    std::atomic<api::EngineHandle*> engine_;
+    std::mutex renderMutex_;
     std::atomic<bool> running_{false},recover_{false};
     std::atomic<int> lastError_{0};
     std::atomic<std::uint64_t> callbacks_{0};
@@ -35,9 +36,14 @@ oboe::DataCallbackResult NativeOutput::Callbacks::onAudioReady(oboe::AudioStream
     std::uint64_t wallStart{},cpuStart{},cpuEnd{},wallEnd{};
     const bool started=readClock(CLOCK_MONOTONIC,wallStart) && readClock(CLOCK_THREAD_CPUTIME_ID,cpuStart);
     auto* output=static_cast<float*>(data);
-    for(std::int32_t offset=0;offset<frames;) {
-        const auto count=std::min<std::int32_t>(4096,frames-offset);
-        api::renderEngineDevice(state_->engine_,output+offset*2,count,stream->getSampleRate()); offset+=count;
+    {
+        std::lock_guard<std::mutex> renderLock(state_->renderMutex_);
+        auto* eng=state_->engine_.load(std::memory_order_acquire);
+        if(!eng) return oboe::DataCallbackResult::Stop;
+        for(std::int32_t offset=0;offset<frames;) {
+            const auto count=std::min<std::int32_t>(4096,frames-offset);
+            api::renderEngineDevice(eng,output+offset*2,count,stream->getSampleRate()); offset+=count;
+        }
     }
     const bool ended=readClock(CLOCK_THREAD_CPUTIME_ID,cpuEnd) && readClock(CLOCK_MONOTONIC,wallEnd);
     const auto rate=stream->getSampleRate();
@@ -59,13 +65,13 @@ bool NativeOutput::openLocked() {
     oboe::AudioStreamBuilder builder;
     builder.setDirection(oboe::Direction::Output)->setFormat(oboe::AudioFormat::Float)
         ->setChannelCount(2)->setPerformanceMode(oboe::PerformanceMode::LowLatency)
-        ->setSharingMode(oboe::SharingMode::Shared)->setUsage(oboe::Usage::Media)->setContentType(oboe::ContentType::Music)->setDataCallback(callback_)->setErrorCallback(callback_);
+        ->setSharingMode(oboe::SharingMode::Shared)->setUsage(oboe::Usage::Media)->setContentType(oboe::ContentType::Music)->setBufferCapacityInFrames(8192)->setDataCallback(callback_)->setErrorCallback(callback_);
     if(requestedRate_) builder.setSampleRate(requestedRate_);
     auto result=builder.openStream(stream_);
     if(result!=oboe::Result::OK) { state_->lastError_=static_cast<int>(result); stream_.reset(); return false; }
     const auto burst=std::max<std::int32_t>(stream_->getFramesPerBurst(),192);
     const auto cap=stream_->getBufferCapacityInFrames();
-    if(cap>0) stream_->setBufferSizeInFrames(std::min<std::int32_t>(cap,std::max<std::int32_t>(burst*4,1024)));
+    if(cap>0) stream_->setBufferSizeInFrames(std::min<std::int32_t>(cap,std::max<std::int32_t>(burst*8,4096)));
     rate_=stream_->getSampleRate();
     if(!callback_->callbackLifetime_.open()) {state_->lastError_=static_cast<int>(oboe::Result::ErrorInvalidState);closeLocked();return false;}
     callback_->acceptedStream_.store(stream_.get(),std::memory_order_release);result=stream_->requestStart();
@@ -85,7 +91,7 @@ bool NativeOutput::start(int requestedRate) {
     if(requestedRate!=0 && (requestedRate<8000 || requestedRate>192000)) return false;
     std::lock_guard<std::mutex> lock(control_);
     if(state_->running_) return true;
-    if(!api::claimEngineOutput(engine_)) return false;
+    if(!engine_ || !api::claimEngineOutput(engine_)) return false;
     requestedRate_=requestedRate; state_->running_=true;
     if(openLocked()) return true;
     state_->running_=false; api::releaseEngineOutput(engine_); return false;
@@ -93,7 +99,7 @@ bool NativeOutput::start(int requestedRate) {
 void NativeOutput::stop() {
     std::lock_guard<std::mutex> lock(control_); const bool wasRunning=state_->running_.exchange(false);
     closeLocked(); state_->recover_=false;
-    if(wasRunning) api::releaseEngineOutput(engine_);
+    if(wasRunning && engine_) api::releaseEngineOutput(engine_);
 }
 bool NativeOutput::rebuild(int requestedRate) {
     if(requestedRate!=0 && (requestedRate<8000 || requestedRate>192000)) return false;
@@ -101,7 +107,46 @@ bool NativeOutput::rebuild(int requestedRate) {
     if(!state_->running_) return false;
     requestedRate_=requestedRate; closeLocked(); ++rebuilds_;
     if(openLocked()) return true;
-    state_->running_=false; api::releaseEngineOutput(engine_); return false;
+    state_->running_=false; if(engine_) api::releaseEngineOutput(engine_); return false;
+}
+bool NativeOutput::rebind(api::EngineHandle* nextEngine,int requestedRate) {
+    if(!nextEngine) return false;
+    if(requestedRate!=0 && (requestedRate<8000 || requestedRate>192000)) return false;
+    std::lock_guard<std::mutex> lock(control_);
+    if(nextEngine==engine_) {
+        if(state_->running_ && (requestedRate==0 || requestedRate==rate_.load())) return true;
+    }
+    if(state_->running_ && stream_ && (requestedRate==0 || requestedRate==requestedRate_ || requestedRate==rate_.load())) {
+        if(nextEngine!=engine_) {
+            if(!api::claimEngineOutput(nextEngine)) return false;
+            auto* oldEngine=engine_;
+            {
+                std::lock_guard<std::mutex> renderLock(state_->renderMutex_);
+                engine_=nextEngine;
+                state_->engine_.store(nextEngine,std::memory_order_release);
+            }
+            if(oldEngine) api::releaseEngineOutput(oldEngine);
+        }
+        return true;
+    }
+    const bool wasRunning=state_->running_.exchange(false);
+    closeLocked(); state_->recover_=false;
+    if(wasRunning && engine_) api::releaseEngineOutput(engine_);
+    if(!api::claimEngineOutput(nextEngine)) {
+        engine_=nullptr;
+        state_->engine_.store(nullptr,std::memory_order_release);
+        return false;
+    }
+    engine_=nextEngine;
+    state_->engine_.store(nextEngine,std::memory_order_release);
+    requestedRate_=requestedRate;
+    state_->running_=true;
+    if(openLocked()) return true;
+    state_->running_=false;
+    api::releaseEngineOutput(nextEngine);
+    engine_=nullptr;
+    state_->engine_.store(nullptr,std::memory_order_release);
+    return false;
 }
 int NativeOutput::lastError()const noexcept{return state_->lastError_.load();}
 std::uint64_t NativeOutput::callbacks()const noexcept{return state_->callbacks_.load();}
@@ -128,7 +173,7 @@ void NativeOutput::recoverLoop() {
           if(state_->running_ && callback_ && callback_->recover_.exchange(false)) {
               state_->lastError_=callback_->lastError_.load();
               closeLocked(); ++rebuilds_;
-              if(!openLocked()) { state_->running_=false; api::releaseEngineOutput(engine_); }
+              if(!openLocked()) { state_->running_=false; if(engine_) api::releaseEngineOutput(engine_); }
           }
         }
         wait.lock();

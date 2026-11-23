@@ -16,10 +16,12 @@ import com.mylittleblover.player2.platform.audio.NativeAudioLibrary
  * implementation of it.
  */
 internal class AudioOutput private constructor(
-    private val engine: Long,
+    private var engine: Long,
     private val handle: Long,
-    val sampleRate: Int,
+    sampleRate: Int,
 ) : SessionAudioOutput {
+    var sampleRate: Int = sampleRate
+        private set
     private var closed = false
     private var suspended = false
 
@@ -98,6 +100,18 @@ internal class AudioOutput private constructor(
         if (!NativeAudioLibrary.startOutput(handle, sampleRate)) {
             return false
         }
+        suspended = false
+        return true
+    }
+
+    /** Hot-swaps the bound native engine without stopping the active Oboe hardware stream when compatible. */
+    override fun rebindEngine(engineHandle: Long, sampleRate: Int): Boolean {
+        if (closed || engineHandle == 0L) return false
+        if (!NativeAudioLibrary.rebindOutput(handle, engineHandle, sampleRate)) {
+            return false
+        }
+        engine = engineHandle
+        this.sampleRate = sampleRate
         suspended = false
         return true
     }

@@ -30,6 +30,7 @@ public:
     bool start(int requestedRate=0);
     void stop();
     bool rebuild(int requestedRate=0);
+    bool rebind(api::EngineHandle* nextEngine,int requestedRate=0);
     int rate() const noexcept { return rate_.load(); }
     int lastError() const noexcept;
     int rebuilds() const noexcept { return rebuilds_.load(); }

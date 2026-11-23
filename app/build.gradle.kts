@@ -34,9 +34,9 @@ android {
         applicationId = "com.mylittleblover.mkwplayer"
         minSdk = 26
         targetSdk = 35
-        // Beta 03: JukeKart-Android repository URL migration, adaptive icon drawable layers & service manifest icons for MIUI/HyperOS.
-        versionCode = 28
-        versionName = "0.1.0-beta03"
+        // Beta 04: Compact mobile custom-route drawer, 6-stop Survival Rally handover, seek-safe Outro->Pre chains, and Oboe stream rebind hot-swap.
+        versionCode = 29
+        versionName = "0.1.0-beta04"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

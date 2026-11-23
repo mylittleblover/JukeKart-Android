@@ -4,7 +4,7 @@ package com.mylittleblover.mkwplayer.player
  * Pure planning helpers for cross-track native transitions (#51-#53) and session serialization.
  */
 internal object LinearHandoverPlanner {
-    const val MAX_CHAIN_SEGMENTS = 4
+    const val MAX_CHAIN_SEGMENTS = 8
 
     fun isVerifiedPreludeStart(stem: String): Boolean {
         val tail = stem.substringAfterLast('/')

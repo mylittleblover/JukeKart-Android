@@ -2,6 +2,7 @@ package com.mylittleblover.mkwplayer.interactive
 
 import com.mylittleblover.mkwplayer.audio.BwavHeader
 import com.mylittleblover.mkwplayer.graph.MusicGraphBuilder as G
+import java.io.File
 import java.security.MessageDigest
 
 /**
@@ -27,6 +28,15 @@ internal object CourseMedleyChainCompiler {
     data class CompiledChain(
         val packet: ByteArray,
         val assets: List<Pair<String, ByteArray>>,
+        val autoAdvance: Map<Int, Int>,
+        val windows: List<SegmentWindow>,
+        val firstTotalFrames: Long,
+        val sampleRate: Int,
+    )
+
+    data class CompiledFileChain(
+        val packet: ByteArray,
+        val assets: List<CourseMedleyCompiler.AssetSource>,
         val autoAdvance: Map<Int, Int>,
         val windows: List<SegmentWindow>,
         val firstTotalFrames: Long,
@@ -66,6 +76,105 @@ internal object CourseMedleyChainCompiler {
             }
         }
 
+        val assetSpecs = uniqueAssets.values.map { it.first }
+        val built = buildChain(entries, baseRate, assetSpecs, assetIndexByStem)
+        return CompiledChain(
+            packet = built.packet,
+            assets = uniqueAssets.values.map { (asset, bytes) -> asset.path to bytes },
+            autoAdvance = built.autoAdvance,
+            windows = built.windows,
+            firstTotalFrames = built.firstTotalFrames,
+            sampleRate = baseRate,
+        )
+    }
+
+    fun compileChainFromFiles(
+        entries: List<Pair<String, CourseMedleyCompiler.ResolvedMedley>>,
+        filesByStem: Map<String, File>,
+        fallbackBytesByStem: Map<String, ByteArray> = emptyMap(),
+    ): CompiledFileChain {
+        require(entries.size >= 2) { "Native handover chain requires at least 2 entries" }
+        val baseRate = entries.first().second.sampleRate
+        val uniqueAssets = linkedMapOf<String, Pair<G.Asset, CourseMedleyCompiler.AssetSource>>()
+        val assetIndexByStem = linkedMapOf<String, Int>()
+
+        for ((_, resolved) in entries) {
+            require(resolved.sampleRate == baseRate) {
+                "All chained native entries must share sample rate $baseRate"
+            }
+            for (stem in resolved.medley.uniqueStems) {
+                if (stem in assetIndexByStem) continue
+                val knownDigest = resolved.stemDigests[stem]?.let(CourseMedleyCompiler::decodeHexSha256)
+                val file = filesByStem[stem]
+                if (file != null) {
+                    val header = (BwavHeader.readFile(file) as? BwavHeader.Result.Ok)?.info
+                        ?: error("Unreadable BWAV '$stem'")
+                    val frames = header.frames.toLong()
+                    require(frames > 0L) { "Zero-frame BWAV '$stem'" }
+                    val shaBytes = knownDigest ?: CourseMedleyCompiler.sha256File(file)
+                    val specAsset = G.Asset(
+                        path = "$stem.bwav",
+                        sampleRate = header.sampleRate,
+                        channels = header.channels.coerceIn(1, 2),
+                        frames = frames,
+                        sha256 = shaBytes,
+                    )
+                    assetIndexByStem[stem] = uniqueAssets.size
+                    uniqueAssets[stem] = specAsset to CourseMedleyCompiler.AssetSource.DiskFile(
+                        path = specAsset.path,
+                        sha256 = shaBytes,
+                        file = file,
+                    )
+                } else {
+                    val bytes = fallbackBytesByStem[stem]
+                        ?: error("Missing stem '$stem' for chained medley '${resolved.medley.id}'")
+                    val header = (BwavHeader.read(bytes) as? BwavHeader.Result.Ok)?.info
+                        ?: error("Unreadable BWAV '$stem'")
+                    val frames = header.frames.toLong()
+                    require(frames > 0L) { "Zero-frame BWAV '$stem'" }
+                    val shaBytes = knownDigest ?: MessageDigest.getInstance("SHA-256").digest(bytes)
+                    val specAsset = G.Asset(
+                        path = "$stem.bwav",
+                        sampleRate = header.sampleRate,
+                        channels = header.channels.coerceIn(1, 2),
+                        frames = frames,
+                        sha256 = shaBytes,
+                    )
+                    assetIndexByStem[stem] = uniqueAssets.size
+                    uniqueAssets[stem] = specAsset to CourseMedleyCompiler.AssetSource.Bytes(
+                        path = specAsset.path,
+                        sha256 = shaBytes,
+                        bytes = bytes,
+                    )
+                }
+            }
+        }
+
+        val assetSpecs = uniqueAssets.values.map { it.first }
+        val built = buildChain(entries, baseRate, assetSpecs, assetIndexByStem)
+        return CompiledFileChain(
+            packet = built.packet,
+            assets = uniqueAssets.values.map { it.second },
+            autoAdvance = built.autoAdvance,
+            windows = built.windows,
+            firstTotalFrames = built.firstTotalFrames,
+            sampleRate = baseRate,
+        )
+    }
+
+    private data class BuiltChain(
+        val packet: ByteArray,
+        val autoAdvance: Map<Int, Int>,
+        val windows: List<SegmentWindow>,
+        val firstTotalFrames: Long,
+    )
+
+    private fun buildChain(
+        entries: List<Pair<String, CourseMedleyCompiler.ResolvedMedley>>,
+        baseRate: Int,
+        assetSpecs: List<G.Asset>,
+        assetIndexByStem: Map<String, Int>,
+    ): BuiltChain {
         val segments = mutableListOf<G.Segment>()
         val tracks = mutableListOf<G.Track>()
         val clipEnvelopes = mutableListOf<G.TimelineEnvelope>()
@@ -100,7 +209,7 @@ internal object CourseMedleyChainCompiler {
 
             resolved.medley.clips.forEach { clip ->
                 val assetIdx = assetIndexByStem.getValue(clip.stem)
-                val assetFrames = uniqueAssets.getValue(clip.stem).first.frames
+                val assetFrames = assetSpecs[assetIdx].frames
                 val offset = clip.sourceOffset.coerceIn(0L, assetFrames - 1L)
                 val length = clip.sourceLength.coerceIn(1L, assetFrames - offset)
                 val start = clip.start.coerceAtLeast(0L)
@@ -163,20 +272,18 @@ internal object CourseMedleyChainCompiler {
         }
 
         val spec = G.Spec(
-            assets = uniqueAssets.values.map { it.first },
+            assets = assetSpecs,
             segments = segments,
             tracks = tracks,
             transitions = transitions,
             transportSampleRate = baseRate,
             clipEnvelopes = clipEnvelopes,
         )
-        return CompiledChain(
+        return BuiltChain(
             packet = G.build(spec),
-            assets = uniqueAssets.values.map { (asset, bytes) -> asset.path to bytes },
             autoAdvance = autoAdvance,
             windows = windows,
             firstTotalFrames = entries.first().second.medley.totalFrames,
-            sampleRate = baseRate,
         )
     }
 }

@@ -24,6 +24,7 @@ struct SourceOpenRequest {
     const char* assetId{};
     // Optional expected original root identity, valid only during this control call.
     const std::array<std::uint8_t,32>* expectedRootSha256{};
+    bool trustExpectedDigest{false};
 };
 struct SourceOpenResult { audio::SourceStatus status{}; AudioSourceHandle* handle{}; };
 struct SourceRenderResult { audio::SourceStatus status{}; std::size_t frames{}; };

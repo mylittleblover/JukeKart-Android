@@ -18,6 +18,10 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_mylittleblover_player2_platform_audio_NativeAudioLibrary_stopOutput(JNIEnv*,jobject,jlong value) { if(value) output(value)->stop(); }
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_mylittleblover_player2_platform_audio_NativeAudioLibrary_rebuildOutput(JNIEnv*,jobject,jlong value,jint rate) { return value && output(value)->rebuild(rate); }
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_mylittleblover_player2_platform_audio_NativeAudioLibrary_rebindOutput(JNIEnv*,jobject,jlong value,jlong engine,jint rate) {
+    return value && engine && output(value)->rebind(reinterpret_cast<player2::api::EngineHandle*>(static_cast<std::intptr_t>(engine)),rate);
+}
 extern "C" JNIEXPORT jlongArray JNICALL
 Java_com_mylittleblover_player2_platform_audio_NativeAudioLibrary_outputSnapshot(JNIEnv* env,jobject,jlong value) {
     if(!value) return nullptr;

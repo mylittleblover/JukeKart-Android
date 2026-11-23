@@ -8,6 +8,17 @@ internal interface SessionAudioEngine : PlaybackEngine {
     override fun sourceSnapshot(slot: Int): LongArray?
     fun bindStreamedBwav(assetIndex: Int,bytes: ByteArray,assetId: String): Int = bindBwav(assetIndex,bytes,assetId)
 
+    fun bindBwavFile(
+        assetIndex: Int,
+        file: java.io.File,
+        assetId: String,
+        streamed: Boolean = true,
+        expectedSha256: ByteArray? = null,
+    ): Int {
+        val bytes = file.readBytes()
+        return if (streamed) bindStreamedBwav(assetIndex, bytes, assetId) else bindBwav(assetIndex, bytes, assetId)
+    }
+
     /**
      * Master output trim: lift the mix by [gainDb], then hold it under [ceilingDb].
      *
@@ -33,5 +44,6 @@ internal interface SessionAudioOutput {
     fun timingSnapshot(): LongArray?
     fun suspendStream(): Boolean = false
     fun resumeStream(sampleRate: Int): Boolean = false
+    fun rebindEngine(engineHandle: Long, sampleRate: Int): Boolean = false
     fun close()
 }
