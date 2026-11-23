@@ -45,5 +45,6 @@ internal interface SessionAudioOutput {
     fun suspendStream(): Boolean = false
     fun resumeStream(sampleRate: Int): Boolean = false
     fun rebindEngine(engineHandle: Long, sampleRate: Int): Boolean = false
+    fun rebuildStream(sampleRate: Int): Boolean? = null
     fun close()
 }

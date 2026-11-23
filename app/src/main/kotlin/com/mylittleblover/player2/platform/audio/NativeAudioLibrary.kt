@@ -113,6 +113,8 @@ internal object NativeAudioLibrary {
     external fun createOutput(handle: Long): Long
     external fun destroyOutput(handle: Long)
     external fun startOutput(handle: Long, rate: Int): Boolean
+    external fun attachExternalOutput(handle: Long, rate: Int): Boolean
+    external fun renderOutputPcm16(handle: Long, pcm16: ShortArray, frames: Int): Boolean
     external fun stopOutput(handle: Long)
     external fun rebuildOutput(handle: Long, rate: Int): Boolean
     external fun rebindOutput(outputHandle: Long, engineHandle: Long, sampleRate: Int): Boolean

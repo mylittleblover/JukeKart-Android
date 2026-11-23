@@ -154,6 +154,7 @@ internal object CourseMedleyCompiler {
             channels = if (info.channels > 2) 2 else info.channels.coerceAtLeast(1),
             frames = frames,
             sha256 = shaBytes,
+            lookAheadFrames = info.sampleRate * 2L,
         )
     }
 

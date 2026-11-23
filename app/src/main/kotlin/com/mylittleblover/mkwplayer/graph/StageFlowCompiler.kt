@@ -119,6 +119,7 @@ internal object StageFlowCompiler {
                 channels = part.channels,
                 frames = part.frames,
                 sha256 = digest,
+                lookAheadFrames = part.sampleRate * 2L,
             )
         }
         val assetIndex = ordered.withIndex().associate { (position, part) -> part.fileName to position }

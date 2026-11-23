@@ -109,7 +109,7 @@ internal object MinfInteractiveCompiler {
             }
         }
         val spec=G.Spec(
-            assets=ordered.map { p -> G.Asset(p.fileName,p.sampleRate,p.channels,p.frames,digests.getValue(p.fileName)) },
+            assets=ordered.map { p -> G.Asset(p.fileName,p.sampleRate,p.channels,p.frames,digests.getValue(p.fileName),lookAheadFrames=p.sampleRate*2L) },
             segments=segments,
             tracks=ordered.mapIndexed { i,p -> G.Track(300+i,indices.getValue(p.fileName),listOf(G.Clip(500+i,i,sourceLength=p.frames))) },
             transitions=transitions,bpm=full.bpm,

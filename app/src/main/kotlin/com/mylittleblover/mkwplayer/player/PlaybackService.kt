@@ -10,6 +10,9 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.AudioDeviceCallback
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
@@ -47,9 +50,40 @@ class PlaybackService : Service() {
     private var mediaSession: MediaSessionCompat? = null
     private lateinit var manager: NotificationManager
     private lateinit var focus: AudioFocusManager
+    private var audioManager: AudioManager? = null
 
     /** True when focus itself paused the transport, so a gain may resume it. */
     private var pausedByFocus = false
+
+    private val knownExternalOutputIds = mutableSetOf<Int>()
+    private var deviceCallbackPrimed = false
+
+    private val routeRebuildRunnable = Runnable {
+        session.onAudioRouteChanged()
+    }
+
+    private val audioDeviceCallback = object : AudioDeviceCallback() {
+        override fun onAudioDevicesAdded(addedDevices: Array<AudioDeviceInfo>) {
+            val externalIds = addedDevices.filter(::isHeadphoneOrExternalOutput).map { it.id }
+            if (!deviceCallbackPrimed) {
+                deviceCallbackPrimed = true
+                knownExternalOutputIds.addAll(externalIds)
+                return
+            }
+            val newlyAdded = externalIds.any { knownExternalOutputIds.add(it) }
+            if (!newlyAdded) return
+            val st = session.state.value
+            if (!st.active || !st.playing) return
+            handler.removeCallbacks(routeRebuildRunnable)
+            handler.postDelayed(routeRebuildRunnable, ROUTE_REBUILD_DEBOUNCE_MS)
+        }
+
+        override fun onAudioDevicesRemoved(removedDevices: Array<AudioDeviceInfo>) {
+            for (device in removedDevices) {
+                knownExternalOutputIds.remove(device.id)
+            }
+        }
+    }
 
     /**
      * Keeps the session state fresh while the screen is away.
@@ -84,8 +118,28 @@ class PlaybackService : Service() {
             syncWakeLock(st)
             val nowMs = SystemClock.elapsedRealtime()
             val refreshKey = buildRefreshKey(st)
-            if (!st.active || refreshKey != lastRefreshKey || nowMs - lastFullRefreshMs >= FULL_REFRESH_INTERVAL_MS) {
+            val refreshKeyChanged = refreshKey != lastRefreshKey
+            val seekSeqChanged = session.seekSequence != lastPublishedSeekSeq
+            val speedChanged = session.currentPlaybackSpeed != lastPublishedSpeed
+            val actualPosMs = positionMillis(st)
+            if (!st.active || refreshKeyChanged) {
                 refresh()
+            } else if (
+                shouldRefreshMediaState(
+                    active = st.active,
+                    refreshKeyChanged = false,
+                    seekSequenceChanged = seekSeqChanged,
+                    speedChanged = speedChanged,
+                    playing = st.playing,
+                    actualPositionMs = actualPosMs,
+                    lastPublishedPositionMs = lastPublishedPositionMs,
+                    elapsedSincePublishMs = nowMs - lastPublishedElapsedMs,
+                    lastPublishedSpeed = lastPublishedSpeed,
+                )
+            ) {
+                // Only resync MediaSession position/speed (for seek, speed change, or loop wrap);
+                // skip rebuilding Notification/Widget/Tile bitmaps and Binder IPC.
+                updatePlaybackState(st)
             }
             if (polling && session.state.value.active) {
                 handler.postDelayed(this, nextPollDelayMs(session.state.value))
@@ -96,8 +150,11 @@ class PlaybackService : Service() {
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
     private var wakeLock: PowerManager.WakeLock? = null
     private var lastWakeLockAcquireMs: Long = 0L
-    private var lastFullRefreshMs: Long = 0L
     private var lastRefreshKey: String? = null
+    private var lastPublishedPositionMs: Long = 0L
+    private var lastPublishedElapsedMs: Long = 0L
+    private var lastPublishedSeekSeq: Long = -1L
+    private var lastPublishedSpeed: Float = 1f
     private val artExecutor = Executors.newSingleThreadExecutor()
     private val artCache = object : LruCache<String, Bitmap>(4) {}
     private var currentArtKey: String? = null
@@ -161,21 +218,22 @@ class PlaybackService : Service() {
     }
 
     private fun nextPollDelayMs(state: PlaybackSession.State): Long {
-        if (PlaybackHolder.linear().state.value.loading || session.isSeeking) {
-            return FAST_POLL_INTERVAL_MS
-        }
-        if (state.linear && state.playing && state.totalFrames > 0L && state.sampleRate > 0) {
-            val remainingFrames = (state.totalFrames - state.positionFrames).coerceAtLeast(0L)
-            val remainingMs = remainingFrames * 1000L / state.sampleRate
-            if (remainingMs <= NEAR_END_WINDOW_MS) {
-                return FAST_POLL_INTERVAL_MS
-            }
-        }
-        return if (state.playing) POLL_INTERVAL_MS else PAUSED_POLL_INTERVAL_MS
+        val linearState = PlaybackHolder.linear().state.value
+        return computePollDelayMs(
+            linear = state.linear,
+            playing = state.playing,
+            positionFrames = state.positionFrames,
+            totalFrames = state.totalFrames,
+            sampleRate = state.sampleRate,
+            loadingOrSeeking = linearState.loading || session.isSeeking,
+            playbackSpeed = session.currentPlaybackSpeed.toDouble(),
+            abLoopEndFrame = linearState.abLoopEndFrame,
+        )
     }
 
     private fun buildRefreshKey(state: PlaybackSession.State): String =
         "${state.title}|${state.playing}|${state.paused}|${state.loaded}|${state.subtitle}|" +
+            "${state.detail}|${state.totalFrames}|${state.packDirPath}|" +
             "${state.courseCode}|${state.artworkName}|${session.uninterruptible}|" +
             "${state.linear && session.canSkipQueue?.invoke() == true}"
 
@@ -237,12 +295,14 @@ class PlaybackService : Service() {
         super.onCreate()
         session = PlaybackHolder.get()
         manager = getSystemService(NotificationManager::class.java)
+        audioManager = getSystemService(AudioManager::class.java)
         createChannel()
         // MediaSession/receiver initialization can involve slow Binder calls. Meet the
         // platform deadline before that work, then refresh the richer notification later.
         startMediaForeground()
 
         focus = AudioFocusManager(this) { event -> handleFocusEvent(event) }
+        audioManager?.registerAudioDeviceCallback(audioDeviceCallback, handler)
 
         ContextCompat.registerReceiver(
             this,
@@ -429,6 +489,9 @@ class PlaybackService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        handler.removeCallbacks(routeRebuildRunnable)
+        audioManager?.unregisterAudioDeviceCallback(audioDeviceCallback)
+        audioManager = null
         try {
             unregisterReceiver(noisyReceiver)
         } catch (e: IllegalArgumentException) {
@@ -458,7 +521,6 @@ class PlaybackService : Service() {
     /** Rebuilds the notification and the media session state from the session. */
     private fun refresh() {
         val state = session.state.value
-        lastFullRefreshMs = SystemClock.elapsedRealtime()
         lastRefreshKey = buildRefreshKey(state)
         syncWakeLock(state)
         updatePlaybackState(state)
@@ -483,6 +545,9 @@ class PlaybackService : Service() {
         }
     }
 
+    private fun positionMillis(state: PlaybackSession.State): Long =
+        if (state.sampleRate > 0) state.positionFrames * 1000L / state.sampleRate else 0L
+
     private fun updatePlaybackState(state: PlaybackSession.State) {
         val session = mediaSession ?: return
         val playbackState = when {
@@ -490,12 +555,12 @@ class PlaybackService : Service() {
             state.paused -> PlaybackStateCompat.STATE_PAUSED
             else -> PlaybackStateCompat.STATE_STOPPED
         }
-        val position = if (state.sampleRate > 0) {
-            // MediaSession reports milliseconds; the engine only knows frames.
-            state.positionFrames * 1000L / state.sampleRate
-        } else {
-            0L
-        }
+        val position = positionMillis(state)
+        val speed = if (state.playing) this.session.currentPlaybackSpeed else 0f
+        lastPublishedPositionMs = position
+        lastPublishedElapsedMs = SystemClock.elapsedRealtime()
+        lastPublishedSeekSeq = this.session.seekSequence
+        lastPublishedSpeed = this.session.currentPlaybackSpeed
         val cover = currentCoverBitmap(state)
         val titleText = state.title.ifEmpty { getString(R.string.app_name) }
         val artistText = state.subtitle?.takeIf { it.isNotBlank() }
@@ -534,7 +599,7 @@ class PlaybackService : Service() {
         session.setPlaybackState(
             PlaybackStateCompat.Builder()
                 .setActions(actions)
-                .setState(playbackState, position, if (state.playing) 1f else 0f)
+                .setState(playbackState, position, speed)
                 .build(),
         )
     }
@@ -664,15 +729,94 @@ class PlaybackService : Service() {
         const val NOTIFICATION_ID = 1
         const val MEDIA_SESSION_TAG = "mkwplayer"
 
-        /** 200 ms keeps background polling responsive while 40 ms near track end cuts handover latency. */
+        /** 200 ms keeps background polling responsive while 20 ms near track/AB end cuts handover latency. */
         const val POLL_INTERVAL_MS = 200L
-        private const val PAUSED_POLL_INTERVAL_MS = 500L
-        private const val FAST_POLL_INTERVAL_MS = 40L
-        private const val NEAR_END_WINDOW_MS = 1_500L
-        private const val FULL_REFRESH_INTERVAL_MS = 1_000L
+        internal const val PAUSED_POLL_INTERVAL_MS = 500L
+        internal const val FAST_POLL_INTERVAL_MS = 20L
+        internal const val NEAR_END_WINDOW_MS = 2_500L
+        private const val ROUTE_REBUILD_DEBOUNCE_MS = 250L
+        internal const val POSITION_DRIFT_RESYNC_MS = 2_000L
         private const val WAKE_LOCK_TAG = "JukeKart:PlaybackWakeLock"
         private const val WAKE_LOCK_LEASE_MS = 10 * 60 * 1000L
         private const val WAKE_LOCK_RENEW_MS = 5 * 60 * 1000L
+
+        /**
+         * Decides whether [MediaSessionCompat.setPlaybackState] should be pushed.
+         *
+         * Android and Bluetooth AVRCP already extrapolate playback position smoothly from the last
+         * reported `(position, speed, updateTime)`. Pushing `setPlaybackState` every 1s spams
+         * AVRCP `PLAYBACK_POS_CHANGED` packets over the same Bluetooth link carrying A2DP stereo
+         * audio to TWS earbuds, so we only resync on real transitions, seeks, speed changes, or
+         * discontinuities such as native loop wraps.
+         */
+        internal fun shouldRefreshMediaState(
+            active: Boolean,
+            refreshKeyChanged: Boolean,
+            seekSequenceChanged: Boolean,
+            speedChanged: Boolean,
+            playing: Boolean,
+            actualPositionMs: Long,
+            lastPublishedPositionMs: Long,
+            elapsedSincePublishMs: Long,
+            lastPublishedSpeed: Float,
+            driftThresholdMs: Long = POSITION_DRIFT_RESYNC_MS,
+        ): Boolean {
+            if (!active || refreshKeyChanged || seekSequenceChanged || speedChanged) return true
+            if (elapsedSincePublishMs < 0L) return true
+            val expectedPositionMs = if (playing) {
+                lastPublishedPositionMs + (elapsedSincePublishMs * lastPublishedSpeed.coerceAtLeast(0f)).toLong()
+            } else {
+                lastPublishedPositionMs
+            }
+            return kotlin.math.abs(actualPositionMs - expectedPositionMs) >= driftThresholdMs
+        }
+
+        internal fun computePollDelayMs(
+            linear: Boolean,
+            playing: Boolean,
+            positionFrames: Long,
+            totalFrames: Long,
+            sampleRate: Int,
+            loadingOrSeeking: Boolean,
+            playbackSpeed: Double,
+            abLoopEndFrame: Long?,
+        ): Long {
+            if (loadingOrSeeking) return FAST_POLL_INTERVAL_MS
+            if (linear && playing && sampleRate > 0) {
+                val effectiveSpeed = playbackSpeed.coerceAtLeast(0.25)
+                val targetEnd = when {
+                    abLoopEndFrame != null && abLoopEndFrame > 0L && totalFrames > 0L ->
+                        minOf(totalFrames, abLoopEndFrame)
+                    abLoopEndFrame != null && abLoopEndFrame > 0L -> abLoopEndFrame
+                    totalFrames > 0L -> totalFrames
+                    else -> 0L
+                }
+                if (targetEnd > 0L) {
+                    val remainingFrames = (targetEnd - positionFrames).coerceAtLeast(0L)
+                    val remainingWallMs = (remainingFrames * 1000.0 / sampleRate / effectiveSpeed).toLong()
+                    if (remainingWallMs <= NEAR_END_WINDOW_MS) {
+                        return FAST_POLL_INTERVAL_MS
+                    }
+                }
+            }
+            return if (playing) POLL_INTERVAL_MS else PAUSED_POLL_INTERVAL_MS
+        }
+
+        private fun isHeadphoneOrExternalOutput(device: AudioDeviceInfo): Boolean {
+            if (!device.isSink) return false
+            return when (device.type) {
+                AudioDeviceInfo.TYPE_WIRED_HEADSET,
+                AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+                AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+                AudioDeviceInfo.TYPE_USB_HEADSET,
+                AudioDeviceInfo.TYPE_USB_DEVICE -> true
+                else -> (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                    (device.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
+                        device.type == AudioDeviceInfo.TYPE_BLE_SPEAKER)) ||
+                    (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                        device.type == AudioDeviceInfo.TYPE_BLE_BROADCAST)
+            }
+        }
 
         const val ACTION_TOGGLE = "com.mylittleblover.mkwplayer.TOGGLE"
         const val ACTION_PAUSE = "com.mylittleblover.mkwplayer.PAUSE"

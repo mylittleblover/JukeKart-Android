@@ -38,6 +38,7 @@ internal object ExtraInteractiveCompilers {
                 channels = projectedChannels(ref.channels),
                 frames = ref.frames,
                 sha256 = sha256(bytes),
+                lookAheadFrames = ref.sampleRate * 2L,
             )
         }
 
@@ -331,7 +332,7 @@ internal object ExtraInteractiveCompilers {
         val pathToIndex = uniqueAssets.keys.mapIndexed { idx, path -> path to idx }.toMap()
         val assetSpecs = uniqueAssets.entries.map { (path, pair) ->
             val (ref, bytes) = pair
-            G.Asset(path, ref.sampleRate, projectedChannels(ref.channels), ref.frames, sha256(bytes))
+            G.Asset(path, ref.sampleRate, projectedChannels(ref.channels), ref.frames, sha256(bytes), lookAheadFrames = ref.sampleRate * 2L)
         }
 
         var cursor = 0L

@@ -408,6 +408,7 @@ void EngineRuntime::schedule(Scene& scene) noexcept {
         if(scene.switchObject>=0 && scene.segmentEnded) scene.active=true;
         return;
     }
+    collectSegmentLoopFutureClips(scene);
     for(const auto* trackPointer:tracksBySegment_[segment.index]) {
         const auto& track=*trackPointer;
         if(track.mode==TrackMode::Normal) for(const auto& c:track.clips) clip(scene,track,c);

@@ -723,20 +723,30 @@ internal class LinearPlaybackCoordinator(
 
     private fun refreshPreloadIfNeeded() {
         if (!_state.value.active) return
-        val nextKey = queue.peekNextEntries(1).firstOrNull()?.key
         val singleLoop = queue.repeatMode == LinearQueue.RepeatMode.SINGLE
+        val expectedTarget = if (singleLoop) {
+            queue.snapshot().current?.takeIf { !supportsNativeAbLoop(it) }
+        } else {
+            queue.peekNextEntries(1).firstOrNull()
+        }
         val currentPreload = preparedNext
         if (currentPreload != null) {
             val chainValid = if (currentPreload.chainWindows.isEmpty()) {
                 true
+            } else if (singleLoop || expectedTarget == null) {
+                false
             } else {
                 val expectedChain = LinearHandoverPlanner.collectChainEntries(
-                    queue.peekNextEntries(1).firstOrNull() ?: return,
+                    expectedTarget,
                     queue.peekNextEntries(LinearHandoverPlanner.MAX_CHAIN_SEGMENTS).drop(1),
                 ).map { it.key }
                 expectedChain == currentPreload.chainKeys
             }
-            if (currentPreload.entryKey == nextKey && currentPreload.singleLoop == singleLoop && !singleLoop && chainValid) {
+            if (expectedTarget != null &&
+                currentPreload.entryKey == expectedTarget.key &&
+                currentPreload.singleLoop == singleLoop &&
+                chainValid
+            ) {
                 return
             }
             invalidatePreload()
@@ -760,6 +770,7 @@ internal class LinearPlaybackCoordinator(
             return null
         }
         val canChain = allowChaining &&
+            !singleLoop &&
             entry.courseMedley != null &&
             PlaybackTimers.sleepState.value.mode != SleepTimerMode.AFTER_CURRENT_TRACK
         if (candidate.chainWindows.isNotEmpty()) {
@@ -796,11 +807,19 @@ internal class LinearPlaybackCoordinator(
         val session = sessionProvider()
         if (session.uninterruptible) return
         if (PlaybackTimers.sleepState.value.mode == SleepTimerMode.AFTER_CURRENT_TRACK) return
-        if (queue.repeatMode == LinearQueue.RepeatMode.SINGLE) return
+        val singleLoop = queue.repeatMode == LinearQueue.RepeatMode.SINGLE
         if (activeChainWindows.isNotEmpty() && activeChainIndex < activeChainWindows.lastIndex) return
-        val nextEntry = queue.peekNextEntries(1).firstOrNull() ?: return
+        val nextEntry = if (singleLoop) {
+            val current = queue.snapshot().current ?: return
+            // Standalone linear BWAVs use native setLinearRepeat; graph-based linear entries
+            // restart via naturalEnd -> openEntry(current), so preload a fresh engine for them.
+            if (supportsNativeAbLoop(current)) return
+            current
+        } else {
+            queue.peekNextEntries(1).firstOrNull() ?: return
+        }
         if (nextEntry.key == "extra:special_cup_appears") return
-        if (preparedNext?.entryKey == nextEntry.key) return
+        if (preparedNext?.entryKey == nextEntry.key && preparedNext?.singleLoop == singleLoop) return
 
         val lookupKey = nextEntry.sourceTrackKey ?: nextEntry.key
         val track = catalog.tracksByKey[lookupKey]
@@ -814,8 +833,12 @@ internal class LinearPlaybackCoordinator(
             return
         }
 
-        val upcomingAfterNext = queue.peekNextEntries(LinearHandoverPlanner.MAX_CHAIN_SEGMENTS).drop(1)
-        val chainEntries = if (nextEntry.courseMedley != null) {
+        val upcomingAfterNext = if (singleLoop) {
+            emptyList()
+        } else {
+            queue.peekNextEntries(LinearHandoverPlanner.MAX_CHAIN_SEGMENTS).drop(1)
+        }
+        val chainEntries = if (!singleLoop && nextEntry.courseMedley != null) {
             LinearHandoverPlanner.collectChainEntries(nextEntry, upcomingAfterNext)
         } else {
             emptyList()
@@ -834,6 +857,7 @@ internal class LinearPlaybackCoordinator(
                         packDir = packDir,
                         sha256Override = track?.primary?.sha256,
                         session = session,
+                        singleLoop = singleLoop,
                     )
                 }.getOrNull()
             } ?: return@launch
@@ -859,6 +883,7 @@ internal class LinearPlaybackCoordinator(
         packDir: File,
         sha256Override: String?,
         session: PlaybackSession,
+        singleLoop: Boolean = false,
     ): PreparedNextEntry? {
         if (entry.overlaidOpening != null) {
             val op = entry.overlaidOpening
@@ -879,7 +904,7 @@ internal class LinearPlaybackCoordinator(
                 PreparedNextEntry(
                     entryKey = entry.key,
                     chainKeys = emptyList(),
-                    singleLoop = false,
+                    singleLoop = singleLoop,
                     packDirPath = packDir.path,
                     prepared = it.prepared,
                     totalFrames = compiled.totalFrames,
@@ -912,7 +937,7 @@ internal class LinearPlaybackCoordinator(
                 PreparedNextEntry(
                     entryKey = entry.key,
                     chainKeys = emptyList(),
-                    singleLoop = false,
+                    singleLoop = singleLoop,
                     packDirPath = packDir.path,
                     prepared = it.prepared,
                     totalFrames = compiled.totalFrames,
@@ -921,7 +946,7 @@ internal class LinearPlaybackCoordinator(
             }
         }
         if (entry.courseMedley != null) {
-            if (chainEntries.size >= 2) {
+            if (!singleLoop && chainEntries.size >= 2) {
                 val (filesByStem, fallbackBytesByStem) = resolveStemsOnDisk(
                     chainEntries.flatMap { item ->
                         item.courseMedley?.stemDigests?.entries?.map { it.key to it.value }.orEmpty()
@@ -980,7 +1005,7 @@ internal class LinearPlaybackCoordinator(
                 PreparedNextEntry(
                     entryKey = entry.key,
                     chainKeys = emptyList(),
-                    singleLoop = false,
+                    singleLoop = singleLoop,
                     packDirPath = packDir.path,
                     prepared = it.prepared,
                     totalFrames = compiled.totalFrames,
@@ -995,7 +1020,7 @@ internal class LinearPlaybackCoordinator(
             file = info.file,
             assetId = sha256,
             frames = info.frames,
-            loop = false,
+            loop = singleLoop,
             streamed = true,
             loopStart = info.loopStart,
             loopEnd = info.loopEnd,
@@ -1004,7 +1029,7 @@ internal class LinearPlaybackCoordinator(
             PreparedNextEntry(
                 entryKey = entry.key,
                 chainKeys = emptyList(),
-                singleLoop = false,
+                singleLoop = singleLoop,
                 packDirPath = packDir.path,
                 prepared = it.prepared,
                 totalFrames = info.frames,

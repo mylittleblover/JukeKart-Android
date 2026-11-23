@@ -249,23 +249,42 @@ internal class PlaybackSession(
      */
     fun timingSnapshot(): LongArray? = output?.timingSnapshot()
 
-    fun interactiveObservation(): NativeInteractiveDriver.Observation? {
+    private var lastObservedSourceSlot: Int = -1
+
+    fun interactiveObservation(): NativeInteractiveDriver.Observation? =
+        interactiveObservation(includeSourceFrame = true)
+
+    private fun interactiveObservation(includeSourceFrame: Boolean): NativeInteractiveDriver.Observation? {
         val current=engine ?: return null
         val raw=current.snapshot() ?: return null
         if(raw.size<65 || raw[0]!=8L) return null
         val segment=raw[11].toInt()
+        val activeVoices=raw[3].toInt()
         var sourceFrame: Long?=null
-        if(segment>=0) for(slot in 0 until 128) {
-            val source=current.sourceSnapshot(slot) ?: continue
-            if(source.size==207 && source[0] in 3L..11L && source[1]==1L && source[4]==segment.toLong()) {
-                sourceFrame=source[10]
-                break
+        if(includeSourceFrame && segment>=0 && activeVoices>0) {
+            val cachedSlot = lastObservedSourceSlot
+            if (cachedSlot in 0 until 128) {
+                val cached = current.sourceSnapshot(cachedSlot)
+                if (cached != null && cached.size == 207 && cached[0] in 3L..11L && cached[1] == 1L && cached[4] == segment.toLong()) {
+                    sourceFrame = cached[10]
+                }
+            }
+            if (sourceFrame == null) {
+                for(slot in 0 until 128) {
+                    if (slot == cachedSlot) continue
+                    val source=current.sourceSnapshot(slot) ?: continue
+                    if(source.size==207 && source[0] in 3L..11L && source[1]==1L && source[4]==segment.toLong()) {
+                        lastObservedSourceSlot = slot
+                        sourceFrame=source[10]
+                        break
+                    }
+                }
             }
         }
         val destination=if(raw[24]!=0L) raw[27].toInt() else automaticPending?.takeIf {
             it.first==segment && it.third==raw[6]
         }?.second
-        return NativeInteractiveDriver.Observation(segment,sourceFrame,raw[24]!=0L,raw[2]==2L,raw[3].toInt(),
+        return NativeInteractiveDriver.Observation(segment,sourceFrame,raw[24]!=0L,raw[2]==2L,activeVoices,
             if(raw[7]!=0L) "Native playback: ${AudioStatusText.engine(raw[7].toInt())}" else null,raw[6],destination,canCancel=raw[24]!=0L && raw[37]==0L,stopped=raw[2]==0L,transportFrame=raw[1],fadeEndFrame=raw.getOrNull(65)?.takeIf { it>=0 })
     }
 
@@ -550,37 +569,38 @@ internal class PlaybackSession(
     /** Swaps a background-prepared engine into the active session and rebinds or opens output on Main. */
     fun commitPrepared(prepared: Prepared): State {
         applySessionEffectsToEngine(prepared.engine)
-        val existingOut = output
-        val rebound = existingOut != null &&
-            existingOut.rebindEngine(prepared.engine.nativeHandle(), prepared.engine.sampleRate)
-        if (!rebound) {
-            closeOutput()
-        }
-        engineEpoch++
-        isSeeking = false
-        if (prepared.initialSeeked) {
-            seekSequence++
-        }
         var oldEngine: SessionAudioEngine? = null
         var oldController: PlaybackController? = null
         synchronized(nativeLifecycleLock) {
+            val existingOut = output
+            val rebound = existingOut != null &&
+                existingOut.rebindEngine(prepared.engine.nativeHandle(), prepared.engine.sampleRate)
+            if (!rebound) {
+                closeOutput()
+            }
+            engineEpoch++
+            isSeeking = false
+            if (prepared.initialSeeked) {
+                seekSequence++
+            }
             oldEngine = engine
             oldController = controller
             engine = prepared.engine
             controller = prepared.controller
-        }
-        linearSession = prepared.linear
-        automaticTransitions = prepared.autoAdvance
-        automaticSource = prepared.initialAutoSource
-        automaticPending = null
-        linearDisplayOffsetFrames = 0L
-        linearActiveSegment = if (prepared.linear && prepared.autoAdvance.isNotEmpty()) {
-            interactiveObservation()?.segment?.takeIf { it >= 0 } ?: prepared.startSegment
-        } else {
-            -1
-        }
-        if (!rebound) {
-            output = openOutput(prepared.engine.nativeHandle(), prepared.engine.sampleRate)
+            linearSession = prepared.linear
+            automaticTransitions = prepared.autoAdvance
+            automaticSource = prepared.initialAutoSource
+            automaticPending = null
+            linearDisplayOffsetFrames = 0L
+            lastObservedSourceSlot = -1
+            linearActiveSegment = if (prepared.linear && prepared.autoAdvance.isNotEmpty()) {
+                interactiveObservation(includeSourceFrame = false)?.segment?.takeIf { it >= 0 } ?: prepared.startSegment
+            } else {
+                -1
+            }
+            if (!rebound) {
+                output = openOutput(prepared.engine.nativeHandle(), prepared.engine.sampleRate)
+            }
         }
         oldController?.let { staleController ->
             if (oldEngine is AudioEngine) {
@@ -847,6 +867,31 @@ internal class PlaybackSession(
         return publishState(active.resume())
     }
 
+    /**
+     * Rebuilds the active output stream when an external headphone/Bluetooth output device connects
+     * so MIUI/Android audio routing cleanly establishes a stereo stream even when AAudio omits
+     * ErrorDisconnected.
+     */
+    fun onAudioRouteChanged(): Boolean {
+        if (isSeeking) return false
+        val st = _state.value
+        if (!st.active || !st.playing) return false
+        return synchronized(nativeLifecycleLock) {
+            val currentOutput = output ?: return@synchronized false
+            val currentEngine = engine ?: return@synchronized false
+            val rate = currentEngine.sampleRate
+            when (currentOutput.rebuildStream(rate)) {
+                true -> true
+                null -> false
+                false -> {
+                    closeOutput(preserveAutoTransitions = true)
+                    output = openOutput(currentEngine.nativeHandle(), rate)
+                    output != null
+                }
+            }
+        }
+    }
+
     fun fadeStop(beats: Double): String? {
         if (uninterruptible) return "Ceremony playback cannot be interrupted"
         val current = engine ?: return "No audio source is open"
@@ -972,7 +1017,7 @@ internal class PlaybackSession(
         val active = controller ?: return _state.value
         val current=active.poll()
         if(_state.value.loaded && (!linearSession || automaticTransitions.isNotEmpty())) {
-            val observation=interactiveObservation()
+            val observation=interactiveObservation(includeSourceFrame = !linearSession)
             if (linearSession && observation != null && observation.segment >= 0) {
                 if (linearActiveSegment >= 0 && observation.segment != linearActiveSegment) {
                     linearActiveSegment = observation.segment
@@ -1035,6 +1080,7 @@ internal class PlaybackSession(
         linearSession = false
         linearActiveSegment = -1
         linearDisplayOffsetFrames = 0L
+        lastObservedSourceSlot = -1
         synchronized(nativeLifecycleLock) {
             controller?.release()
             controller = null

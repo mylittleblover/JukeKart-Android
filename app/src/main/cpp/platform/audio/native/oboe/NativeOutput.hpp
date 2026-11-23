@@ -28,6 +28,8 @@ public:
     explicit NativeOutput(api::EngineHandle* engine);
     ~NativeOutput();
     bool start(int requestedRate=0);
+    bool attachExternal(int rate);
+    bool renderExternalPcm16(std::int16_t* pcm16,std::int32_t frames) noexcept;
     void stop();
     bool rebuild(int requestedRate=0);
     bool rebind(api::EngineHandle* nextEngine,int requestedRate=0);

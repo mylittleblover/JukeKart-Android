@@ -111,7 +111,7 @@ internal object RainbowInteractiveCompiler {
             link("Area2",outro,"Full_ToOutro%02d".format(n),timeline=G.TransitionTimeline(0,0,0,0))
             link(outro,"Area3_Pre",null,sync=G.SyncPoint.ExitCue,tail=true)
         }
-        val spec=G.Spec(assets=assets.map { G.Asset(it.fileName,it.sampleRate,it.channels,it.frames,it.sha256) },
+        val spec=G.Spec(assets=assets.map { G.Asset(it.fileName,it.sampleRate,it.channels,it.frames,it.sha256,lookAheadFrames=it.sampleRate*2L) },
             segments=segments,tracks=tracks,transitions=transitions,bpm=meta("Area1_Inst").bpm)
         return Prepared(spec,G.build(spec),ids,assets)
     }

@@ -27,6 +27,11 @@ internal class AudioFocusManager(
         .build()
 
     private val listener = AudioManager.OnAudioFocusChangeListener { change ->
+        when (change) {
+            AudioManager.AUDIOFOCUS_GAIN -> held = true
+            AudioManager.AUDIOFOCUS_LOSS,
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> held = false
+        }
         val event = when (change) {
             AudioManager.AUDIOFOCUS_GAIN -> FocusPolicy.Event.GAIN
             AudioManager.AUDIOFOCUS_LOSS -> FocusPolicy.Event.LOSS
@@ -50,7 +55,10 @@ internal class AudioFocusManager(
             .setAudioAttributes(attributes)
             // Ducking is not implemented, so do not ask the platform to prefer it.
             .setWillPauseWhenDucked(false)
-            .setOnAudioFocusChangeListener(listener)
+            .setOnAudioFocusChangeListener(
+                listener,
+                android.os.Handler(android.os.Looper.getMainLooper()),
+            )
             .build()
 
     private var held = false

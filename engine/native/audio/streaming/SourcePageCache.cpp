@@ -4,6 +4,16 @@
 #include <chrono>
 #include <cmath>
 #include <limits>
+#if defined(__linux__)
+#include <linux/futex.h>
+#include <sys/syscall.h>
+#include <time.h>
+#include <unistd.h>
+#endif
+#if defined(__ANDROID__)
+#include <sys/prctl.h>
+#include <sys/resource.h>
+#endif
 namespace player2::audio {
 void SourcePageCache::increment(std::uint64_t& value) noexcept {if(value<static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()))++value;}
 void SourcePageCache::increment(std::atomic<std::uint32_t>& value) noexcept {auto current=value.load(std::memory_order_relaxed);
@@ -15,7 +25,27 @@ SourcePageCache::SourcePageCache(std::size_t maximumPcmBytes,std::size_t maximum
     for(auto& tag:pageTags_)tag.store(0ULL,std::memory_order_relaxed);
     for(auto& hint:slotHints_)hint.store(0,std::memory_order_relaxed);
     static_assert(std::atomic<std::uint32_t>::is_always_lock_free,"Page leases must be lock-free");
+    static_assert(sizeof(std::atomic<std::uint32_t>)==sizeof(std::uint32_t),"Futex word size");
     worker_=std::thread([this] {work();});
+}
+void SourcePageCache::wakeWorker() noexcept {
+    wakeSeq_.fetch_add(1,std::memory_order_seq_cst);
+#if defined(__linux__)
+    if(workerSleeping_.load(std::memory_order_seq_cst)) {
+        ::syscall(SYS_futex,reinterpret_cast<std::uint32_t*>(&wakeSeq_),FUTEX_WAKE_PRIVATE,1,nullptr,nullptr,0);
+    }
+#endif
+}
+void SourcePageCache::waitForWork(std::uint32_t expectedSeq,long timeoutNsec) noexcept {
+#if defined(__linux__)
+    timespec timeout{};
+    timeout.tv_sec=timeoutNsec/1000000000L;
+    timeout.tv_nsec=timeoutNsec%1000000000L;
+    ::syscall(SYS_futex,reinterpret_cast<std::uint32_t*>(&wakeSeq_),FUTEX_WAIT_PRIVATE,expectedSeq,&timeout,nullptr,0);
+#else
+    (void)expectedSeq;
+    std::this_thread::sleep_for(std::chrono::nanoseconds(timeoutNsec));
+#endif
 }
 void SourcePageCache::publishSlotTag(std::size_t slot,int asset,std::int64_t page) noexcept {
     const auto tag=packTag(asset,page);
@@ -46,12 +76,13 @@ void SourcePageCache::clearSlotTag(std::size_t slot) noexcept {
         }
     }
 }
-SourcePageCache::~SourcePageCache() {stopping_.store(true,std::memory_order_release);if(worker_.joinable())worker_.join();}
+SourcePageCache::~SourcePageCache() {stopping_.store(true,std::memory_order_release);wakeWorker();if(worker_.joinable())worker_.join();}
 void SourcePageCache::pauseWorker() noexcept {
     paused_.store(true,std::memory_order_release);
+    wakeWorker();
     while(!idle_.load(std::memory_order_acquire))std::this_thread::sleep_for(std::chrono::microseconds(100));
 }
-void SourcePageCache::resumeWorker() noexcept {paused_.store(false,std::memory_order_release);}
+void SourcePageCache::resumeWorker() noexcept {paused_.store(false,std::memory_order_release);wakeWorker();}
 SourceStatus SourcePageCache::bind(int asset,std::unique_ptr<AudioFrameSource> source,std::size_t encodedBytes,const SourceSamplePosition* warm,std::size_t count) noexcept {
     if(asset<0 || asset>=4096 || !source || count>MaximumPages || (count && !warm))return SourceStatus::InvalidRequest;
     const auto& m=source->metadata();
@@ -207,7 +238,7 @@ bool SourcePageCache::request(int asset,std::int64_t page) noexcept {
     const auto slot=acquire(asset,page);if(slot>=0){release(slot);return true;}
     const Key key{asset,page};for(std::size_t n=0;n<pendingCount_;++n)if(pending_[n]==key)return true;
     if(pendingCount_==pending_.size() || !requests_.push(key)){increment(dropped_);return false;}
-    pending_[pendingCount_++]=key;increment(requestCount_);return true;
+    pending_[pendingCount_++]=key;increment(requestCount_);wakeWorker();return true;
 }
 SourceStatus SourcePageCache::load(Key key) noexcept {
     if(key.asset<0 || key.asset>=4096 || !sources_[key.asset].frames || key.page<0 || key.page>(duration(key.asset).value-1)/static_cast<std::int64_t>(FramesPerPage))return SourceStatus::InvalidRequest;
@@ -238,17 +269,36 @@ SourceStatus SourcePageCache::load(Key key) noexcept {
     increment(failures_);lastFailure_.store(static_cast<int>(SourceStatus::ResourceLimit),std::memory_order_relaxed);return SourceStatus::ResourceLimit;
 }
 void SourcePageCache::work() noexcept {
+#if defined(__ANDROID__)
+    ::setpriority(PRIO_PROCESS,0,-8);
+    ::prctl(PR_SET_NAME,"mkw-decode",0,0,0);
+#endif
     while(!stopping_.load(std::memory_order_acquire)) {
-        if(paused_.load(std::memory_order_acquire)) {idle_.store(true,std::memory_order_release);std::this_thread::sleep_for(std::chrono::microseconds(250));continue;}
+        if(paused_.load(std::memory_order_acquire)) {
+            idle_.store(true,std::memory_order_release);
+            const auto seq=wakeSeq_.load(std::memory_order_seq_cst);
+            workerSleeping_.store(true,std::memory_order_seq_cst);
+            if(!stopping_.load(std::memory_order_acquire) && paused_.load(std::memory_order_acquire) && wakeSeq_.load(std::memory_order_seq_cst)==seq) {
+                waitForWork(seq,10000000L);
+            }
+            workerSleeping_.store(false,std::memory_order_release);
+            continue;
+        }
         idle_.store(false,std::memory_order_release);
         if(paused_.load(std::memory_order_acquire))continue;
+        const auto seq=wakeSeq_.load(std::memory_order_seq_cst);
         Key key;
         if(requests_.pop(key)){
             load(key);
             // At most 256 outstanding requests; the acknowledgment ring holds all 256.
             if(!completed_.push(key)){increment(failures_);lastFailure_.store(static_cast<int>(SourceStatus::ResourceLimit),std::memory_order_relaxed);}
+        } else {
+            workerSleeping_.store(true,std::memory_order_seq_cst);
+            if(!stopping_.load(std::memory_order_acquire) && !paused_.load(std::memory_order_acquire) && wakeSeq_.load(std::memory_order_seq_cst)==seq) {
+                waitForWork(seq,50000000L);
+            }
+            workerSleeping_.store(false,std::memory_order_release);
         }
-        else std::this_thread::sleep_for(std::chrono::microseconds(500));
     }
     idle_.store(true,std::memory_order_release);
 }
@@ -283,7 +333,7 @@ bool StreamCursor::prepare(double position,std::optional<SourceSamplePosition> n
     }
     if(!cache_->controlRendering() && !prefetched_){const auto duration=cache_->duration(asset_).value;
         bool allPrefetched=cache_->prefetchLinearRepeat(asset_,page);
-        for(std::int64_t ahead=1;ahead<=4;++ahead) {
+        for(std::int64_t ahead=1;ahead<=8;++ahead) {
             if((page+ahead)*static_cast<std::int64_t>(SourcePageCache::FramesPerPage)<duration) {
                 allPrefetched&=cache_->request(asset_,page+ahead);
             }

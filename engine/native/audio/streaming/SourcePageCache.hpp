@@ -15,11 +15,11 @@ struct StreamCacheSnapshot {
 // Binding/pause/destruction require stopped audio and all cursors released.
 class SourcePageCache {
 public:
-    static constexpr std::size_t FramesPerPage=4096,MaximumPages=256,MaximumSources=64;
+    static constexpr std::size_t FramesPerPage=4096,MaximumPages=512,MaximumSources=64;
     static constexpr std::size_t PagePcmBytes=FramesPerPage*2*sizeof(float);
 private:
     static constexpr std::uint32_t Writing=std::uint32_t{1}<<31;
-    static constexpr std::size_t HintBuckets=512;
+    static constexpr std::size_t HintBuckets=1024;
     struct Key { int asset{-1};std::int64_t page{-1};bool operator==(const Key& other) const noexcept {return asset==other.asset && page==other.page;} };
     struct Page {
         std::atomic<std::uint32_t> users{0};Key key;int channels{};
@@ -35,7 +35,8 @@ private:
     SpscQueue<Key,257> requests_,completed_;
     std::array<Key,256> pending_{};std::size_t pendingCount_{};
     std::uint64_t underruns_{},requestCount_{},dropped_{};
-    std::atomic<bool> paused_{true},idle_{true},stopping_{false};
+    std::atomic<bool> paused_{true},idle_{true},stopping_{false},workerSleeping_{false};
+    std::atomic<std::uint32_t> wakeSeq_{0};
     std::atomic<std::uint32_t> decoded_{0},failures_{0},cached_{0};
     std::atomic<int> lastFailure_{0};std::thread worker_;
     static constexpr std::uint64_t packTag(int asset,std::int64_t page) noexcept {
@@ -47,6 +48,8 @@ private:
     }
     void publishSlotTag(std::size_t slot,int asset,std::int64_t page) noexcept;
     void clearSlotTag(std::size_t slot) noexcept;
+    void wakeWorker() noexcept;
+    void waitForWork(std::uint32_t expectedSeq,long timeoutNsec) noexcept;
     SourceStatus load(Key key) noexcept;
     SourceStatus setSourceControls(int asset,std::uint64_t mute,std::uint64_t solo,bool groups)noexcept;
     void work() noexcept;

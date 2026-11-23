@@ -89,6 +89,7 @@ object MusicGraphBuilder {
         val channels: Int,
         val frames: Long,
         val sha256: ByteArray,
+        val lookAheadFrames: Long = 0L,
     )
 
     data class Cue(
@@ -461,7 +462,7 @@ object MusicGraphBuilder {
             GraphWire.writeI32(out, asset.sampleRate)
             GraphWire.writeI32(out, asset.channels)
             GraphWire.writeLong(out, asset.frames)
-            GraphWire.writeLong(out, 0)   // lookAhead
+            GraphWire.writeLong(out, asset.lookAheadFrames)   // lookAhead
             out.write(asset.sha256)       // v3 digest
             GraphWire.writeByteValue(out, 0)   // v4 hasSource = false
         }
@@ -491,6 +492,9 @@ object MusicGraphBuilder {
             "asset $position channels must be 1..2, got ${asset.channels}"
         }
         require(asset.frames > 0) { "asset $position frames must be positive, got ${asset.frames}" }
+        require(asset.lookAheadFrames >= 0) {
+            "asset $position lookAheadFrames must be non-negative, got ${asset.lookAheadFrames}"
+        }
         require(asset.sha256.size == 32) {
             "asset $position sha256 must be 32 bytes, got ${asset.sha256.size}"
         }

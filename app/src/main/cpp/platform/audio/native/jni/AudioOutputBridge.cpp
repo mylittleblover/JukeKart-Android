@@ -14,6 +14,25 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_mylittleblover_player2_platform_audio_NativeAudioLibrary_destroyOutput(JNIEnv*,jobject,jlong value) { delete output(value); }
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_mylittleblover_player2_platform_audio_NativeAudioLibrary_startOutput(JNIEnv*,jobject,jlong value,jint rate) { return value && output(value)->start(rate); }
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_mylittleblover_player2_platform_audio_NativeAudioLibrary_attachExternalOutput(JNIEnv*,jobject,jlong value,jint rate) { return value && output(value)->attachExternal(rate); }
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_mylittleblover_player2_platform_audio_NativeAudioLibrary_renderOutputPcm16(JNIEnv* env,jobject,jlong value,jshortArray pcm16,jint frames) {
+    if(!value || !pcm16 || frames<=0 || frames>16384) return JNI_FALSE;
+    const jsize length=env->GetArrayLength(pcm16);
+    if(length<frames*2) return JNI_FALSE;
+    auto* out=output(value);
+    constexpr jint ChunkFrames=2048;
+    jshort buffer[ChunkFrames*2];
+    for(jint offset=0;offset<frames;) {
+        const jint count=frames-offset<ChunkFrames ? frames-offset : ChunkFrames;
+        if(!out->renderExternalPcm16(buffer,count)) return JNI_FALSE;
+        env->SetShortArrayRegion(pcm16,offset*2,count*2,buffer);
+        if(env->ExceptionCheck()) { env->ExceptionClear(); return JNI_FALSE; }
+        offset+=count;
+    }
+    return JNI_TRUE;
+}
 extern "C" JNIEXPORT void JNICALL
 Java_com_mylittleblover_player2_platform_audio_NativeAudioLibrary_stopOutput(JNIEnv*,jobject,jlong value) { if(value) output(value)->stop(); }
 extern "C" JNIEXPORT jboolean JNICALL

@@ -17,15 +17,32 @@ bool EngineRuntime::collectPreparationPages(int index,Frame position,std::array<
                 std::optional<audio::SourceSamplePosition> neighbor;
                 if(clip.loop)neighbor=audio::SourceSamplePosition{std::min(buffer->frames()-1,static_cast<std::int64_t>(ClipPlayback::position(*clip.loop,clip.sourceOffset,std::floor(progress)+1)))};
                 required[count++]={buffer->stream,buffer->streamedAsset,{whole},static_cast<double>(sample-whole),neighbor};
-                // Prefetch up to 7 additional ahead pages (~341ms total at 48kHz) so streamed openings do not underrun on entry.
+                // Prefetch up to 7 additional ahead pages (~682ms total at 48kHz) so streamed openings do not underrun on entry.
                 const auto framesPerPage=static_cast<std::int64_t>(audio::SourcePageCache::FramesPerPage);
                 const auto basePage=whole/framesPerPage;
                 const auto maxPos=std::min(buffer->frames()-1,clip.sourceOffset+clip.sourceLength-1);
-                for(int ahead=1;ahead<5 && count+4<required.size();++ahead) {
-                    const auto nextFrame=(basePage+ahead)*framesPerPage;
-                    if(nextFrame>maxPos)break;
-                    if(clip.loop && nextFrame>=clip.loop->end.value)break;
-                    required[count++]={buffer->stream,buffer->streamedAsset,{nextFrame},0.0,std::nullopt};
+                bool wrappedToLoopStart=false;
+                std::int64_t wrapOffset=0;
+                for(int ahead=1;ahead<8 && count+4<required.size();++ahead) {
+                    if(!wrappedToLoopStart) {
+                        const auto nextFrame=(basePage+ahead)*framesPerPage;
+                        if(clip.loop && nextFrame>=clip.loop->end.value) {
+                            wrappedToLoopStart=true;
+                            wrapOffset=0;
+                        } else if(nextFrame>maxPos) {
+                            break;
+                        } else {
+                            required[count++]={buffer->stream,buffer->streamedAsset,{nextFrame},0.0,std::nullopt};
+                            continue;
+                        }
+                    }
+                    if(wrappedToLoopStart && clip.loop) {
+                        const auto loopStartPage=clip.loop->start.value/framesPerPage;
+                        const auto loopFrame=(loopStartPage+wrapOffset)*framesPerPage;
+                        ++wrapOffset;
+                        if(loopFrame>=clip.loop->end.value || loopFrame>maxPos)break;
+                        required[count++]={buffer->stream,buffer->streamedAsset,{loopFrame},0.0,std::nullopt};
+                    }
                 }
                 return true;
             };

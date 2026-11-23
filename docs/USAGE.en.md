@@ -4,7 +4,7 @@
 
 ## Installation & Importing Music
 
-1. Install the JukeKart `0.1.0-beta04` Release APK on Android 8.0 or higher. Your device may prompt you to allow installation from this source.
+1. Install the JukeKart `0.1.0-beta05` Release APK on Android 8.0 or higher. Your device may prompt you to allow installation from this source.
 2. Download the complete [`.mkwpack` archive (MEGA)](https://mega.nz/file/j1BxBRyI#cJxJEof3uY3JxDSPiIep7WOI1mNyI2h3Vz7yZ3YRdOc) (or prepare your own compatible `.mkwpack`) and save it somewhere accessible to the Android system file picker. The app imports pack contents into internal storage, so keep sufficient free space available. See [Pack Format](PACK-FORMAT.md) for the archive specification.
 3. On first launch, you can grant notification permission and select a `.mkwpack` directly from the welcome screen, or open **Settings → Import .mkwpack** at any time to choose a file and wait for verification. Once complete, open **Import details** to review playable tracks. Multiple packs can be imported sequentially and merge automatically into your library.
 4. If an import is interrupted, choose **Resume import** in Settings. If the system file access grant has expired, re-select the exact same `.mkwpack` file when prompted.

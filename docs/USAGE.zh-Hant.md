@@ -4,7 +4,7 @@
 
 ## 安裝與匯入音樂
 
-1. 在 Android 8.0 或更高版本上安裝 JukeKart `0.1.0-beta04` Release APK。系統可能會要求授權安裝未知應用程式來源。
+1. 在 Android 8.0 或更高版本上安裝 JukeKart `0.1.0-beta05` Release APK。系統可能會要求授權安裝未知應用程式來源。
 2. 下載完整 [`.mkwpack` 資源包（MEGA）](https://mega.nz/file/j1BxBRyI#cJxJEof3uY3JxDSPiIep7WOI1mNyI2h3Vz7yZ3YRdOc)（或自備相容的 `.mkwpack`），並儲存於系統檔案選擇器可存取的位置。應用程式會將曲包內容匯入內部儲存空間，請預留足夠容量。曲包結構詳見[格式說明](PACK-FORMAT.zh-Hant.md)。
 3. 首次啟動可在歡迎頁授予通知權限並直接選擇匯入 `.mkwpack`，也可隨時開啟 **設定 → 匯入 .mkwpack** 選取檔案並等待校驗。完成後可在 **匯入詳情** 查看可播放曲目。可陸續匯入多個曲包，內容會自動合併至曲庫。
 4. 若匯入中斷，可在設定中選擇 **繼續匯入**。若系統檔案存取授權已過期，請依提示重新選取同一個曲包。

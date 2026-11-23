@@ -2,7 +2,7 @@
 
 **简体中文** | [繁體中文](README.zh-Hant.md) | [English](README.en.md) | [日本語](README.ja.md)
 
-**0.1.0-beta04** · Android 8.0（API 26）及以上
+**0.1.0-beta05** · Android 8.0（API 26）及以上
 
 JukeKart 是面向《马力欧卡丁车 世界》配乐的独立 Android 播放器。导入自己的 `.mkwpack` 后，可以切换赛道音乐的阶段和版本，播放赛道组曲，沿世界地图路线听音乐，或用点唱机管理收藏和播放列表。
 
@@ -26,7 +26,7 @@ JukeKart 是面向《马力欧卡丁车 世界》配乐的独立 Android 播放�
 ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 ```
 
-Windows 上将 `./gradlew` 换成 `.\gradlew.bat`。Debug APK 位于 `app/build/outputs/apk/debug/`。项目架构与核心模块说明详见[架构文档](docs/ARCHITECTURE.md)。
+Windows 上将 `./gradlew` 换成 `.\gradlew.bat`。Debug APK 位于 `app/build/outputs/apk/debug/`。项目架构与核心模块说明详见[架构文档](docs/ARCHITECTURE.md)，赛道配乐与路线无缝衔接原理详见[《马力欧卡丁车 世界》音乐衔接机制详解](docs/MUSIC-TRANSITIONS.md)。
 
 维护者可在本地创建被 Git 忽略的 `keystore.properties`，配置 `storeFile`、`storePassword`、`keyAlias` 和 `keyPassword`。使用绝对路径指向仓库外的密钥库，再运行 `./gradlew :app:assembleRelease`。Release APK 位于 `app/build/outputs/apk/release/`。Debug APK 使用仓库提供的测试签名。
 

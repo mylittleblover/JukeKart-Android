@@ -157,7 +157,9 @@ class EngineRuntime {
     api::EngineStatus requestPlay(int target) noexcept;
     api::EngineStatus planTransition(Scene& source,int target,const TransitionChoice& choice,bool switchChange,const PlaylistSession::SwitchBranch* leaf=nullptr,bool naturalSource=false,Frame destinationLead=0) noexcept;
     void tickTransition() noexcept;
+    void addFutureClipPages(const AudioBuffer* buffer,std::int64_t startSample,std::int64_t maxSample) noexcept;
     void collectFutureClip(const Scene& scene,const Track& track,const Clip& clip) noexcept;
+    void collectSegmentLoopFutureClips(const Scene& scene) noexcept;
     void prepareFutureClips() noexcept;
     bool collectPreparationPages(int index,Frame position,std::array<audio::PreparationSet::Requirement,128>& required,std::size_t& count) noexcept;
     api::EngineStatus prepareStingerPages(const StingerRun& run) noexcept;

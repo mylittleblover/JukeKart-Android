@@ -34,9 +34,9 @@ android {
         applicationId = "com.mylittleblover.mkwplayer"
         minSdk = 26
         targetSdk = 35
-        // Beta 04: Compact mobile custom-route drawer, 6-stop Survival Rally handover, seek-safe Outro->Pre chains, and Oboe stream rebind hot-swap.
-        versionCode = 29
-        versionName = "0.1.0-beta04"
+        // Beta 05: Seamless background/screen-off loop & track transitions + deep-buffer AudioTrack for TWS Bluetooth stability.
+        versionCode = 30
+        versionName = "0.1.0-beta05"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

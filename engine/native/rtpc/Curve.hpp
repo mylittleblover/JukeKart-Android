@@ -49,5 +49,5 @@ struct SmoothedParameter {
         current=std::clamp(current*(1-step)+target*step,low,high); return current;
     }
 };
-inline double dbGain(double db) noexcept { return std::pow(10.0,db/20); }
+inline double dbGain(double db) noexcept { return db==0.0 ? 1.0 : std::pow(10.0,db/20); }
 }

@@ -4,6 +4,13 @@
 
 The entries below summarize releases and development milestones verifiable from the Git history.
 
+## 0.1.0-beta05 · 2026-11-23
+
+- Fixed audible seams at loop wraps and track transitions during background and screen-off playback: doubled the streaming page cache to 512 pages with lock-free `futex` worker wakeup, added multi-page lookahead prefetching for loop starts and transition destinations, enabled 2-second `lookAheadFrames` across interactive/medley/route compilers, added single-repeat medley preloading, and made background fast-polling scale with playback speed and A–B loop endpoints.
+- Fixed choppy playback and single-ear dropouts on Bluetooth TWS earbuds (notably on MIUI / Qualcomm devices): switched primary audio output to standard Android deep-buffer stereo `AudioTrack` (`PCM16`, `PERFORMANCE_MODE_POWER_SAVING`, `16384`-frame buffer, `2048`-frame chunks, keeping Oboe as fallback) with prefill-before-play, full partial-write handling, synchronized track recovery, and real `AudioTrack.getUnderrunCount()` reporting in Timing Diagnosis.
+- Eliminated the 1-second Bluetooth AVRCP and Notification/Widget/Tile Binder refresh storm during steady playback (now event-driven with drift resync and accurate playback speed reporting), fixed `AudioFocusManager` state tracking and `PlaybackSession` native lifecycle synchronization, cached active source slots to avoid 128-slot JNI polling churn, tuned decode-worker priority/wake cadence, and added 1:1 sample-rate and `0 dB` fast paths.
+- Added a detailed technical guide to *Mario Kart World*'s music transition and stitching architecture (`docs/MUSIC-TRANSITIONS.md`), covering BWAV loop measurements, MINF beat/phase alignment, `TransitionTimeline` scheduling, special course flows, and 6-stop Survival Rally chaining.
+
 ## 0.1.0-beta04 · 2026-11-23
 
 - Redesigned the mobile portrait custom-route editor in World Map: introduced a compact bottom dock (`DraftRouteCompactDock`) paired with an expandable legs-and-rules sheet (`DraftRouteSettingsSheet`), maximizing map visibility and removing internal identifier labels.

@@ -192,6 +192,7 @@ public:
         std::size_t done=0;
         while(done<wanted) {
             const auto raw=layout_.preSkip+static_cast<std::uint64_t>(from)+done;
+            if(raw<start_)seekTo(from+static_cast<std::int64_t>(done));
             while(raw>=end_ && nextPacket_<layout_.packets.size())decodeNextPacket();
             if(raw>=end_) {
                 // The container can declare up to one pre-skip of zero padding at EOF.
@@ -265,9 +266,9 @@ public:
             }
             for(auto& track:*tracks_)track->seekTo(target.value);
             position_=target;status_=SourceStatus::Ok;return status_;
-        }catch(const SourceFailure& failure){return failure.status;}
-         catch(const std::bad_alloc&){return SourceStatus::ResourceLimit;}
-         catch(...){return SourceStatus::MalformedSource;}
+        }catch(const SourceFailure& failure){status_=failure.status;return failure.status;}
+         catch(const std::bad_alloc&){status_=SourceStatus::ResourceLimit;return SourceStatus::ResourceLimit;}
+         catch(...){status_=SourceStatus::MalformedSource;return SourceStatus::MalformedSource;}
     }
     void reset()noexcept override{const auto result=seek({0});if(result!=SourceStatus::Ok)status_=result;}
 };

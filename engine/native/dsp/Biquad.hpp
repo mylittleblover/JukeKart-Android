@@ -21,7 +21,9 @@ public:
         }
     }
     float process(float input,int channel,std::uint64_t& corrections) noexcept {
-        const double y=b0_*input+z1_[channel]; z1_[channel]=b1_*input-a1_*y+z2_[channel]; z2_[channel]=b2_*input-a2_*y;
+        const double y=b0_*input+z1_[channel];
+        if(!std::isfinite(y)) { z1_[channel]=0; z2_[channel]=0; return audioSample(y,corrections); }
+        z1_[channel]=b1_*input-a1_*y+z2_[channel]; z2_[channel]=b2_*input-a2_*y;
         return audioSample(y,corrections);
     }
     bool hasTail() const noexcept {

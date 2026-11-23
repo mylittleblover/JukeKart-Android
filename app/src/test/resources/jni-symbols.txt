@@ -2,6 +2,7 @@
 # Captured from the arm64-v8a Debug artifact with llvm-nm -D --defined-only.
 # Regenerate when a native function is added or removed; a mismatch fails the test.
 albumFlowSnapshot
+attachExternalOutput
 automaticSnapshot
 bindSource
 bindSourceInput
@@ -32,6 +33,7 @@ playlistGroupSnapshot
 rebindOutput
 rebuildOutput
 render
+renderOutputPcm16
 renderRealtime
 seek
 setLinearModuleChannels

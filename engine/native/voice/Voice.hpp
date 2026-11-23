@@ -53,7 +53,7 @@ struct Voice {
     bool departureRepeat{}; // Owned by the pending finite departure; undone on cancellation.
     bool sourceRepeats{};audio::SourceSamplePosition sourceRepeatBegin,sourceRepeatEnd; MusicFilters filters; audio::StreamCursor streamCursor; const AudioBuffer* buffer{}; std::uint64_t numericalCorrections{};
     int segment{-1},track{-1},clip{-1},bus{-1},instance{-1},owner{-1}; Frame startFrame{},sourceOffset{},sourceLength{};
-    std::optional<CompiledClipLoop> clipLoop;bool clipLoopReleased{};std::int64_t releasedWraps{};long double sourceProgress{},sourceProgressCorrection{};
+    std::optional<CompiledClipLoop> clipLoop;bool clipLoopReleased{};std::int64_t releasedWraps{};long double sourceProgress{},sourceProgressCorrection{};std::int64_t lastLoopPrefetchPage_{-1};
     double sourcePosition{},timelinePosition{},speed{1},timelineRate{1},gain{1},pan{};
     Frame fadeIn{},fadeOut{},fadeStart{-1},fadeEnd{-1}; Shape fadeShape{Shape::Linear};
     Frame entranceStart{-1},entranceEnd{-1}; Shape entranceShape{Shape::Linear};
@@ -62,7 +62,7 @@ struct Voice {
     // Graph owns this immutable Segment until all of its Voices retire.
     const Segment* envelopeSegment{}; const Clip* envelopeClip{}; Frame segmentClipStart{};
     void begin(const AudioBuffer* data,int rate,double catchup=0) noexcept {
-        streamCursor.reset(); sourceRepeats=false;departureRepeat=false;clipLoopReleased=false;releasedWraps=0; buffer=data; active=data && data->valid() && (!clipLoop || validClipLoop(*clipLoop,sourceOffset,sourceLength)); sourceEnded=false; filters.clear(); timelinePosition=catchup;
+        streamCursor.reset(); sourceRepeats=false;departureRepeat=false;clipLoopReleased=false;releasedWraps=0;lastLoopPrefetchPage_=-1; buffer=data; active=data && data->valid() && (!clipLoop || validClipLoop(*clipLoop,sourceOffset,sourceLength)); sourceEnded=false; filters.clear(); timelinePosition=catchup;
         sourceProgress=static_cast<long double>(catchup)*speed/timelineRate*(data ? data->sampleRate : rate)/rate;
         sourceProgressCorrection=0;
         sourcePosition=clipLoop ? ClipPlayback::position(*clipLoop,sourceOffset,sourceProgress) : static_cast<double>(sourceOffset+sourceProgress);
@@ -140,6 +140,28 @@ struct Voice {
         if(!sourceEnded) {
             if(forceUnderrun){streamCursor.reset();lastUnderrun=true;}
             else {
+                if(buffer->stream && !buffer->stream->controlRendering()) {
+                    constexpr std::int64_t pageFrames=static_cast<std::int64_t>(audio::SourcePageCache::FramesPerPage);
+                    const auto currentPage=static_cast<std::int64_t>(sourcePosition)/pageFrames;
+                    if(currentPage!=lastLoopPrefetchPage_) {
+                        lastLoopPrefetchPage_=currentPage;
+                        constexpr double leadSamples=static_cast<double>(pageFrames*24);
+                        if(clipLoop && !clipLoopReleased && (clipLoop->count<0 || ClipPlayback::wraps(*clipLoop,sourceOffset,sourceProgress)<clipLoop->count) &&
+                            sourcePosition+leadSamples>=static_cast<double>(clipLoop->end.value)) {
+                            const auto startPage=clipLoop->start.value/pageFrames;
+                            const auto maxFrame=std::min(buffer->frames(),clipLoop->end.value);
+                            for(std::int64_t k=0;k<6;++k) {
+                                if((startPage+k)*pageFrames<maxFrame)buffer->stream->request(buffer->streamedAsset,startPage+k);
+                            }
+                        } else if(sourceRepeats && sourcePosition+leadSamples>=static_cast<double>(sourceRepeatEnd.value)) {
+                            const auto startPage=sourceRepeatBegin.value/pageFrames;
+                            const auto maxFrame=std::min(buffer->frames(),sourceRepeatEnd.value);
+                            for(std::int64_t k=0;k<6;++k) {
+                                if((startPage+k)*pageFrames<maxFrame)buffer->stream->request(buffer->streamedAsset,startPage+k);
+                            }
+                        }
+                    }
+                }
                 std::optional<audio::SourceSamplePosition> neighbor;
                 if(clipLoop && !clipLoopReleased)neighbor=audio::SourceSamplePosition{std::min({buffer->frames()-1,sourceOffset+sourceLength-1,static_cast<std::int64_t>(ClipPlayback::position(*clipLoop,sourceOffset,std::floor(sourceProgress)+1))})};
                 else if(sourceRepeats && std::floor(sourcePosition)+1>=sourceRepeatEnd.value)neighbor=sourceRepeatBegin;

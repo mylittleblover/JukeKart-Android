@@ -70,6 +70,7 @@ internal object CourseMedleyChainCompiler {
                     channels = header.channels.coerceIn(1, 2),
                     frames = frames,
                     sha256 = digest.digest(bytes),
+                    lookAheadFrames = header.sampleRate * 2L,
                 )
                 assetIndexByStem[stem] = uniqueAssets.size
                 uniqueAssets[stem] = specAsset to bytes
@@ -118,6 +119,7 @@ internal object CourseMedleyChainCompiler {
                         channels = header.channels.coerceIn(1, 2),
                         frames = frames,
                         sha256 = shaBytes,
+                        lookAheadFrames = header.sampleRate * 2L,
                     )
                     assetIndexByStem[stem] = uniqueAssets.size
                     uniqueAssets[stem] = specAsset to CourseMedleyCompiler.AssetSource.DiskFile(
@@ -139,6 +141,7 @@ internal object CourseMedleyChainCompiler {
                         channels = header.channels.coerceIn(1, 2),
                         frames = frames,
                         sha256 = shaBytes,
+                        lookAheadFrames = header.sampleRate * 2L,
                     )
                     assetIndexByStem[stem] = uniqueAssets.size
                     uniqueAssets[stem] = specAsset to CourseMedleyCompiler.AssetSource.Bytes(

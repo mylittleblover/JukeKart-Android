@@ -78,6 +78,45 @@ public:
         }
         if (deviceRate_ && deviceRate_ != rate) phase_ = phase_ * rate / deviceRate_;
         deviceRate_ = rate;
+        if (rate == transportRate && phase_ == 0) {
+            if (frames == 1) {
+                output[0] = std::isfinite(current_.left) ? std::clamp(current_.left, -1.0f, 1.0f) : 0.0f;
+                output[1] = std::isfinite(current_.right) ? std::clamp(current_.right, -1.0f, 1.0f) : 0.0f;
+                float one[2]{};
+                runtime.render(one, 1);
+                current_ = next_;
+                next_ = {one[0], one[1]};
+            } else if (frames >= 2) {
+                const Stereo oldCurrent = current_;
+                const Stereo oldNext = next_;
+                runtime.render(output, frames);
+                const Stereo newCurrent{output[(frames - 2) * 2], output[(frames - 2) * 2 + 1]};
+                const Stereo newNext{output[(frames - 1) * 2], output[(frames - 1) * 2 + 1]};
+                for (std::size_t n = frames - 1; n >= 2; --n) {
+                    const float l = output[(n - 2) * 2];
+                    const float r = output[(n - 2) * 2 + 1];
+                    output[n * 2] = std::isfinite(l) ? std::clamp(l, -1.0f, 1.0f) : 0.0f;
+                    output[n * 2 + 1] = std::isfinite(r) ? std::clamp(r, -1.0f, 1.0f) : 0.0f;
+                }
+                output[0] = std::isfinite(oldCurrent.left) ? std::clamp(oldCurrent.left, -1.0f, 1.0f) : 0.0f;
+                output[1] = std::isfinite(oldCurrent.right) ? std::clamp(oldCurrent.right, -1.0f, 1.0f) : 0.0f;
+                output[2] = std::isfinite(oldNext.left) ? std::clamp(oldNext.left, -1.0f, 1.0f) : 0.0f;
+                output[3] = std::isfinite(oldNext.right) ? std::clamp(oldNext.right, -1.0f, 1.0f) : 0.0f;
+                current_ = newCurrent;
+                next_ = newNext;
+            }
+            if (frames <= static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max() - position_.value)) position_.value += frames;
+            return;
+        }
+        renderResampled(runtime, output, frames, rate, transportRate);
+        if (frames <= static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max() - position_.value)) position_.value += frames;
+    }
+    audio::DeviceFrame position() const noexcept { return position_; }
+private:
+#if defined(__GNUC__) || defined(__clang__)
+    __attribute__((noinline))
+#endif
+    void renderResampled(EngineRuntime& runtime, float* output, std::size_t frames, int rate, int transportRate) noexcept {
         // Render exactly the same transport samples as the scalar adapter, in
         // bounded blocks. No extra read-ahead, allocation or decoder work here.
         // 128 device frames need at most 3,072 transport frames (192 kHz / 8 kHz).
@@ -101,8 +140,6 @@ public:
             }
             offset += count;
         }
-        if (frames <= static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max() - position_.value)) position_.value += frames;
     }
-    audio::DeviceFrame position() const noexcept { return position_; }
 };
 }
